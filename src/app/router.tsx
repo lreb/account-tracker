@@ -1,0 +1,43 @@
+import { createBrowserRouter } from 'react-router-dom'
+import Shell from '@/components/layout/Shell'
+import DashboardPage from '@/features/reports/components/DashboardPage'
+import TransactionListPage from '@/features/transactions/components/TransactionListPage'
+import TransactionFormPage from '@/features/transactions/components/TransactionFormPage'
+import VehicleListPage from '@/features/vehicles/components/VehicleListPage'
+import VehicleDetailPage from '@/features/vehicles/components/VehicleDetailPage'
+import ReportsPage from '@/features/reports/components/ReportsPage'
+import BudgetsPage from '@/features/budgets/components/BudgetsPage'
+import InsightsPage from '@/features/insights/components/InsightsPage'
+import SettingsPage from '@/features/settings/components/SettingsPage'
+import AccountsSettingsPage from '@/features/settings/components/AccountsSettingsPage'
+import CategoriesSettingsPage from '@/features/settings/components/CategoriesSettingsPage'
+import LabelsSettingsPage from '@/features/settings/components/LabelsSettingsPage'
+import ExchangeRatesSettingsPage from '@/features/settings/components/ExchangeRatesSettingsPage'
+
+export const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <Shell />,
+    children: [
+      { index: true, element: <DashboardPage /> },
+      { path: 'transactions', element: <TransactionListPage /> },
+      { path: 'transactions/new', element: <TransactionFormPage /> },
+      { path: 'transactions/:id', element: <TransactionFormPage /> },
+      { path: 'vehicles', element: <VehicleListPage /> },
+      { path: 'vehicles/:id', element: <VehicleDetailPage /> },
+      { path: 'reports', element: <ReportsPage /> },
+      { path: 'budgets', element: <BudgetsPage /> },
+      { path: 'insights', element: <InsightsPage /> },
+      {
+        path: 'settings',
+        children: [
+          { index: true, element: <SettingsPage /> },
+          { path: 'accounts', element: <AccountsSettingsPage /> },
+          { path: 'categories', element: <CategoriesSettingsPage /> },
+          { path: 'labels', element: <LabelsSettingsPage /> },
+          { path: 'exchange-rates', element: <ExchangeRatesSettingsPage /> },
+        ],
+      },
+    ],
+  },
+])

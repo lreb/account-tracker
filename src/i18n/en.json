@@ -1,0 +1,69 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "transactions": "Transactions",
+    "reports": "Reports",
+    "budgets": "Budgets",
+    "settings": "Settings",
+    "vehicles": "Vehicles",
+    "insights": "Insights"
+  },
+  "common": {
+    "add": "Add",
+    "edit": "Edit",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "comingSoon": "Coming soon"
+  },
+  "dashboard": {
+    "income": "Income",
+    "expenses": "Expenses",
+    "balance": "Balance",
+    "thisMonth": "This month"
+  },
+  "transactions": {
+    "title": "Transactions",
+    "new": "New Transaction",
+    "edit": "Edit Transaction",
+    "income": "Income",
+    "expense": "Expense",
+    "transfer": "Transfer",
+    "status": {
+      "pending": "Pending",
+      "cleared": "Cleared",
+      "reconciled": "Reconciled",
+      "cancelled": "Cancelled"
+    }
+  },
+  "vehicles": {
+    "title": "Vehicles",
+    "fuelLog": "Fuel Log",
+    "serviceHistory": "Service History"
+  },
+  "budgets": {
+    "title": "Budgets",
+    "spent": "Spent",
+    "limit": "Limit",
+    "remaining": "Remaining"
+  },
+  "insights": {
+    "title": "Insights"
+  },
+  "settings": {
+    "title": "Settings",
+    "accounts": "Accounts",
+    "categories": "Categories",
+    "labels": "Labels",
+    "exchangeRates": "Exchange Rates",
+    "language": "Language",
+    "baseCurrency": "Base Currency",
+    "theme": "Theme",
+    "backup": "Backup & Restore",
+    "exportData": "Export Data",
+    "importData": "Import Data"
+  }
+}

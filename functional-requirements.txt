@@ -1,0 +1,235 @@
+💰
+ExpenseTracking
+Functional Specification Document
+Personal Finance PWA / Android Application
+Version 1.0  ·  March 2026
+
+1. General Project Information
+
+Project Name
+ExpenseTracking
+Application Type
+Progressive Web App (PWA) + Android
+Document Version
+1.0
+Date of Preparation
+March 2026
+Status
+Under definition — Pre-development
+
+
+1.1 Business Description
+ExpenseTracking is a personal finance mobile application designed to provide complete visibility into the user's income and expenses. The application allows users to record financial transactions easily, categorize them automatically, and generate detailed reports that facilitate intelligent saving decisions.
+
+1.2 Problem Being Solved
+Most people do not have real visibility into how they spend their money on a daily basis. This results in:
+- Lack of control over recurring expenses (fuel, food, health)
+- Inability to compare financial performance across periods
+- Absence of concrete data to make saving decisions
+- No specific metrics for vehicles: cost per kilometer, fuel consumption, efficiency
+- Difficulty identifying areas for improvement or expense reduction
+
+2. Project Objectives
+
+2.1 Expected Outcomes
+The application must provide the user with:
+- Quick, categorized recording of income and expenses
+- Visual comparative reports (month-to-month, year-to-year)
+- Vehicle consumption statistics: km/liter, cost/km, total fuel spending
+- Automatic recommendations based on detected spending patterns
+- Data export in PDF and spreadsheet-compatible formats
+
+2.2 Success Indicators (KPIs)
+Monthly Savings
+Expense reduction vs. previous month (%)
+Annual Savings
+Cumulative comparison of current year vs. prior years
+Category Coverage
+% of transactions correctly categorized
+Engagement
+Record frequency per user/week
+Vehicle Precision
+Accuracy of km/liter and cost/km metrics
+Recommendation Adoption
+% of suggestions applied per user
+
+
+2.3 Project Priority
+The project has strategic and operational priority:
+- Strategic: build a personal financial database that enables long-term projections and decisions
+- Operational: simplify daily expense recording to make it sustainable over time
+
+3. Functional Scope
+
+3.1 Main Modules
+
+💵 Module: Transaction Recording
+• Expense entry: amount, date, category, description, source account
+• Income entry: amount, date, source, category, destination account
+• Quick category selection with visual icons
+• Free-text notes field per transaction
+• Support for multiple accounts (cash, card, transfer)
+
+
+⛽ Module: Vehicle and Fuel Management
+• Refuel log: liters, total cost, cost per liter, odometer reading
+• Automatic calculation: km traveled since last refuel, km/liter (fuel efficiency)
+• Cumulative statistics: total fuel spending, average efficiency
+• Vehicle service log: service type, cost, km at time of service
+• Next service alerts based on km or time
+• Service and maintenance history
+
+
+📊 Module: Reports and Analysis
+• Main dashboard: summary of income vs. expenses for the month
+• Charts by category (pie chart, bar chart)
+• Monthly comparison: evolution of expenses by category
+• Annual comparison: current year vs. prior years
+• Cash flow report by period
+• Filters: by account, category, date range
+• Export to PDF with professional design
+
+
+🤖 Module: Smart Recommendations
+• Analysis of recurring spending patterns
+• Alerts when a category exceeds the historical average
+• Savings suggestions based on the user's real data
+• Financial performance comparison across periods
+• Expense projection for the current month
+
+
+⚙️ Module: Settings and Accounts
+• Financial account management (name, type, opening balance)
+• Custom category management
+• Language settings (English as initial input; Spanish in a future version)
+• Data export and import (manual backup)
+• Optional sync with Google Drive
+
+
+3.2 Predefined Expense Categories
+The application will include the following base categories (expandable by the user):
+
+Transportation
+Food & Groceries
+Health
+Housing
+Fuel / Gas
+Restaurants / Dining Out
+Medical / Pharmacy
+Rent / Mortgage
+Vehicle Maintenance
+Supermarket / Groceries
+Health Insurance
+Utilities (electricity, water, gas)
+Entertainment
+Education
+Investments / Savings
+Other
+
+
+3.3 Secondary Features (Nice to Have)
+- Sync with Google Drive for automatic data backup
+- Home screen widget (Android) with monthly summary
+- Configurable dark / light mode
+- Push notifications for recording reminders
+- Multi-vehicle support
+
+4. Users and Experience
+
+Estimated Initial Users
+10,000 users
+Growth Projection
+Variable based on organic adoption
+System Roles
+Personal administrator (single user per account)
+Initial Language
+English
+Future Language
+Spanish (second phase)
+Target Platforms
+PWA (mobile and desktop browser) + Native Android
+
+
+4.1 UX / UI Principles
+- Transaction recording in a maximum of 3 taps/clicks
+- Informative dashboard as the main screen
+- Heavy use of iconography for categories (fast visual recognition)
+- Simple, readable charts on small screens
+- Offline support — functions without a connection, with later synchronization
+
+5. Resources and Constraints
+
+Available Budget
+$300,000 MXN
+MVP Deadline
+12 months
+Technology Constraints
+Open source technologies only
+Expected Support
+On-demand
+Data Model
+Local first + optional synchronization
+
+
+5.1 Proposed Technology Stack (Open Source)
+Layer              | Technology                  | Justification
+-------------------|-----------------------------|--------------------------------------------------
+Frontend (PWA)     | React + Vite + Workbox      | Large community, native PWA support
+Android            | Capacitor.js / TWA          | PWA packaged as APK with no extra native code
+Local Database     | IndexedDB / Dexie.js        | Offline-first storage on device
+Charts             | Recharts / Chart.js         | Open source, easy React integration
+PDF Export         | jsPDF / Puppeteer           | Report generation on client or server
+Backend (future)   | Node.js + Fastify           | Lightweight, open source, high performance
+Database (future)  | PostgreSQL                  | Open source, scalable, reliable
+Synchronization    | Google Drive API            | Backup without own storage infrastructure
+
+
+6. Development Plan — Roadmap
+
+Phase   | Period      | Key Deliverables
+--------|-------------|------------------------------------------------------------
+Phase 1 | Months 1–3  | Project setup, UX/UI design, data architecture, basic transaction recording module
+Phase 2 | Months 4–6  | Vehicle and fuel module, main dashboard, categories, first APK for testing
+Phase 3 | Months 7–9  | Reports and charts, PDF export, monthly/annual comparisons
+Phase 4 | Months 10–12| Smart recommendations, Google Drive sync, multi-language (Spanish), QA and launch
+
+
+7. Scalability, Security and Evolution
+
+7.1 Information Security
+- Data stored locally on the device (not exposed to third-party servers in v1)
+- Optional encrypted backup to Google Drive
+- Local authentication with PIN or biometrics (fingerprint/Face ID) in future versions
+- Optional password-protected exports for PDF reports
+- No transmission of financial data to external servers during MVP phase
+
+7.2 Technical Scalability
+- Modular architecture: each feature implemented as an independent module
+- Local database designed for future cloud migration without rewriting
+- REST API ready to support multi-user in future versions
+- Internationalization (i18n) integrated from the start (English → Spanish → others)
+
+7.3 Planned Future Modules
+- Budget module: define spending limits per category
+- Multi-user / family module: shared accounts
+- Investment module: basic portfolio tracking
+- Bank integration: automatic reading of account statements (Open Banking)
+- iOS version (React Native or installable PWA)
+
+8. Product Vision and Additional Notes
+
+8.1 General Vision
+ExpenseTracking aims to become the personal financial assistant that every user carries in their pocket. The product philosophy is simple: real data → clear visibility → better decisions → more savings. It is not a rigid budgeting application, but a personal financial intelligence tool that learns from the user's behavior and offers actionable recommendations.
+
+The key differentiator from other personal finance applications is the advanced vehicle module, which addresses a specific and underserved need: detailed control of the real cost of owning and operating a vehicle (fuel, services, maintenance, cost per kilometer).
+
+8.2 Additional Project Notes
+- Data export: CSV, JSON, and PDF with professional report design
+- PDF report generation: will include charts, summary tables, and comparisons
+- The application must work 100% offline; Google Drive sync is optional
+- The $300,000 MXN budget covers development, design, and QA for the 12-month timeline
+- Support will be on-demand; continuous 24/7 support is not planned for the initial phase
+- The monetization model is out of scope for this document (v1 is free)
+
+ExpenseTracking  ·  Functional Specification Document v1.0  ·  March 2026
+Confidential — Prepared for internal use by the development team

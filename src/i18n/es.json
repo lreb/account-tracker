@@ -1,0 +1,69 @@
+{
+  "nav": {
+    "dashboard": "Inicio",
+    "transactions": "Transacciones",
+    "reports": "Reportes",
+    "budgets": "Presupuestos",
+    "settings": "Configuración",
+    "vehicles": "Vehículos",
+    "insights": "Análisis"
+  },
+  "common": {
+    "add": "Agregar",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "loading": "Cargando…",
+    "error": "Algo salió mal",
+    "comingSoon": "Próximamente"
+  },
+  "dashboard": {
+    "income": "Ingresos",
+    "expenses": "Gastos",
+    "balance": "Balance",
+    "thisMonth": "Este mes"
+  },
+  "transactions": {
+    "title": "Transacciones",
+    "new": "Nueva Transacción",
+    "edit": "Editar Transacción",
+    "income": "Ingreso",
+    "expense": "Gasto",
+    "transfer": "Transferencia",
+    "status": {
+      "pending": "Pendiente",
+      "cleared": "Liquidado",
+      "reconciled": "Conciliado",
+      "cancelled": "Cancelado"
+    }
+  },
+  "vehicles": {
+    "title": "Vehículos",
+    "fuelLog": "Registro de Combustible",
+    "serviceHistory": "Historial de Servicios"
+  },
+  "budgets": {
+    "title": "Presupuestos",
+    "spent": "Gastado",
+    "limit": "Límite",
+    "remaining": "Restante"
+  },
+  "insights": {
+    "title": "Análisis"
+  },
+  "settings": {
+    "title": "Configuración",
+    "accounts": "Cuentas",
+    "categories": "Categorías",
+    "labels": "Etiquetas",
+    "exchangeRates": "Tipos de Cambio",
+    "language": "Idioma",
+    "baseCurrency": "Moneda Base",
+    "theme": "Tema",
+    "backup": "Respaldo y Restauración",
+    "exportData": "Exportar Datos",
+    "importData": "Importar Datos"
+  }
+}
