@@ -74,7 +74,7 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
     } else {
       reset({ name: '', type: 'cash', currency: 'USD', openingBalance: '0' })
     }
-  }, [open, editing])
+  }, [open, editing, reset])
 
   const onSubmit = async (values: AccountFormValues) => {
     const balanceCents = Math.round(parseFloat(values.openingBalance) * 100)
@@ -88,7 +88,7 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose() }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset({ name: '', type: 'cash', currency: 'USD', openingBalance: '0' }); onClose() } }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>

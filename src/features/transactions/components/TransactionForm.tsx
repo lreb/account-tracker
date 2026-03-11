@@ -45,20 +45,26 @@ export default function TransactionForm() {
   const { id } = useParams<{ id?: string }>()
   const isEdit = Boolean(id)
 
-  const { transactions, add, update } = useTransactionsStore()
+  const { transactions, loading, load: loadTransactions, add, update } = useTransactionsStore()
   const { accounts } = useAccountsStore()
   const { categories } = useCategoriesStore()
   const { labels, load: loadLabels } = useLabelsStore()
   const { getRateForPair, load: loadRates } = useExchangeRatesStore()
   const { baseCurrency, load: loadSettings } = useSettingsStore()
 
-  const existing = isEdit ? transactions.find((tx) => tx.id === id) : undefined
+  // Ensure the store is hydrated before we try to find the transaction.
+  // On a hard refresh to /transactions/:id the store starts empty.
+  const [storeReady, setStoreReady] = useState(!isEdit || transactions.length > 0)
 
   useEffect(() => {
-    loadLabels()
-    loadRates()
-    loadSettings()
-  }, [loadLabels, loadRates, loadSettings])
+    const tasks: Promise<void>[] = [loadLabels(), loadRates(), loadSettings()]
+    if (isEdit && transactions.length === 0) {
+      tasks.push(loadTransactions().then(() => setStoreReady(true)))
+    }
+    Promise.all(tasks)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const existing = isEdit ? transactions.find((tx) => tx.id === id) : undefined
 
   // local label selection — ids of chosen labels
   const [selectedLabels, setSelectedLabels] = useState<string[]>(
@@ -75,6 +81,7 @@ export default function TransactionForm() {
     handleSubmit,
     watch,
     setValue,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -103,6 +110,25 @@ export default function TransactionForm() {
           description: '',
         },
   })
+
+  // When the store finishes loading on a hard-refresh edit, populate the form
+  useEffect(() => {
+    if (!storeReady || !isEdit || !existing) return
+    reset({
+      type:         existing.type,
+      amount:       (existing.amount / 100).toFixed(2),
+      date:         existing.date.slice(0, 10),
+      categoryId:   existing.categoryId,
+      accountId:    existing.accountId,
+      toAccountId:  existing.toAccountId ?? '',
+      description:  existing.description,
+      notes:        existing.notes ?? '',
+      status:       existing.status,
+      currency:     existing.currency,
+      exchangeRate: existing.exchangeRate?.toString() ?? '',
+    })
+    setSelectedLabels(existing.labels ?? [])
+  }, [storeReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const watchType       = watch('type')
   const watchAccountId  = watch('accountId')
@@ -148,6 +174,14 @@ export default function TransactionForm() {
       await add({ id: uuid(), ...base })
     }
     navigate('/transactions')
+  }
+
+  // Early returns after all hooks — guards for edit mode on hard refresh
+  if (isEdit && (loading || !storeReady)) {
+    return <p className="text-sm text-muted-foreground py-10 text-center">{t('common.loading')}</p>
+  }
+  if (isEdit && !existing) {
+    return <p className="text-sm text-red-500 py-10 text-center">{t('common.error')}</p>
   }
 
   return (

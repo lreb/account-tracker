@@ -7,6 +7,7 @@ import { useTransactionsStore } from '@/stores/transactions.store'
 import { useCategoriesStore } from '@/stores/categories.store'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useSettingsStore } from '@/stores/settings.store'
+import { useLabelsStore } from '@/stores/labels.store'
 import { formatCurrency } from '@/lib/currency'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -35,6 +36,7 @@ interface Filters {
   type: TxType | ''
   categoryId: string
   accountId: string
+  labelId: string
   status: TxStatus | ''
   dateFrom: string
   dateTo: string
@@ -45,6 +47,7 @@ const EMPTY_FILTERS: Filters = {
   type: '',
   categoryId: '',
   accountId: '',
+  labelId: '',
   status: '',
   dateFrom: '',
   dateTo: '',
@@ -69,13 +72,14 @@ export default function TransactionListPage() {
   const { categories } = useCategoriesStore()
   const { accounts } = useAccountsStore()
   const { baseCurrency } = useSettingsStore()
+  const { labels, load: loadLabels } = useLabelsStore()
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
   // draft = filters being edited inside the sheet; only committed on Apply
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS)
 
-  useEffect(() => { loadTx() }, [loadTx])
+  useEffect(() => { loadTx(); loadLabels() }, [loadTx, loadLabels])
 
   const openSheet = () => { setDraft(filters); setSheetOpen(true) }
   const applyFilters = () => { setFilters(draft); setSheetOpen(false) }
@@ -90,6 +94,7 @@ export default function TransactionListPage() {
       if (filters.type && tx.type !== filters.type) return false
       if (filters.categoryId && tx.categoryId !== filters.categoryId) return false
       if (filters.accountId && tx.accountId !== filters.accountId) return false
+      if (filters.labelId && !(tx.labels ?? []).includes(filters.labelId)) return false
       if (filters.status && tx.status !== filters.status) return false
       if (filters.dateFrom && tx.date < new Date(filters.dateFrom).toISOString()) return false
       if (filters.dateTo) {
@@ -108,6 +113,7 @@ export default function TransactionListPage() {
     filters.type      ? { key: 'type',        label: t(`transactions.${filters.type}`) }                                 : null,
     filters.categoryId? { key: 'categoryId',  label: categories.find((c) => c.id === filters.categoryId)?.name ?? '' }   : null,
     filters.accountId ? { key: 'accountId',   label: accounts.find((a) => a.id === filters.accountId)?.name ?? '' }      : null,
+    filters.labelId   ? { key: 'labelId',      label: labels.find((l) => l.id === filters.labelId)?.name ?? '' }           : null,
     filters.status    ? { key: 'status',      label: t(`transactions.status.${filters.status}`) }                        : null,
     filters.dateFrom  ? { key: 'dateFrom',    label: `From ${filters.dateFrom}` }                                        : null,
     filters.dateTo    ? { key: 'dateTo',      label: `To ${filters.dateTo}` }                                            : null,
@@ -193,6 +199,23 @@ export default function TransactionListPage() {
                     <p className="text-xs text-gray-400 truncate">
                       {cat?.name ?? '—'} · {acc?.name ?? '—'} · {format(new Date(tx.date), 'MMM d, yyyy')}
                     </p>
+                    {(tx.labels ?? []).length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {(tx.labels ?? []).map((lid) => {
+                          const lbl = labels.find((l) => l.id === lid)
+                          if (!lbl) return null
+                          return (
+                            <span
+                              key={lid}
+                              className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium border"
+                              style={{ borderColor: lbl.color ?? '#6b7280', color: lbl.color ?? '#6b7280', backgroundColor: `${lbl.color ?? '#6b7280'}18` }}
+                            >
+                              {lbl.name}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                   <div className="text-right shrink-0">
                     <p className={`text-sm font-semibold ${
@@ -303,6 +326,33 @@ export default function TransactionListPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Label */}
+            {labels.length > 0 && (
+              <div className="space-y-1">
+                <Label>{t('settings.labels')}</Label>
+                <Select
+                  value={draft.labelId || '__all__'}
+                  onValueChange={(v) => setDraft((p) => ({ ...p, labelId: v === '__all__' ? '' : v }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All labels</SelectItem>
+                    {labels.map((lbl) => (
+                      <SelectItem key={lbl.id} value={lbl.id}>
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="inline-block h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: lbl.color ?? '#6b7280' }}
+                          />
+                          {lbl.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Status */}
             <div className="space-y-1">
