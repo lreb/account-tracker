@@ -1,12 +1,13 @@
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { LayoutDashboard, ArrowLeftRight, BarChart2, Wallet, Settings } from 'lucide-react'
+import { LayoutDashboard, ArrowLeftRight, BarChart2, Wallet, Car, Settings } from 'lucide-react'
 
 const navItems = [
   { to: '/',             icon: LayoutDashboard, labelKey: 'nav.dashboard',     end: true },
   { to: '/transactions', icon: ArrowLeftRight,  labelKey: 'nav.transactions',  end: false },
   { to: '/reports',      icon: BarChart2,       labelKey: 'nav.reports',       end: false },
   { to: '/budgets',      icon: Wallet,          labelKey: 'nav.budgets',       end: false },
+  { to: '/vehicles',     icon: Car,             labelKey: 'nav.vehicles',      end: false },
   { to: '/settings',     icon: Settings,        labelKey: 'nav.settings',      end: false },
 ] as const
 

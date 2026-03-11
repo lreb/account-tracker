@@ -65,5 +65,23 @@
     "backup": "Respaldo y Restauración",
     "exportData": "Exportar Datos",
     "importData": "Importar Datos"
+  },
+  "exchangeRates": {
+    "fetchLatest": "Obtener Tipos Actuales",
+    "fetching": "Obteniendo…",
+    "addManual": "Agregar Manualmente",
+    "addRate": "Agregar Tipo de Cambio",
+    "lastUpdated": "Última actualización",
+    "noRates": "No hay tipos de cambio almacenados",
+    "from": "De",
+    "to": "A",
+    "rate": "Tipo",
+    "rateHint": "Ej. 1.085 significa 1 {{from}} = 1.085 {{to}}",
+    "offlineWarning": "Sin conexión — mostrando datos en caché",
+    "autoFilled": "Completado automáticamente"
+  },
+  "transactions": {
+    "exchangeRate": "Tipo de Cambio",
+    "exchangeRateHelper": "1 {{currency}} = {{rate}} {{base}}"
   }
 }

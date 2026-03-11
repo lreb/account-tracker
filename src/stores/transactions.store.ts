@@ -10,6 +10,7 @@ interface TransactionsState {
   add: (t: Transaction) => Promise<void>
   update: (t: Transaction) => Promise<void>
   remove: (id: string) => Promise<void>
+  removeMany: (ids: string[]) => void  // sync in-memory removal (DB already deleted by caller)
 }
 
 export const useTransactionsStore = create<TransactionsState>((set) => ({
@@ -62,5 +63,10 @@ export const useTransactionsStore = create<TransactionsState>((set) => ({
       console.error(err)
       toast.error('Failed to delete transaction')
     }
+  },
+
+  removeMany: (ids) => {
+    const set_ = new Set(ids)
+    set((s) => ({ transactions: s.transactions.filter((t) => !set_.has(t.id)) }))
   },
 }))
