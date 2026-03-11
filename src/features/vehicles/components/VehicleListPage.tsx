@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate } from 'react-router-dom'
@@ -41,15 +41,22 @@ function VehicleDialog({
     formState: { errors, isSubmitting },
   } = useForm<VehicleFormValues>({
     resolver: zodResolver(vehicleSchema),
-    defaultValues: editing
-      ? {
-          name: editing.name,
-          make: editing.make ?? '',
-          model: editing.model ?? '',
-          year: editing.year?.toString() ?? '',
-        }
-      : { name: '', make: '', model: '', year: '' },
+    defaultValues: { name: '', make: '', model: '', year: '' },
   })
+
+  useEffect(() => {
+    if (!open) return
+    if (editing) {
+      reset({
+        name: editing.name,
+        make: editing.make ?? '',
+        model: editing.model ?? '',
+        year: editing.year?.toString() ?? '',
+      })
+    } else {
+      reset({ name: '', make: '', model: '', year: '' })
+    }
+  }, [open, editing])
 
   const onSubmit = async (values: VehicleFormValues) => {
     const payload: Vehicle = {

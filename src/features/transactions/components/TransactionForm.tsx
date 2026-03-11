@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -10,6 +10,9 @@ import { transactionSchema, type TransactionFormValues } from '../schemas/transa
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useCategoriesStore } from '@/stores/categories.store'
+import { useLabelsStore } from '@/stores/labels.store'
+import { useExchangeRatesStore } from '@/stores/exchange-rates.store'
+import { useSettingsStore } from '@/stores/settings.store'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -45,8 +48,27 @@ export default function TransactionForm() {
   const { transactions, add, update } = useTransactionsStore()
   const { accounts } = useAccountsStore()
   const { categories } = useCategoriesStore()
+  const { labels, load: loadLabels } = useLabelsStore()
+  const { getRateForPair, load: loadRates } = useExchangeRatesStore()
+  const { baseCurrency, load: loadSettings } = useSettingsStore()
 
   const existing = isEdit ? transactions.find((tx) => tx.id === id) : undefined
+
+  useEffect(() => {
+    loadLabels()
+    loadRates()
+    loadSettings()
+  }, [loadLabels, loadRates, loadSettings])
+
+  // local label selection — ids of chosen labels
+  const [selectedLabels, setSelectedLabels] = useState<string[]>(
+    () => existing?.labels ?? []
+  )
+
+  const toggleLabel = (id: string) =>
+    setSelectedLabels((prev) =>
+      prev.includes(id) ? prev.filter((l) => l !== id) : [...prev, id]
+    )
 
   const {
     register,
@@ -82,8 +104,10 @@ export default function TransactionForm() {
         },
   })
 
-  const watchType = watch('type')
-  const watchAccountId = watch('accountId')
+  const watchType       = watch('type')
+  const watchAccountId  = watch('accountId')
+  const watchCurrency   = watch('currency')
+  const watchRate       = watch('exchangeRate')
 
   // Keep currency in sync with selected account
   useEffect(() => {
@@ -91,19 +115,31 @@ export default function TransactionForm() {
     if (acct) setValue('currency', acct.currency)
   }, [watchAccountId, accounts, setValue])
 
+  // Auto-fill exchange rate when currency differs from base
+  useEffect(() => {
+    if (!watchCurrency || watchCurrency === baseCurrency) {
+      setValue('exchangeRate', '')
+      return
+    }
+    const cached = getRateForPair(watchCurrency, baseCurrency)
+    if (cached !== null) setValue('exchangeRate', cached.toFixed(6))
+  }, [watchCurrency, baseCurrency, getRateForPair, setValue])
+
   const onSubmit = async (values: TransactionFormValues) => {
     const amountCents = Math.round(parseFloat(values.amount) * 100)
+    const rateValue = values.exchangeRate ? parseFloat(values.exchangeRate) : undefined
     const base = {
-      type:        values.type,
-      amount:      amountCents,
-      date:        new Date(values.date).toISOString(),
-      categoryId:  values.categoryId,
-      accountId:   values.accountId,
-      description: values.description,
-      notes:       values.notes || undefined,
-      status:      values.status,
-      currency:    values.currency,
-      labels:      existing?.labels ?? [],
+      type:         values.type,
+      amount:       amountCents,
+      date:         new Date(values.date).toISOString(),
+      categoryId:   values.categoryId,
+      accountId:    values.accountId,
+      description:  values.description,
+      notes:        values.notes || undefined,
+      status:       values.status,
+      currency:     values.currency,
+      exchangeRate: rateValue,
+      labels:       selectedLabels,
     }
 
     if (isEdit && existing) {
@@ -249,6 +285,62 @@ export default function TransactionForm() {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Exchange rate — only when account currency differs from base currency */}
+      {watchCurrency && watchCurrency !== baseCurrency && (
+        <div className="space-y-1">
+          <Label>{t('transactions.exchangeRate', 'Exchange Rate')}</Label>
+          <Input
+            type="number"
+            step="0.000001"
+            inputMode="decimal"
+            placeholder="1.0000"
+            {...register('exchangeRate')}
+          />
+          {watchRate && parseFloat(watchRate) > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {t('transactions.exchangeRateHelper', {
+                currency: watchCurrency,
+                rate: parseFloat(watchRate).toFixed(4),
+                base: baseCurrency,
+              })}
+              {' '}
+              <span className="text-xs opacity-60">({t('exchangeRates.autoFilled', 'Auto-filled from cache')})</span>
+            </p>
+          )}
+          {errors.exchangeRate && (
+            <p className="text-xs text-red-500">{errors.exchangeRate.message}</p>
+          )}
+        </div>
+      )}
+
+      {/* Labels */}
+      {labels.length > 0 && (
+        <div className="space-y-2">
+          <Label>{t('settings.labels')}</Label>
+          <div className="flex flex-wrap gap-2">
+            {labels.map((lbl) => {
+              const active = selectedLabels.includes(lbl.id)
+              return (
+                <button
+                  key={lbl.id}
+                  type="button"
+                  onClick={() => toggleLabel(lbl.id)}
+                  className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border transition-all"
+                  style={{
+                    backgroundColor: active ? `${lbl.color ?? '#6b7280'}25` : 'transparent',
+                    borderColor: lbl.color ?? '#6b7280',
+                    color: lbl.color ?? '#6b7280',
+                    opacity: active ? 1 : 0.5,
+                  }}
+                >
+                  {lbl.name}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Notes */}
       <div className="space-y-1">

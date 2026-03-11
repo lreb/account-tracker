@@ -101,5 +101,23 @@
     "backup": "Backup & Restore",
     "exportData": "Export Data",
     "importData": "Import Data"
+  },
+  "exchangeRates": {
+    "fetchLatest": "Fetch Latest Rates",
+    "fetching": "Fetching…",
+    "addManual": "Add Manually",
+    "addRate": "Add Exchange Rate",
+    "lastUpdated": "Last updated",
+    "noRates": "No exchange rates cached yet",
+    "from": "From",
+    "to": "To",
+    "rate": "Rate",
+    "rateHint": "e.g. 1.085 means 1 {{from}} = 1.085 {{to}}",
+    "offlineWarning": "Offline — showing cached rates",
+    "autoFilled": "Auto-filled from cache"
+  },
+  "transactions": {
+    "exchangeRate": "Exchange Rate",
+    "exchangeRateHelper": "1 {{currency}} = {{rate}} {{base}}"
   }
 }

@@ -141,28 +141,44 @@ function BudgetDialog({
     register,
     handleSubmit,
     setValue,
+    watch,
     control,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<BudgetFormValues>({
     resolver: zodResolver(budgetSchema),
-    defaultValues: editing
-      ? {
-          categoryId: editing.categoryId,
-          amount: (editing.amount / 100).toFixed(2),
-          period: editing.period,
-          rollover: editing.rollover,
-          startDate: editing.startDate.slice(0, 10),
-          endDate: editing.endDate?.slice(0, 10) ?? '',
-        }
-      : {
-          period: 'monthly',
-          rollover: false,
-          startDate: format(new Date(), 'yyyy-MM-dd'),
-          amount: '',
-          categoryId: '',
-        },
+    defaultValues: {
+      period: 'monthly',
+      rollover: false,
+      startDate: format(new Date(), 'yyyy-MM-dd'),
+      amount: '',
+      categoryId: '',
+      endDate: '',
+    },
   })
+
+  useEffect(() => {
+    if (!open) return
+    if (editing) {
+      reset({
+        categoryId: editing.categoryId,
+        amount: (editing.amount / 100).toFixed(2),
+        period: editing.period,
+        rollover: editing.rollover,
+        startDate: editing.startDate.slice(0, 10),
+        endDate: editing.endDate?.slice(0, 10) ?? '',
+      })
+    } else {
+      reset({
+        period: 'monthly',
+        rollover: false,
+        startDate: format(new Date(), 'yyyy-MM-dd'),
+        amount: '',
+        categoryId: '',
+        endDate: '',
+      })
+    }
+  }, [open, editing])
 
   const onSubmit = async (values: BudgetFormValues) => {
     const amountCents = Math.round(parseFloat(values.amount) * 100)
@@ -197,7 +213,7 @@ function BudgetDialog({
           <div className="space-y-1">
             <Label>Category</Label>
             <Select
-              defaultValue={editing?.categoryId}
+              value={watch('categoryId') || ''}
               onValueChange={(v) => setValue('categoryId', v)}
             >
               <SelectTrigger>
@@ -234,7 +250,7 @@ function BudgetDialog({
           <div className="space-y-1">
             <Label>Period</Label>
             <Select
-              defaultValue={editing?.period ?? 'monthly'}
+              value={watch('period') || 'monthly'}
               onValueChange={(v) => setValue('period', v as BudgetFormValues['period'])}
             >
               <SelectTrigger>

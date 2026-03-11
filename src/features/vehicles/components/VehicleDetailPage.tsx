@@ -71,6 +71,7 @@ function FuelLogDialog({
     register,
     handleSubmit,
     setValue,
+    watch,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<FuelLogFormValues>({
@@ -84,6 +85,10 @@ function FuelLogDialog({
       categoryId: fuelCategory?.id ?? '',
     },
   })
+
+  // expose watch so Selects can be controlled
+  const watchFuelAccountId = watch('accountId')
+  const watchFuelCategoryId = watch('categoryId')
 
   // Populate form when opening for edit, reset to blank for add
   useEffect(() => {
@@ -206,10 +211,7 @@ function FuelLogDialog({
           <div className="space-y-1">
             <Label>Charge to Account</Label>
             <Select
-              key={`fa-${editing?.id ?? 'new'}`}
-              defaultValue={editing
-                ? (useTransactionsStore.getState().transactions.find(t => t.id === editing.transactionId)?.accountId ?? defaultAccount?.id)
-                : defaultAccount?.id}
+              value={watchFuelAccountId || ''}
               onValueChange={(v) => setValue('accountId', v)}
             >
               <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
@@ -224,10 +226,7 @@ function FuelLogDialog({
           <div className="space-y-1">
             <Label>Category</Label>
             <Select
-              key={`fc-${editing?.id ?? 'new'}`}
-              defaultValue={editing
-                ? (useTransactionsStore.getState().transactions.find(t => t.id === editing.transactionId)?.categoryId ?? fuelCategory?.id)
-                : fuelCategory?.id}
+              value={watchFuelCategoryId || ''}
               onValueChange={(v) => setValue('categoryId', v)}
             >
               <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
@@ -277,6 +276,7 @@ function ServiceDialog({
     register,
     handleSubmit,
     setValue,
+    watch,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<VehicleServiceFormValues>({
@@ -290,6 +290,9 @@ function ServiceDialog({
       categoryId: maintenanceCategory?.id ?? '',
     },
   })
+
+  const watchSvcAccountId = watch('accountId')
+  const watchSvcCategoryId = watch('categoryId')
 
   // Populate form when opening for edit, reset to blank for add
   useEffect(() => {
@@ -429,10 +432,7 @@ function ServiceDialog({
           <div className="space-y-1">
             <Label>Charge to Account</Label>
             <Select
-              key={`sa-${editing?.id ?? 'new'}`}
-              defaultValue={editing
-                ? (useTransactionsStore.getState().transactions.find(t => t.id === editing.transactionId)?.accountId ?? defaultAccount?.id)
-                : defaultAccount?.id}
+              value={watchSvcAccountId || ''}
               onValueChange={(v) => setValue('accountId', v)}
             >
               <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
@@ -447,10 +447,7 @@ function ServiceDialog({
           <div className="space-y-1">
             <Label>Category</Label>
             <Select
-              key={`sc-${editing?.id ?? 'new'}`}
-              defaultValue={editing
-                ? (useTransactionsStore.getState().transactions.find(t => t.id === editing.transactionId)?.categoryId ?? maintenanceCategory?.id)
-                : maintenanceCategory?.id}
+              value={watchSvcCategoryId || ''}
               onValueChange={(v) => setValue('categoryId', v)}
             >
               <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
