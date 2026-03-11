@@ -9,8 +9,12 @@ interface VehiclesState {
   vehicleServices: VehicleService[]
   load: () => Promise<void>
   addVehicle: (v: Vehicle) => Promise<void>
+  updateVehicle: (v: Vehicle) => Promise<void>
+  removeVehicle: (id: string) => Promise<void>
   addFuelLog: (f: FuelLog) => Promise<void>
+  removeFuelLog: (id: string) => Promise<void>
   addService: (s: VehicleService) => Promise<void>
+  removeService: (id: string) => Promise<void>
 }
 
 export const useVehiclesStore = create<VehiclesState>((set) => ({
@@ -43,6 +47,28 @@ export const useVehiclesStore = create<VehiclesState>((set) => ({
     }
   },
 
+  updateVehicle: async (vehicle) => {
+    try {
+      await db.vehicles.put(vehicle)
+      set((s) => ({ vehicles: s.vehicles.map((v) => (v.id === vehicle.id ? vehicle : v)) }))
+      toast.success('Vehicle updated')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to update vehicle')
+    }
+  },
+
+  removeVehicle: async (id) => {
+    try {
+      await db.vehicles.delete(id)
+      set((s) => ({ vehicles: s.vehicles.filter((v) => v.id !== id) }))
+      toast.success('Vehicle deleted')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to delete vehicle')
+    }
+  },
+
   addFuelLog: async (fuelLog) => {
     try {
       await db.fuelLogs.add(fuelLog)
@@ -54,6 +80,17 @@ export const useVehiclesStore = create<VehiclesState>((set) => ({
     }
   },
 
+  removeFuelLog: async (id) => {
+    try {
+      await db.fuelLogs.delete(id)
+      set((s) => ({ fuelLogs: s.fuelLogs.filter((f) => f.id !== id) }))
+      toast.success('Fuel log deleted')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to delete fuel log')
+    }
+  },
+
   addService: async (service) => {
     try {
       await db.vehicleServices.add(service)
@@ -62,6 +99,17 @@ export const useVehiclesStore = create<VehiclesState>((set) => ({
     } catch (err) {
       console.error(err)
       toast.error('Failed to add service record')
+    }
+  },
+
+  removeService: async (id) => {
+    try {
+      await db.vehicleServices.delete(id)
+      set((s) => ({ vehicleServices: s.vehicleServices.filter((s) => s.id !== id) }))
+      toast.success('Service record deleted')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to delete service record')
     }
   },
 }))
