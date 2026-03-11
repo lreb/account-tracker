@@ -6,6 +6,8 @@ import { toast } from 'sonner'
 import { ChevronRight, Wallet, Tag, RefreshCw, Download, Upload, Table2 } from 'lucide-react'
 
 import { useTransactionsStore } from '@/stores/transactions.store'
+import { useAccountsStore } from '@/stores/accounts.store'
+import { useLabelsStore } from '@/stores/labels.store'
 import { exportTransactionsCsv, parseTransactionsCsv } from '@/lib/csv'
 
 const settingsItems = [
@@ -18,6 +20,8 @@ const settingsItems = [
 export default function SettingsPage() {
   const { t } = useTranslation()
   const { transactions, add } = useTransactionsStore()
+  const { accounts } = useAccountsStore()
+  const { labels }   = useLabelsStore()
   const importRef = useRef<HTMLInputElement>(null)
 
   // ── Export ──────────────────────────────────────────────────────────────
@@ -27,7 +31,7 @@ export default function SettingsPage() {
       return
     }
     const filename = `transactions_${format(new Date(), 'yyyy-MM-dd')}.csv`
-    exportTransactionsCsv(transactions, filename)
+    exportTransactionsCsv(transactions, accounts, labels, filename)
     toast.success(`Exported ${transactions.length} transaction(s).`)
   }
 
@@ -40,7 +44,7 @@ export default function SettingsPage() {
     reader.onload = async (ev) => {
       try {
         const text = ev.target?.result as string
-        const { imported, skipped, errors } = parseTransactionsCsv(text)
+        const { imported, skipped, errors } = parseTransactionsCsv(text, accounts, labels)
 
         const existingIds = new Set(transactions.map((tx) => tx.id))
         const newTxs = imported.filter((tx) => !existingIds.has(tx.id))
