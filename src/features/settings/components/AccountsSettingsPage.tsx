@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
@@ -54,19 +54,27 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors, isSubmitting },
     reset,
   } = useForm<AccountFormValues>({
     resolver: zodResolver(accountSchema),
-    defaultValues: editing
-      ? {
-          name: editing.name,
-          type: editing.type,
-          currency: editing.currency,
-          openingBalance: (editing.openingBalance / 100).toFixed(2),
-        }
-      : { type: 'cash', currency: 'USD', openingBalance: '0' },
+    defaultValues: { type: 'cash', currency: 'USD', openingBalance: '0', name: '' },
   })
+
+  useEffect(() => {
+    if (!open) return
+    if (editing) {
+      reset({
+        name: editing.name,
+        type: editing.type,
+        currency: editing.currency,
+        openingBalance: (editing.openingBalance / 100).toFixed(2),
+      })
+    } else {
+      reset({ name: '', type: 'cash', currency: 'USD', openingBalance: '0' })
+    }
+  }, [open, editing])
 
   const onSubmit = async (values: AccountFormValues) => {
     const balanceCents = Math.round(parseFloat(values.openingBalance) * 100)
@@ -100,7 +108,7 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
           <div className="space-y-1">
             <Label>Account Type</Label>
             <Select
-              defaultValue={editing?.type ?? 'cash'}
+              value={watch('type')}
               onValueChange={(v) => setValue('type', v as AccountFormValues['type'])}
             >
               <SelectTrigger>
@@ -120,7 +128,7 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
           <div className="space-y-1">
             <Label>Currency</Label>
             <Select
-              defaultValue={editing?.currency ?? 'USD'}
+              value={watch('currency')}
               onValueChange={(v) => setValue('currency', v)}
             >
               <SelectTrigger>
