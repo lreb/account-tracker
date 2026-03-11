@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { toast } from 'sonner'
 import { db } from '@/db'
 import { useTransactionsStore } from './transactions.store'
-import type { Vehicle, FuelLog, VehicleService } from '@/types'
+import type { Vehicle, FuelLog, VehicleService, Transaction } from '@/types'
 
 interface VehiclesState {
   vehicles: Vehicle[]
@@ -13,8 +13,10 @@ interface VehiclesState {
   updateVehicle: (v: Vehicle) => Promise<void>
   removeVehicle: (id: string) => Promise<void>
   addFuelLog: (f: FuelLog) => Promise<void>
+  updateFuelLog: (log: FuelLog, linkedTx?: Transaction) => Promise<void>
   removeFuelLog: (id: string) => Promise<void>
   addService: (s: VehicleService) => Promise<void>
+  updateService: (svc: VehicleService, linkedTx?: Transaction) => Promise<void>
   removeService: (id: string) => Promise<void>
 }
 
@@ -98,6 +100,23 @@ export const useVehiclesStore = create<VehiclesState>((set) => ({
     }
   },
 
+  updateFuelLog: async (log, linkedTx) => {
+    try {
+      if (linkedTx) {
+        await db.transactions.put(linkedTx)
+        useTransactionsStore.setState((s) => ({
+          transactions: s.transactions.map((t) => (t.id === linkedTx.id ? linkedTx : t)),
+        }))
+      }
+      await db.fuelLogs.put(log)
+      set((s) => ({ fuelLogs: s.fuelLogs.map((f) => (f.id === log.id ? log : f)) }))
+      toast.success('Fuel log updated')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to update fuel log')
+    }
+  },
+
   removeFuelLog: async (id) => {
     try {
       const log = await db.fuelLogs.get(id)
@@ -122,6 +141,23 @@ export const useVehiclesStore = create<VehiclesState>((set) => ({
     } catch (err) {
       console.error(err)
       toast.error('Failed to add service record')
+    }
+  },
+
+  updateService: async (svc, linkedTx) => {
+    try {
+      if (linkedTx) {
+        await db.transactions.put(linkedTx)
+        useTransactionsStore.setState((s) => ({
+          transactions: s.transactions.map((t) => (t.id === linkedTx.id ? linkedTx : t)),
+        }))
+      }
+      await db.vehicleServices.put(svc)
+      set((s) => ({ vehicleServices: s.vehicleServices.map((sv) => (sv.id === svc.id ? svc : sv)) }))
+      toast.success('Service record updated')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to update service record')
     }
   },
 

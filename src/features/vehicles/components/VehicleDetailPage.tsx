@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useParams, useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { v4 as uuid } from 'uuid'
-import { ArrowLeft, Plus, Trash2, Gauge, TrendingDown, Fuel } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Pencil, Gauge, TrendingDown, Fuel } from 'lucide-react'
 
 import {
   fuelLogSchema,
@@ -19,7 +19,7 @@ import { useCategoriesStore } from '@/stores/categories.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { formatCurrency } from '@/lib/currency'
 import { calcKmPerLiter, calcCostPerKm, calcKmSinceLastFill } from '@/lib/vehicles'
-import type { FuelLog, VehicleService } from '@/types'
+import type { FuelLog, VehicleService, Transaction } from '@/types'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,22 +41,24 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 
-// ─── Add Fuel Log dialog ──────────────────────────────────────────────────────
+// ─── Fuel Log dialog (add + edit) ────────────────────────────────────────────
 
 function FuelLogDialog({
   open,
   vehicleId,
   vehicleName,
   lastOdometer,
+  editing,
   onClose,
 }: {
   open: boolean
   vehicleId: string
   vehicleName: string
   lastOdometer: number
+  editing?: FuelLog
   onClose: () => void
 }) {
-  const { addFuelLog } = useVehiclesStore()
+  const { addFuelLog, updateFuelLog } = useVehiclesStore()
   const { add: addTransaction } = useTransactionsStore()
   const { accounts } = useAccountsStore()
   const { categories } = useCategoriesStore()
@@ -83,38 +85,91 @@ function FuelLogDialog({
     },
   })
 
+  // Populate form when opening for edit, reset to blank for add
+  useEffect(() => {
+    if (!open) return
+    if (editing) {
+      const existingTx = editing.transactionId
+        ? useTransactionsStore.getState().transactions.find((t) => t.id === editing.transactionId)
+        : undefined
+      reset({
+        date: format(new Date(editing.date), 'yyyy-MM-dd'),
+        liters: editing.liters.toString(),
+        totalCost: (editing.totalCost / 100).toFixed(2),
+        odometer: editing.odometer.toString(),
+        accountId: existingTx?.accountId ?? defaultAccount?.id ?? '',
+        categoryId: existingTx?.categoryId ?? fuelCategory?.id ?? '',
+      })
+    } else {
+      reset({
+        date: format(new Date(), 'yyyy-MM-dd'),
+        liters: '',
+        totalCost: '',
+        odometer: '',
+        accountId: defaultAccount?.id ?? '',
+        categoryId: fuelCategory?.id ?? '',
+      })
+    }
+  }, [open, editing]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const onSubmit = async (values: FuelLogFormValues) => {
     const account = accounts.find((a) => a.id === values.accountId)
     const costCents = Math.round(parseFloat(values.totalCost) * 100)
     const isoDate = new Date(values.date).toISOString()
-    const txId = uuid()
-    const logId = uuid()
 
-    // 1. Create the expense transaction
-    await addTransaction({
-      id: txId,
-      type: 'expense',
-      amount: costCents,
-      date: isoDate,
-      categoryId: values.categoryId,
-      accountId: values.accountId,
-      description: `Fuel – ${parseFloat(values.liters).toFixed(2)} L · ${vehicleName}`,
-      status: 'cleared',
-      currency: account?.currency ?? baseCurrency,
-      labels: [],
-    })
-
-    // 2. Create the fuel log linked to the transaction
-    const log: FuelLog = {
-      id: logId,
-      vehicleId,
-      date: isoDate,
-      liters: parseFloat(values.liters),
-      totalCost: costCents,
-      odometer: parseInt(values.odometer, 10),
-      transactionId: txId,
+    if (editing) {
+      // ── Update existing records ─────────────────────────────────────
+      const updatedLog: FuelLog = {
+        ...editing,
+        date: isoDate,
+        liters: parseFloat(values.liters),
+        totalCost: costCents,
+        odometer: parseInt(values.odometer, 10),
+      }
+      let linkedTx: Transaction | undefined
+      if (editing.transactionId) {
+        const existingTx = useTransactionsStore.getState().transactions.find(
+          (t) => t.id === editing.transactionId,
+        )
+        if (existingTx) {
+          linkedTx = {
+            ...existingTx,
+            amount: costCents,
+            date: isoDate,
+            categoryId: values.categoryId,
+            accountId: values.accountId,
+            description: `Fuel – ${parseFloat(values.liters).toFixed(2)} L · ${vehicleName}`,
+            currency: account?.currency ?? baseCurrency,
+          }
+        }
+      }
+      await updateFuelLog(updatedLog, linkedTx)
+    } else {
+      // ── Create new records ──────────────────────────────────────────
+      const txId = uuid()
+      const logId = uuid()
+      await addTransaction({
+        id: txId,
+        type: 'expense',
+        amount: costCents,
+        date: isoDate,
+        categoryId: values.categoryId,
+        accountId: values.accountId,
+        description: `Fuel – ${parseFloat(values.liters).toFixed(2)} L · ${vehicleName}`,
+        status: 'cleared',
+        currency: account?.currency ?? baseCurrency,
+        labels: [],
+      })
+      await addFuelLog({
+        id: logId,
+        vehicleId,
+        date: isoDate,
+        liters: parseFloat(values.liters),
+        totalCost: costCents,
+        odometer: parseInt(values.odometer, 10),
+        transactionId: txId,
+      })
     }
-    await addFuelLog(log)
     reset()
     onClose()
   }
@@ -123,7 +178,7 @@ function FuelLogDialog({
     <Dialog open={open} onOpenChange={(v) => { if (!v) { reset(); onClose() } }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Add Fuel Fill-up</DialogTitle>
+          <DialogTitle>{editing ? 'Edit Fuel Fill-up' : 'Add Fuel Fill-up'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-1">
           <div className="space-y-1">
@@ -148,10 +203,15 @@ function FuelLogDialog({
             <Input id="fOdo" type="number" inputMode="numeric" placeholder={lastOdometer > 0 ? `Last: ${lastOdometer}` : '0'} {...register('odometer')} />
             {errors.odometer && <p className="text-xs text-red-500">{errors.odometer.message}</p>}
           </div>
-          {/* Account */}
           <div className="space-y-1">
             <Label>Charge to Account</Label>
-            <Select defaultValue={defaultAccount?.id} onValueChange={(v) => setValue('accountId', v)}>
+            <Select
+              key={`fa-${editing?.id ?? 'new'}`}
+              defaultValue={editing
+                ? (useTransactionsStore.getState().transactions.find(t => t.id === editing.transactionId)?.accountId ?? defaultAccount?.id)
+                : defaultAccount?.id}
+              onValueChange={(v) => setValue('accountId', v)}
+            >
               <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
               <SelectContent>
                 {accounts.map((a) => (
@@ -161,10 +221,15 @@ function FuelLogDialog({
             </Select>
             {errors.accountId && <p className="text-xs text-red-500">{errors.accountId.message}</p>}
           </div>
-          {/* Category */}
           <div className="space-y-1">
             <Label>Category</Label>
-            <Select defaultValue={fuelCategory?.id} onValueChange={(v) => setValue('categoryId', v)}>
+            <Select
+              key={`fc-${editing?.id ?? 'new'}`}
+              defaultValue={editing
+                ? (useTransactionsStore.getState().transactions.find(t => t.id === editing.transactionId)?.categoryId ?? fuelCategory?.id)
+                : fuelCategory?.id}
+              onValueChange={(v) => setValue('categoryId', v)}
+            >
               <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
               <SelectContent>
                 {categories.map((c) => (
@@ -176,7 +241,7 @@ function FuelLogDialog({
           </div>
           <DialogFooter className="gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => { reset(); onClose() }}>Cancel</Button>
-            <Button type="submit" disabled={isSubmitting}>Save</Button>
+            <Button type="submit" disabled={isSubmitting}>{editing ? 'Update' : 'Save'}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -184,20 +249,22 @@ function FuelLogDialog({
   )
 }
 
-// ─── Add Service dialog ───────────────────────────────────────────────────────
+// ─── Service dialog (add + edit) ──────────────────────────────────────────────
 
 function ServiceDialog({
   open,
   vehicleId,
   vehicleName,
+  editing,
   onClose,
 }: {
   open: boolean
   vehicleId: string
   vehicleName: string
+  editing?: VehicleService
   onClose: () => void
 }) {
-  const { addService } = useVehiclesStore()
+  const { addService, updateService } = useVehiclesStore()
   const { add: addTransaction } = useTransactionsStore()
   const { accounts } = useAccountsStore()
   const { categories } = useCategoriesStore()
@@ -224,42 +291,108 @@ function ServiceDialog({
     },
   })
 
+  // Populate form when opening for edit, reset to blank for add
+  useEffect(() => {
+    if (!open) return
+    if (editing) {
+      const existingTx = editing.transactionId
+        ? useTransactionsStore.getState().transactions.find((t) => t.id === editing.transactionId)
+        : undefined
+      reset({
+        date: format(new Date(editing.date), 'yyyy-MM-dd'),
+        serviceType: editing.serviceType,
+        cost: (editing.cost / 100).toFixed(2),
+        odometer: editing.odometer.toString(),
+        notes: editing.notes ?? '',
+        nextServiceKm: editing.nextServiceKm?.toString() ?? '',
+        nextServiceDate: editing.nextServiceDate
+          ? format(new Date(editing.nextServiceDate), 'yyyy-MM-dd')
+          : '',
+        accountId: existingTx?.accountId ?? defaultAccount?.id ?? '',
+        categoryId: existingTx?.categoryId ?? maintenanceCategory?.id ?? '',
+      })
+    } else {
+      reset({
+        date: format(new Date(), 'yyyy-MM-dd'),
+        serviceType: '',
+        cost: '',
+        odometer: '',
+        accountId: defaultAccount?.id ?? '',
+        categoryId: maintenanceCategory?.id ?? '',
+      })
+    }
+  }, [open, editing]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const onSubmit = async (values: VehicleServiceFormValues) => {
     const account = accounts.find((a) => a.id === values.accountId)
     const costCents = Math.round(parseFloat(values.cost) * 100)
     const isoDate = new Date(values.date).toISOString()
-    const txId = uuid()
-    const svcId = uuid()
 
-    // 1. Create the expense transaction
-    await addTransaction({
-      id: txId,
-      type: 'expense',
-      amount: costCents,
-      date: isoDate,
-      categoryId: values.categoryId,
-      accountId: values.accountId,
-      description: `${values.serviceType} · ${vehicleName}`,
-      notes: values.notes || undefined,
-      status: 'cleared',
-      currency: account?.currency ?? baseCurrency,
-      labels: [],
-    })
-
-    // 2. Create the service record linked to the transaction
-    const svc: VehicleService = {
-      id: svcId,
-      vehicleId,
-      date: isoDate,
-      serviceType: values.serviceType,
-      cost: costCents,
-      odometer: parseInt(values.odometer, 10),
-      notes: values.notes || undefined,
-      nextServiceKm: values.nextServiceKm ? parseInt(values.nextServiceKm, 10) : undefined,
-      nextServiceDate: values.nextServiceDate ? new Date(values.nextServiceDate).toISOString() : undefined,
-      transactionId: txId,
+    if (editing) {
+      // ── Update existing records ─────────────────────────────────────────────
+      const updatedSvc: VehicleService = {
+        ...editing,
+        date: isoDate,
+        serviceType: values.serviceType,
+        cost: costCents,
+        odometer: parseInt(values.odometer, 10),
+        notes: values.notes || undefined,
+        nextServiceKm: values.nextServiceKm ? parseInt(values.nextServiceKm, 10) : undefined,
+        nextServiceDate: values.nextServiceDate
+          ? new Date(values.nextServiceDate).toISOString()
+          : undefined,
+      }
+      let linkedTx: Transaction | undefined
+      if (editing.transactionId) {
+        const existingTx = useTransactionsStore.getState().transactions.find(
+          (t) => t.id === editing.transactionId,
+        )
+        if (existingTx) {
+          linkedTx = {
+            ...existingTx,
+            amount: costCents,
+            date: isoDate,
+            categoryId: values.categoryId,
+            accountId: values.accountId,
+            description: `${values.serviceType} · ${vehicleName}`,
+            notes: values.notes || undefined,
+            currency: account?.currency ?? baseCurrency,
+          }
+        }
+      }
+      await updateService(updatedSvc, linkedTx)
+    } else {
+      // ── Create new records ──────────────────────────────────────────────────
+      const txId = uuid()
+      const svcId = uuid()
+      await addTransaction({
+        id: txId,
+        type: 'expense',
+        amount: costCents,
+        date: isoDate,
+        categoryId: values.categoryId,
+        accountId: values.accountId,
+        description: `${values.serviceType} · ${vehicleName}`,
+        notes: values.notes || undefined,
+        status: 'cleared',
+        currency: account?.currency ?? baseCurrency,
+        labels: [],
+      })
+      await addService({
+        id: svcId,
+        vehicleId,
+        date: isoDate,
+        serviceType: values.serviceType,
+        cost: costCents,
+        odometer: parseInt(values.odometer, 10),
+        notes: values.notes || undefined,
+        nextServiceKm: values.nextServiceKm ? parseInt(values.nextServiceKm, 10) : undefined,
+        nextServiceDate: values.nextServiceDate
+          ? new Date(values.nextServiceDate).toISOString()
+          : undefined,
+        transactionId: txId,
+      })
     }
-    await addService(svc)
     reset()
     onClose()
   }
@@ -268,7 +401,7 @@ function ServiceDialog({
     <Dialog open={open} onOpenChange={(v) => { if (!v) { reset(); onClose() } }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Add Service Record</DialogTitle>
+          <DialogTitle>{editing ? 'Edit Service Record' : 'Add Service Record'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-1">
           <div className="space-y-1">
@@ -293,10 +426,15 @@ function ServiceDialog({
               {errors.odometer && <p className="text-xs text-red-500">{errors.odometer.message}</p>}
             </div>
           </div>
-          {/* Account */}
           <div className="space-y-1">
             <Label>Charge to Account</Label>
-            <Select defaultValue={defaultAccount?.id} onValueChange={(v) => setValue('accountId', v)}>
+            <Select
+              key={`sa-${editing?.id ?? 'new'}`}
+              defaultValue={editing
+                ? (useTransactionsStore.getState().transactions.find(t => t.id === editing.transactionId)?.accountId ?? defaultAccount?.id)
+                : defaultAccount?.id}
+              onValueChange={(v) => setValue('accountId', v)}
+            >
               <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
               <SelectContent>
                 {accounts.map((a) => (
@@ -306,10 +444,15 @@ function ServiceDialog({
             </Select>
             {errors.accountId && <p className="text-xs text-red-500">{errors.accountId.message}</p>}
           </div>
-          {/* Category */}
           <div className="space-y-1">
             <Label>Category</Label>
-            <Select defaultValue={maintenanceCategory?.id} onValueChange={(v) => setValue('categoryId', v)}>
+            <Select
+              key={`sc-${editing?.id ?? 'new'}`}
+              defaultValue={editing
+                ? (useTransactionsStore.getState().transactions.find(t => t.id === editing.transactionId)?.categoryId ?? maintenanceCategory?.id)
+                : maintenanceCategory?.id}
+              onValueChange={(v) => setValue('categoryId', v)}
+            >
               <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
               <SelectContent>
                 {categories.map((c) => (
@@ -335,7 +478,7 @@ function ServiceDialog({
           </div>
           <DialogFooter className="gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => { reset(); onClose() }}>Cancel</Button>
-            <Button type="submit" disabled={isSubmitting}>Save</Button>
+            <Button type="submit" disabled={isSubmitting}>{editing ? 'Update' : 'Save'}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -354,7 +497,9 @@ export default function VehicleDetailPage() {
   const { baseCurrency } = useSettingsStore()
   const [tab, setTab] = useState<Tab>('fuel')
   const [fuelDialog, setFuelDialog] = useState(false)
+  const [editingLog, setEditingLog] = useState<FuelLog | null>(null)
   const [serviceDialog, setServiceDialog] = useState(false)
+  const [editingSvc, setEditingSvc] = useState<VehicleService | null>(null)
 
   const vehicle = vehicles.find((v) => v.id === id)
   const logs = fuelLogs.filter((f) => f.vehicleId === id)
@@ -456,14 +601,24 @@ export default function VehicleDetailPage() {
                         </p>
                         <p className="text-xs text-gray-400">Odometer: {log.odometer.toLocaleString()} km</p>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-red-400 hover:text-red-600 shrink-0"
-                        onClick={() => removeFuelLog(log.id)}
-                      >
-                        <Trash2 size={13} />
-                      </Button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-gray-400 hover:text-gray-700"
+                          onClick={() => { setEditingLog(log); setFuelDialog(true) }}
+                        >
+                          <Pencil size={13} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-red-400 hover:text-red-600"
+                          onClick={() => removeFuelLog(log.id)}
+                        >
+                          <Trash2 size={13} />
+                        </Button>
+                      </div>
                     </div>
                   </li>
                 )
@@ -475,7 +630,8 @@ export default function VehicleDetailPage() {
             vehicleId={vehicle.id}
             vehicleName={vehicle.name}
             lastOdometer={logs[0]?.odometer ?? 0}
-            onClose={() => setFuelDialog(false)}
+            editing={editingLog ?? undefined}
+            onClose={() => { setFuelDialog(false); setEditingLog(null) }}
           />
         </>
       )}
@@ -509,14 +665,24 @@ export default function VehicleDetailPage() {
                       </p>
                       {svc.notes && <p className="text-xs text-gray-400 truncate">{svc.notes}</p>}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-red-400 hover:text-red-600 shrink-0"
-                      onClick={() => removeService(svc.id)}
-                    >
-                      <Trash2 size={13} />
-                    </Button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-gray-400 hover:text-gray-700"
+                        onClick={() => { setEditingSvc(svc); setServiceDialog(true) }}
+                      >
+                        <Pencil size={13} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-red-400 hover:text-red-600"
+                        onClick={() => removeService(svc.id)}
+                      >
+                        <Trash2 size={13} />
+                      </Button>
+                    </div>
                   </div>
                 </li>
               ))}
@@ -526,7 +692,8 @@ export default function VehicleDetailPage() {
             open={serviceDialog}
             vehicleId={vehicle.id}
             vehicleName={vehicle.name}
-            onClose={() => setServiceDialog(false)}
+            editing={editingSvc ?? undefined}
+            onClose={() => { setServiceDialog(false); setEditingSvc(null) }}
           />
         </>
       )}
