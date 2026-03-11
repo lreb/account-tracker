@@ -1,8 +1,9 @@
 import { z } from 'zod'
+import { vm } from '@/lib/validation-messages'
 
 export const categorySchema = z.object({
-  name: z.string().min(1, 'Name is required').max(30, 'Max 30 characters'),
-  icon: z.string().min(1, 'Icon is required'),
+  name: z.string().min(1, vm.nameRequired).max(30, vm.max30chars),
+  icon: z.string().min(1, vm.iconRequired),
 })
 
 export type CategoryFormValues = z.infer<typeof categorySchema>

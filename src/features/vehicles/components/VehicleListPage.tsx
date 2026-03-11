@@ -86,7 +86,7 @@ function VehicleDialog({
           <div className="space-y-1">
             <Label htmlFor="vName">Display Name *</Label>
             <Input id="vName" placeholder="e.g. My Car, Work Truck" {...register('name')} />
-            {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
+            {errors.name && <p className="text-xs text-red-500">{t(errors.name.message!)}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -103,7 +103,7 @@ function VehicleDialog({
           <div className="space-y-1">
             <Label htmlFor="vYear">Year</Label>
             <Input id="vYear" type="number" placeholder="2020" {...register('year')} />
-            {errors.year && <p className="text-xs text-red-500">{errors.year.message}</p>}
+            {errors.year && <p className="text-xs text-red-500">{t(errors.year.message!)}</p>}
           </div>
 
           <DialogFooter className="gap-2 pt-2">

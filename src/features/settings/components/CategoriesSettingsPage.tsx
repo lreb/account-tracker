@@ -55,7 +55,7 @@ function AddCategoryDialog({ open, onClose }: { open: boolean; onClose: () => vo
           <div className="space-y-1">
             <Label htmlFor="catName">Category Name</Label>
             <Input id="catName" placeholder="e.g. Gym, Pet Care" {...register('name')} />
-            {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
+            {errors.name && <p className="text-xs text-red-500">{t(errors.name.message!)}</p>}
           </div>
 
           {/* Icon picker */}
@@ -84,7 +84,7 @@ function AddCategoryDialog({ open, onClose }: { open: boolean; onClose: () => vo
                 </div>
               )}
             />
-            {errors.icon && <p className="text-xs text-red-500">{errors.icon.message}</p>}
+            {errors.icon && <p className="text-xs text-red-500">{t(errors.icon.message!)}</p>}
           </div>
 
           <DialogFooter className="gap-2 pt-2">

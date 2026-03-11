@@ -189,24 +189,24 @@ function FuelLogDialog({
           <div className="space-y-1">
             <Label htmlFor="fDate">Date</Label>
             <Input id="fDate" type="date" {...register('date')} />
-            {errors.date && <p className="text-xs text-red-500">{errors.date.message}</p>}
+            {errors.date && <p className="text-xs text-red-500">{t(errors.date.message!)}</p>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="fLiters">Liters</Label>
               <Input id="fLiters" type="number" step="0.001" inputMode="decimal" placeholder="40.000" {...register('liters')} />
-              {errors.liters && <p className="text-xs text-red-500">{errors.liters.message}</p>}
+              {errors.liters && <p className="text-xs text-red-500">{t(errors.liters.message!)}</p>}
             </div>
             <div className="space-y-1">
               <Label htmlFor="fCost">Total Cost</Label>
               <Input id="fCost" type="number" step="0.01" inputMode="decimal" placeholder="0.00" {...register('totalCost')} />
-              {errors.totalCost && <p className="text-xs text-red-500">{errors.totalCost.message}</p>}
+              {errors.totalCost && <p className="text-xs text-red-500">{t(errors.totalCost.message!)}</p>}
             </div>
           </div>
           <div className="space-y-1">
             <Label htmlFor="fOdo">Odometer (km)</Label>
             <Input id="fOdo" type="number" inputMode="numeric" placeholder={lastOdometer > 0 ? `Last: ${lastOdometer}` : '0'} {...register('odometer')} />
-            {errors.odometer && <p className="text-xs text-red-500">{errors.odometer.message}</p>}
+            {errors.odometer && <p className="text-xs text-red-500">{t(errors.odometer.message!)}</p>}
           </div>
           <div className="space-y-1">
             <Label>Charge to Account</Label>
@@ -221,7 +221,7 @@ function FuelLogDialog({
                 ))}
               </SelectContent>
             </Select>
-            {errors.accountId && <p className="text-xs text-red-500">{errors.accountId.message}</p>}
+            {errors.accountId && <p className="text-xs text-red-500">{t(errors.accountId.message!)}</p>}
           </div>
           <div className="space-y-1">
             <Label>Category</Label>
@@ -236,7 +236,7 @@ function FuelLogDialog({
                 ))}
               </SelectContent>
             </Select>
-            {errors.categoryId && <p className="text-xs text-red-500">{errors.categoryId.message}</p>}
+            {errors.categoryId && <p className="text-xs text-red-500">{t(errors.categoryId.message!)}</p>}
           </div>
           <DialogFooter className="gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => { reset(); onClose() }}>Cancel</Button>
@@ -410,23 +410,23 @@ function ServiceDialog({
           <div className="space-y-1">
             <Label htmlFor="sDate">Date</Label>
             <Input id="sDate" type="date" {...register('date')} />
-            {errors.date && <p className="text-xs text-red-500">{errors.date.message}</p>}
+            {errors.date && <p className="text-xs text-red-500">{t(errors.date.message!)}</p>}
           </div>
           <div className="space-y-1">
             <Label htmlFor="sType">Service Type</Label>
             <Input id="sType" placeholder="e.g. Oil change, Tire rotation" {...register('serviceType')} />
-            {errors.serviceType && <p className="text-xs text-red-500">{errors.serviceType.message}</p>}
+            {errors.serviceType && <p className="text-xs text-red-500">{t(errors.serviceType.message!)}</p>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="sCost">Cost</Label>
               <Input id="sCost" type="number" step="0.01" inputMode="decimal" placeholder="0.00" {...register('cost')} />
-              {errors.cost && <p className="text-xs text-red-500">{errors.cost.message}</p>}
+              {errors.cost && <p className="text-xs text-red-500">{t(errors.cost.message!)}</p>}
             </div>
             <div className="space-y-1">
               <Label htmlFor="sOdo">Odometer (km)</Label>
               <Input id="sOdo" type="number" inputMode="numeric" placeholder="0" {...register('odometer')} />
-              {errors.odometer && <p className="text-xs text-red-500">{errors.odometer.message}</p>}
+              {errors.odometer && <p className="text-xs text-red-500">{t(errors.odometer.message!)}</p>}
             </div>
           </div>
           <div className="space-y-1">
@@ -442,7 +442,7 @@ function ServiceDialog({
                 ))}
               </SelectContent>
             </Select>
-            {errors.accountId && <p className="text-xs text-red-500">{errors.accountId.message}</p>}
+            {errors.accountId && <p className="text-xs text-red-500">{t(errors.accountId.message!)}</p>}
           </div>
           <div className="space-y-1">
             <Label>Category</Label>
@@ -457,7 +457,7 @@ function ServiceDialog({
                 ))}
               </SelectContent>
             </Select>
-            {errors.categoryId && <p className="text-xs text-red-500">{errors.categoryId.message}</p>}
+            {errors.categoryId && <p className="text-xs text-red-500">{t(errors.categoryId.message!)}</p>}
           </div>
           <div className="space-y-1">
             <Label htmlFor="sNotes">Notes</Label>

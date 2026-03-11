@@ -21,7 +21,7 @@ A personal finance Progressive Web App (PWA) + Android application. Record incom
 ```bash
 # 1. Clone the repository
 git clone <repo-url>
-cd auto-tracker
+cd expense-tracker
 
 # 2. Install all dependencies
 npm install

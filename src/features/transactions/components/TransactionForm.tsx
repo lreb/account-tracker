@@ -216,21 +216,21 @@ export default function TransactionForm() {
           placeholder="0.00"
           {...register('amount')}
         />
-        {errors.amount && <p className="text-xs text-red-500">{errors.amount.message}</p>}
+        {errors.amount && <p className="text-xs text-red-500">{t(errors.amount.message!)}</p>}
       </div>
 
       {/* Date */}
       <div className="space-y-1">
         <Label htmlFor="date">{t('common.date', 'Date')}</Label>
         <Input id="date" type="date" {...register('date')} />
-        {errors.date && <p className="text-xs text-red-500">{errors.date.message}</p>}
+        {errors.date && <p className="text-xs text-red-500">{t(errors.date.message!)}</p>}
       </div>
 
       {/* Description */}
       <div className="space-y-1">
         <Label htmlFor="description">{t('common.description', 'Description')}</Label>
         <Input id="description" placeholder="e.g. Grocery run" {...register('description')} />
-        {errors.description && <p className="text-xs text-red-500">{errors.description.message}</p>}
+        {errors.description && <p className="text-xs text-red-500">{t(errors.description.message!)}</p>}
       </div>
 
       {/* Category */}
@@ -251,7 +251,7 @@ export default function TransactionForm() {
             ))}
           </SelectContent>
         </Select>
-        {errors.categoryId && <p className="text-xs text-red-500">{errors.categoryId.message}</p>}
+        {errors.categoryId && <p className="text-xs text-red-500">{t(errors.categoryId.message!)}</p>}
       </div>
 
       {/* Account */}
@@ -272,7 +272,7 @@ export default function TransactionForm() {
             ))}
           </SelectContent>
         </Select>
-        {errors.accountId && <p className="text-xs text-red-500">{errors.accountId.message}</p>}
+        {errors.accountId && <p className="text-xs text-red-500">{t(errors.accountId.message!)}</p>}
       </div>
 
       {/* Destination account — transfers only */}
@@ -296,7 +296,7 @@ export default function TransactionForm() {
                 ))}
             </SelectContent>
           </Select>
-          {errors.toAccountId && <p className="text-xs text-red-500">{errors.toAccountId.message}</p>}
+          {errors.toAccountId && <p className="text-xs text-red-500">{t(errors.toAccountId.message!)}</p>}
         </div>
       )}
 
@@ -343,7 +343,7 @@ export default function TransactionForm() {
             </p>
           )}
           {errors.exchangeRate && (
-            <p className="text-xs text-red-500">{errors.exchangeRate.message}</p>
+            <p className="text-xs text-red-500">{t(errors.exchangeRate.message!)}</p>
           )}
         </div>
       )}

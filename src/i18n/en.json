@@ -119,5 +119,26 @@
   "transactions": {
     "exchangeRate": "Exchange Rate",
     "exchangeRateHelper": "1 {{currency}} = {{rate}} {{base}}"
+  },
+  "validation": {
+    "nameRequired":        "Name is required",
+    "currencyRequired":    "Currency is required",
+    "dateRequired":        "Date is required",
+    "accountRequired":     "Account is required",
+    "toAccountRequired":   "Destination account is required for transfers",
+    "categoryRequired":    "Category is required",
+    "descriptionRequired": "Description is required",
+    "serviceTypeRequired": "Service type is required",
+    "startDateRequired":   "Start date is required",
+    "iconRequired":        "Icon is required",
+    "amountRequired":      "Amount is required",
+    "mustBeNumber":        "Must be a valid number",
+    "mustBePositive":      "Must be a positive number",
+    "mustBeNonNegative":   "Must be 0 or greater",
+    "invalidAmount":       "Enter a valid amount",
+    "invalidLiters":       "Enter a valid liters value",
+    "integerKmOnly":       "Whole kilometres only",
+    "max30chars":          "Maximum 30 characters",
+    "amountPositive":      "Amount must be greater than 0"
   }
 }

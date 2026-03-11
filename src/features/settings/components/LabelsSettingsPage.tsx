@@ -92,7 +92,7 @@ function LabelDialog({
           <div className="space-y-1">
             <FormLabel htmlFor="lName">Name</FormLabel>
             <Input id="lName" placeholder="e.g. Business, Tax-deductible" {...register('name')} />
-            {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
+            {errors.name && <p className="text-xs text-red-500">{t(errors.name.message!)}</p>}
           </div>
 
           <div className="space-y-2">

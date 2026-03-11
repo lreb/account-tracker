@@ -101,7 +101,7 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
           <div className="space-y-1">
             <Label htmlFor="name">Account Name</Label>
             <Input id="name" placeholder="e.g. Wallet, Main Bank" {...register('name')} />
-            {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
+            {errors.name && <p className="text-xs text-red-500">{t(errors.name.message!)}</p>}
           </div>
 
           {/* Type */}
@@ -142,7 +142,7 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
                 ))}
               </SelectContent>
             </Select>
-            {errors.currency && <p className="text-xs text-red-500">{errors.currency.message}</p>}
+            {errors.currency && <p className="text-xs text-red-500">{t(errors.currency.message!)}</p>}
           </div>
 
           {/* Opening Balance */}
@@ -157,7 +157,7 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
               {...register('openingBalance')}
             />
             {errors.openingBalance && (
-              <p className="text-xs text-red-500">{errors.openingBalance.message}</p>
+              <p className="text-xs text-red-500">{t(errors.openingBalance.message!)}</p>
             )}
           </div>
 

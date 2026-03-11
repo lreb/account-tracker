@@ -83,5 +83,26 @@
   "transactions": {
     "exchangeRate": "Tipo de Cambio",
     "exchangeRateHelper": "1 {{currency}} = {{rate}} {{base}}"
+  },
+  "validation": {
+    "nameRequired":        "El nombre es obligatorio",
+    "currencyRequired":    "La moneda es obligatoria",
+    "dateRequired":        "La fecha es obligatoria",
+    "accountRequired":     "La cuenta es obligatoria",
+    "toAccountRequired":   "Se requiere cuenta destino para transferencias",
+    "categoryRequired":    "La categoría es obligatoria",
+    "descriptionRequired": "La descripción es obligatoria",
+    "serviceTypeRequired": "El tipo de servicio es obligatorio",
+    "startDateRequired":   "La fecha de inicio es obligatoria",
+    "iconRequired":        "El ícono es obligatorio",
+    "amountRequired":      "El monto es obligatorio",
+    "mustBeNumber":        "Debe ser un número válido",
+    "mustBePositive":      "Debe ser un número positivo",
+    "mustBeNonNegative":   "Debe ser 0 o mayor",
+    "invalidAmount":       "Ingresa un monto válido",
+    "invalidLiters":       "Ingresa un valor de litros válido",
+    "integerKmOnly":       "Solo kilómetros enteros",
+    "max30chars":          "Máximo 30 caracteres",
+    "amountPositive":      "El monto debe ser mayor a 0"
   }
 }
