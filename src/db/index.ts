@@ -1,4 +1,4 @@
-// Current DB version: 1
+// Current DB version: 2
 import Dexie, { type Table } from 'dexie'
 import type {
   Account,
@@ -38,6 +38,10 @@ class ExpenseTrackingDB extends Dexie {
       vehicles:     'id',
       fuelLogs:     'id, vehicleId, date',
       vehicleServices: 'id, vehicleId, date',
+    })
+    // Version 2: index archivedAt on vehicles for active/archived filtering
+    this.version(2).stores({
+      vehicles: 'id, archivedAt',
     })
   }
 }

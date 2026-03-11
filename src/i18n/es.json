@@ -42,7 +42,15 @@
   "vehicles": {
     "title": "Vehículos",
     "fuelLog": "Registro de Combustible",
-    "serviceHistory": "Historial de Servicios"
+    "serviceHistory": "Historial de Servicios",
+    "active": "Activos",
+    "archived": "Archivados",
+    "archive": "Archivar",
+    "unarchive": "Restaurar",
+    "archiveConfirm": "¿Archivar este vehículo? Su historial se conservará.",
+    "archivedSince": "Archivado {{date}}",
+    "noActive": "Sin vehículos activos.",
+    "noArchived": "Sin vehículos archivados."
   },
   "budgets": {
     "title": "Presupuestos",

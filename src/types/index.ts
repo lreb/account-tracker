@@ -78,6 +78,7 @@ export interface Vehicle {
   make?: string
   model?: string
   year?: number
+  archivedAt?: string        // ISO 8601 — set when archived, absent when active
 }
 
 export interface FuelLog {

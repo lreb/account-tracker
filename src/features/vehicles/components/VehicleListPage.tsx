@@ -4,7 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { v4 as uuid } from 'uuid'
-import { Plus, Car, ChevronRight, Pencil, Trash2 } from 'lucide-react'
+import { format } from 'date-fns'
+import { Plus, Car, ChevronRight, Pencil, Archive, ArchiveRestore, ChevronDown, ChevronUp } from 'lucide-react'
 
 import { vehicleSchema, type VehicleFormValues } from '../schemas/vehicle.schema'
 import { useVehiclesStore } from '@/stores/vehicles.store'
@@ -13,6 +14,7 @@ import type { Vehicle } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -32,6 +34,7 @@ function VehicleDialog({
   editing: Vehicle | null
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const { addVehicle, updateVehicle } = useVehiclesStore()
 
   const {
@@ -56,7 +59,7 @@ function VehicleDialog({
     } else {
       reset({ name: '', make: '', model: '', year: '' })
     }
-  }, [open, editing])
+  }, [open, editing, reset])
 
   const onSubmit = async (values: VehicleFormValues) => {
     const payload: Vehicle = {
@@ -65,6 +68,7 @@ function VehicleDialog({
       make: values.make || undefined,
       model: values.model || undefined,
       year: values.year,
+      archivedAt: editing?.archivedAt,
     }
     if (editing) {
       await updateVehicle(payload)
@@ -120,21 +124,120 @@ function VehicleDialog({
   )
 }
 
+// ─── Vehicle row ──────────────────────────────────────────────────────────────
+
+function VehicleRow({
+  vehicle,
+  onEdit,
+}: {
+  vehicle: Vehicle
+  onEdit: (v: Vehicle) => void
+}) {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const { archiveVehicle, unarchiveVehicle } = useVehiclesStore()
+  const isArchived = Boolean(vehicle.archivedAt)
+
+  return (
+    <li className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition-colors ${
+      isArchived ? 'bg-gray-50 border-dashed opacity-70' : 'bg-white'
+    }`}>
+      <span className={`flex h-10 w-10 items-center justify-center rounded-full shrink-0 ${
+        isArchived ? 'bg-gray-100' : 'bg-indigo-50'
+      }`}>
+        <Car size={20} className={isArchived ? 'text-gray-400' : 'text-indigo-500'} />
+      </span>
+
+      <button
+        className="flex-1 min-w-0 text-left"
+        onClick={() => !isArchived && navigate(`/vehicles/${vehicle.id}`)}
+        disabled={isArchived}
+      >
+        <div className="flex items-center gap-2">
+          <p className={`text-sm font-semibold ${isArchived ? 'text-gray-500' : ''}`}>
+            {vehicle.name}
+          </p>
+          {isArchived && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-300 text-amber-600 bg-amber-50">
+              {t('vehicles.archived')}
+            </Badge>
+          )}
+        </div>
+        <p className="text-xs text-gray-400">
+          {[vehicle.make, vehicle.model, vehicle.year].filter(Boolean).join(' · ') || 'No details'}
+        </p>
+        {isArchived && vehicle.archivedAt && (
+          <p className="text-[10px] text-gray-400 mt-0.5">
+            {t('vehicles.archivedSince', { date: format(new Date(vehicle.archivedAt), 'MMM d, yyyy') })}
+          </p>
+        )}
+      </button>
+
+      <div className="flex items-center gap-1 shrink-0">
+        {!isArchived && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => onEdit(vehicle)}
+            title="Edit"
+          >
+            <Pencil size={14} />
+          </Button>
+        )}
+        {isArchived ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+            onClick={() => unarchiveVehicle(vehicle.id)}
+            title={t('vehicles.unarchive')}
+          >
+            <ArchiveRestore size={14} />
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-amber-500 hover:text-amber-600 hover:bg-amber-50"
+            onClick={() => archiveVehicle(vehicle.id)}
+            title={t('vehicles.archive')}
+          >
+            <Archive size={14} />
+          </Button>
+        )}
+        {!isArchived && (
+          <ChevronRight
+            size={16}
+            className="text-gray-300 cursor-pointer"
+            onClick={() => navigate(`/vehicles/${vehicle.id}`)}
+          />
+        )}
+      </div>
+    </li>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function VehicleListPage() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
-  const { vehicles, removeVehicle } = useVehiclesStore()
+  const { vehicles, load } = useVehiclesStore()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Vehicle | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
+
+  useEffect(() => { load() }, [load])
+
+  const active   = vehicles.filter((v) => !v.archivedAt)
+  const archived = vehicles.filter((v) => Boolean(v.archivedAt))
 
   const openAdd = () => { setEditing(null); setDialogOpen(true) }
   const openEdit = (v: Vehicle) => { setEditing(v); setDialogOpen(true) }
   const closeDialog = () => { setDialogOpen(false); setEditing(null) }
 
   return (
-    <div className="p-4">
+    <div className="p-4 pb-24">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold">{t('vehicles.title')}</h1>
         <Button size="sm" onClick={openAdd} className="gap-1">
@@ -143,61 +246,46 @@ export default function VehicleListPage() {
         </Button>
       </div>
 
-      {vehicles.length === 0 ? (
-        <div className="text-center mt-16 space-y-2">
+      {/* Active vehicles */}
+      {active.length === 0 ? (
+        <div className="text-center mt-12 space-y-2">
           <Car size={40} className="mx-auto text-gray-300" />
-          <p className="text-sm text-gray-400">No vehicles yet.</p>
+          <p className="text-sm text-gray-400">{t('vehicles.noActive')}</p>
           <Button variant="outline" size="sm" onClick={openAdd}>
             Add your first vehicle
           </Button>
         </div>
       ) : (
         <ul className="space-y-2">
-          {vehicles.map((v) => (
-            <li
-              key={v.id}
-              className="flex items-center gap-3 rounded-2xl border bg-white px-4 py-3"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 shrink-0">
-                <Car size={20} className="text-gray-500" />
-              </span>
-
-              <button
-                className="flex-1 min-w-0 text-left"
-                onClick={() => navigate(`/vehicles/${v.id}`)}
-              >
-                <p className="text-sm font-semibold">{v.name}</p>
-                <p className="text-xs text-gray-400">
-                  {[v.make, v.model, v.year].filter(Boolean).join(' · ') || 'No details'}
-                </p>
-              </button>
-
-              <div className="flex items-center gap-1 shrink-0">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => openEdit(v)}
-                >
-                  <Pencil size={14} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-red-500 hover:text-red-600"
-                  onClick={() => removeVehicle(v.id)}
-                >
-                  <Trash2 size={14} />
-                </Button>
-                <ChevronRight
-                  size={16}
-                  className="text-gray-300 cursor-pointer"
-                  onClick={() => navigate(`/vehicles/${v.id}`)}
-                />
-              </div>
-            </li>
+          {active.map((v) => (
+            <VehicleRow key={v.id} vehicle={v} onEdit={openEdit} />
           ))}
         </ul>
+      )}
+
+      {/* Archived section — collapsible, only shown when there are archived vehicles */}
+      {archived.length > 0 && (
+        <div className="mt-6">
+          <button
+            type="button"
+            className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2 w-full"
+            onClick={() => setShowArchived((v) => !v)}
+          >
+            {showArchived ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            {t('vehicles.archived')}
+            <span className="ml-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+              {archived.length}
+            </span>
+          </button>
+
+          {showArchived && (
+            <ul className="space-y-2">
+              {archived.map((v) => (
+                <VehicleRow key={v.id} vehicle={v} onEdit={openEdit} />
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       <VehicleDialog open={dialogOpen} editing={editing} onClose={closeDialog} />

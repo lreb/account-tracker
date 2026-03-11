@@ -42,7 +42,15 @@
   "vehicles": {
     "title": "Vehicles",
     "fuelLog": "Fuel Log",
-    "serviceHistory": "Service History"
+    "serviceHistory": "Service History",
+    "active": "Active",
+    "archived": "Archived",
+    "archive": "Archive",
+    "unarchive": "Restore",
+    "archiveConfirm": "Archive this vehicle? Its history will be preserved.",
+    "archivedSince": "Archived {{date}}",
+    "noActive": "No active vehicles.",
+    "noArchived": "No archived vehicles."
   },
   "budgets": {
     "title": "Budgets",
