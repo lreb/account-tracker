@@ -5,11 +5,12 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { v4 as uuid } from 'uuid'
 import { format } from 'date-fns'
-import { Plus, Car, ChevronRight, Pencil, Archive, ArchiveRestore, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Car, ChevronRight, Pencil, Archive, ArchiveRestore, ChevronDown, ChevronUp, X } from 'lucide-react'
 
 import { vehicleSchema, type VehicleFormValues } from '../schemas/vehicle.schema'
 import { useVehiclesStore } from '@/stores/vehicles.store'
 import type { Vehicle } from '@/types'
+import { MAKES, MODEL_MAP } from '@/lib/vehicle-data'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,6 +23,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 // ─── Add / Edit dialog ────────────────────────────────────────────────────────
 
@@ -37,26 +45,42 @@ function VehicleDialog({
   const { t } = useTranslation()
   const { addVehicle, updateVehicle } = useVehiclesStore()
 
+  const [customMakeMode, setCustomMakeMode] = useState(false)
+  const [customModelMode, setCustomModelMode] = useState(false)
+
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<VehicleFormValues>({
     resolver: zodResolver(vehicleSchema),
     defaultValues: { name: '', make: '', model: '', year: '' },
   })
 
+  const watchMake  = watch('make')
+  const watchModel = watch('model')
+  const availableModels = MODEL_MAP[watchMake] ?? []
+
   useEffect(() => {
     if (!open) return
     if (editing) {
+      const isMakeCustom   = !!editing.make  && !MAKES.includes(editing.make)
+      const modelsForMake  = editing.make ? (MODEL_MAP[editing.make] ?? []) : []
+      const isModelCustom  = !!editing.model && !modelsForMake.includes(editing.model)
+      setCustomMakeMode(isMakeCustom)
+      setCustomModelMode(isModelCustom)
       reset({
-        name: editing.name,
-        make: editing.make ?? '',
+        name:  editing.name,
+        make:  editing.make  ?? '',
         model: editing.model ?? '',
-        year: editing.year?.toString() ?? '',
+        year:  editing.year?.toString() ?? '',
       })
     } else {
+      setCustomMakeMode(false)
+      setCustomModelMode(false)
       reset({ name: '', make: '', model: '', year: '' })
     }
   }, [open, editing, reset])
@@ -93,15 +117,115 @@ function VehicleDialog({
             {errors.name && <p className="text-xs text-red-500">{t(errors.name.message!)}</p>}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="vMake">Make</Label>
-              <Input id="vMake" placeholder="Toyota" {...register('make')} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="vModel">Model</Label>
-              <Input id="vModel" placeholder="Corolla" {...register('model')} />
-            </div>
+          {/* Make */}
+          <div className="space-y-1">
+            <Label>Make</Label>
+            {customMakeMode ? (
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Enter make"
+                  className="flex-1"
+                  autoFocus
+                  {...register('make')}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0"
+                  title="Back to list"
+                  onClick={() => {
+                    setCustomMakeMode(false)
+                    setCustomModelMode(false)
+                    setValue('make', '')
+                    setValue('model', '')
+                  }}
+                >
+                  <X size={14} />
+                </Button>
+              </div>
+            ) : (
+              <Select
+                value={watchMake || ''}
+                onValueChange={(val) => {
+                  if (val === '__other__') {
+                    setCustomMakeMode(true)
+                    setValue('make', '')
+                  } else {
+                    setValue('make', val)
+                  }
+                  // always reset model when make changes
+                  setCustomModelMode(false)
+                  setValue('model', '')
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select make" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {MAKES.map((m) => (
+                    <SelectItem key={m} value={m}>{m}</SelectItem>
+                  ))}
+                  <SelectItem value="__other__">Other…</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          {/* Model */}
+          <div className="space-y-1">
+            <Label>Model</Label>
+            {!customModelMode && availableModels.length > 0 ? (
+              <Select
+                value={watchModel || ''}
+                onValueChange={(val) => {
+                  if (val === '__other__') {
+                    setCustomModelMode(true)
+                    setValue('model', '')
+                  } else {
+                    setValue('model', val)
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select model" />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {availableModels.map((m) => (
+                    <SelectItem key={m} value={m}>{m}</SelectItem>
+                  ))}
+                  <SelectItem value="__other__">Other…</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="flex gap-2">
+                <Input
+                  placeholder={
+                    !watchMake && !customMakeMode
+                      ? 'Select a make first'
+                      : 'Enter model'
+                  }
+                  disabled={!watchMake && !customMakeMode}
+                  className="flex-1"
+                  {...register('model')}
+                />
+                {customModelMode && availableModels.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    title="Back to list"
+                    onClick={() => {
+                      setCustomModelMode(false)
+                      setValue('model', '')
+                    }}
+                  >
+                    <X size={14} />
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-1">

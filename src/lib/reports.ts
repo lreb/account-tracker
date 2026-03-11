@@ -7,7 +7,7 @@ import {
   parseISO,
   isWithinInterval,
 } from 'date-fns'
-import type { Transaction, Account, Category } from '@/types'
+import type { Transaction, Account, Category, Label } from '@/types'
 import { convertToBase } from './currency'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -269,4 +269,122 @@ export function computeCashFlow(
       cumulative,
     }
   })
+}
+
+// ─── Label breakdown ──────────────────────────────────────────────────────────
+
+export interface LabelSlice {
+  labelId: string          // '_none' for untagged
+  name: string
+  color: string
+  income: number
+  expenses: number
+  net: number
+  txCount: number
+  percent: number          // share of total expenses (0–100)
+}
+
+/**
+ * Aggregates transactions by label.  A transaction with multiple labels is
+ * counted once per label (intentional — labels are independent dimensions).
+ * Unlabelled transactions are grouped under the synthetic '_none' bucket.
+ */
+export function computeLabelBreakdown(
+  transactions: Transaction[],
+  labels: Label[],
+  filters: ReportFilters,
+): LabelSlice[] {
+  const filtered = transactions.filter((t) => {
+    if (!txInRange(t, filters.from, filters.to)) return false
+    if (filters.accountId && t.accountId !== filters.accountId) return false
+    return true
+  })
+
+  // Build a map: labelId → { income, expenses, net, txCount }
+  interface Acc { income: number; expenses: number; txCount: number }
+  const map = new Map<string, Acc>()
+
+  const ensure = (id: string) => {
+    if (!map.has(id)) map.set(id, { income: 0, expenses: 0, txCount: 0 })
+    return map.get(id)!
+  }
+
+  for (const t of filtered) {
+    const labelIds = t.labels && t.labels.length > 0 ? t.labels : ['_none']
+    for (const lid of labelIds) {
+      const acc = ensure(lid)
+      acc.txCount++
+      if (t.type === 'income')  acc.income   += toBase(t)
+      if (t.type === 'expense') acc.expenses += toBase(t)
+    }
+  }
+
+  const totalExpenses = Array.from(map.values()).reduce((s, v) => s + v.expenses, 0)
+
+  const labelMap = new Map(labels.map((l) => [l.id, l]))
+
+  return Array.from(map.entries())
+    .map(([labelId, acc]) => {
+      const label = labelMap.get(labelId)
+      return {
+        labelId,
+        name:    labelId === '_none' ? 'Untagged' : (label?.name ?? labelId),
+        color:   labelId === '_none' ? '#9ca3af'  : (label?.color ?? '#6366f1'),
+        income:   acc.income,
+        expenses: acc.expenses,
+        net:      acc.income - acc.expenses,
+        txCount:  acc.txCount,
+        percent:  totalExpenses > 0 ? Math.round((acc.expenses / totalExpenses) * 100) : 0,
+      }
+    })
+    .sort((a, b) => b.expenses - a.expenses)
+}
+
+// ─── 50/30/20 rule ───────────────────────────────────────────────────────────
+
+export interface BucketSummary {
+  label: string      // label name used for this bucket
+  labelId: string
+  color: string
+  expenses: number   // total expenses cents
+  income: number     // total income cents
+  txCount: number
+}
+
+/**
+ * Returns per-label totals for expenses and income, in the same structure as
+ * LabelSlice but without percents — the caller decides how to present the
+ * 50/30/20 targets.
+ *
+ * The three canonical bucket labelIds (by convention) are any labels whose
+ * names contain "needs", "wants", or "savings" (case-insensitive).
+ * If none are found, returns all labels so the user can still see their
+ * spending distribution.
+ */
+export function compute503020(
+  transactions: Transaction[],
+  labels: Label[],
+  filters: ReportFilters,
+): {
+  buckets: BucketSummary[]
+  totalIncome: number
+  totalExpenses: number
+} {
+  const slices = computeLabelBreakdown(transactions, labels, filters)
+  const totalIncome   = slices.reduce((s, l) => s + l.income, 0)
+  const totalExpenses = slices.reduce((s, l) => s + l.expenses, 0)
+
+  // Exclude the synthetic 'untagged' bucket from the rule view
+  const buckets = slices
+    .filter((s) => s.labelId !== '_none')
+    .map((s) => ({
+      label:    s.name,
+      labelId:  s.labelId,
+      color:    s.color,
+      expenses: s.expenses,
+      income:   s.income,
+      txCount:  s.txCount,
+    }))
+
+  return { buckets, totalIncome, totalExpenses }
 }

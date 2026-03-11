@@ -72,7 +72,12 @@
     "theme": "Tema",
     "backup": "Respaldo y Restauración",
     "exportData": "Exportar Datos",
-    "importData": "Importar Datos"
+    "importData": "Importar Datos",
+    "exportCsvTransactions": "Exportar transacciones como CSV",
+    "importCsvTransactions": "Importar transacciones desde CSV",
+    "csvImportSuccess": "Se importaron {{count}} transacción(es) correctamente.",
+    "csvImportSkipped": "{{skipped}} fila(s) omitidas por errores.",
+    "csvImportError": "No se pudo leer el archivo. Asegúrate de que sea un CSV válido."
   },
   "exchangeRates": {
     "fetchLatest": "Obtener Tipos Actuales",

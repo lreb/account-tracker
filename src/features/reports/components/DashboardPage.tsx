@@ -7,9 +7,10 @@ import { useTransactionsStore } from '@/stores/transactions.store'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useBudgetsStore } from '@/stores/budgets.store'
 import { useCategoriesStore } from '@/stores/categories.store'
+import { useLabelsStore } from '@/stores/labels.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { formatCurrency } from '@/lib/currency'
-import { computePeriodSummary, computeMonthlyTrend, type ReportFilters } from '@/lib/reports'
+import { computePeriodSummary, computeMonthlyTrend, compute503020, type ReportFilters } from '@/lib/reports'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts'
@@ -20,6 +21,7 @@ export default function DashboardPage() {
   const { accounts } = useAccountsStore()
   const { budgets } = useBudgetsStore()
   const { categories } = useCategoriesStore()
+  const { labels } = useLabelsStore()
   const { baseCurrency } = useSettingsStore()
 
   const now = new Date()
@@ -55,6 +57,12 @@ export default function DashboardPage() {
 
   // Recent transactions (last 5)
   const recent = useMemo(() => transactions.slice(0, 5), [transactions])
+
+  // 50/30/20 — only render when user has labelled transactions this month
+  const rule503020 = useMemo(
+    () => compute503020(transactions, labels, thisMonthFilters),
+    [transactions, labels, thisMonthFilters],
+  )
 
   // Budget health: top 3 budgets by percent used
   const topBudgets = useMemo(() => {
@@ -142,6 +150,48 @@ export default function DashboardPage() {
               <Bar dataKey="expenses" fill="#ef4444" radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* ── 50/30/20 widget (only when user has labelled transactions) ──── */}
+      {rule503020.buckets.length > 0 && (
+        <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider">50/30/20 Overview</p>
+            <Link to="/reports" className="text-xs text-indigo-600 hover:underline">Details</Link>
+          </div>
+          {/* Stacked bar */}
+          <div className="flex h-4 rounded-full overflow-hidden w-full gap-px">
+            {rule503020.buckets.map((b) => {
+              const w = rule503020.totalIncome > 0
+                ? Math.round((b.expenses / rule503020.totalIncome) * 100)
+                : 0
+              return w > 0 ? (
+                <div
+                  key={b.labelId}
+                  className="h-full"
+                  style={{ width: `${w}%`, background: b.color }}
+                  title={`${b.label}: ${w}% of income`}
+                />
+              ) : null
+            })}
+          </div>
+          {/* Legend */}
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {rule503020.buckets.map((b) => {
+              const pct = rule503020.totalIncome > 0
+                ? Math.round((b.expenses / rule503020.totalIncome) * 100)
+                : 0
+              return (
+                <div key={b.labelId} className="flex items-center gap-1 text-xs">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: b.color }} />
+                  <span className="text-gray-500">{b.label}</span>
+                  <span className="font-semibold text-gray-800">{pct}%</span>
+                  <span className="text-gray-400 text-[10px]">({formatCurrency(b.expenses, baseCurrency)})</span>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 

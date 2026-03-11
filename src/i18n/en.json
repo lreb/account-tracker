@@ -108,7 +108,12 @@
     "theme": "Theme",
     "backup": "Backup & Restore",
     "exportData": "Export Data",
-    "importData": "Import Data"
+    "importData": "Import Data",
+    "exportCsvTransactions": "Export transactions as CSV",
+    "importCsvTransactions": "Import transactions from CSV",
+    "csvImportSuccess": "Imported {{count}} transaction(s) successfully.",
+    "csvImportSkipped": "{{skipped}} row(s) were skipped due to errors.",
+    "csvImportError": "Could not read the file. Make sure it is a valid CSV."
   },
   "exchangeRates": {
     "fetchLatest": "Fetch Latest Rates",

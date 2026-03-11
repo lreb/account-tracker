@@ -19,6 +19,7 @@ import {
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useCategoriesStore } from '@/stores/categories.store'
+import { useLabelsStore } from '@/stores/labels.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { formatCurrency } from '@/lib/currency'
 import {
@@ -27,6 +28,8 @@ import {
   computeCategoryBreakdown,
   computeAccountBalances,
   computeCashFlow,
+  computeLabelBreakdown,
+  compute503020,
   type ReportFilters,
 } from '@/lib/reports'
 import { CategoryIcon } from '@/lib/icon-map'
@@ -134,6 +137,7 @@ export default function ReportsPage() {
   const { transactions } = useTransactionsStore()
   const { accounts } = useAccountsStore()
   const { categories } = useCategoriesStore()
+  const { labels } = useLabelsStore()
   const { baseCurrency } = useSettingsStore()
 
   // ── Filter state ─────────────────────────────────────────────────────────
@@ -141,7 +145,8 @@ export default function ReportsPage() {
   const [customFrom, setCustomFrom] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'))
   const [customTo, setCustomTo] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'))
   const [filterAccount, setFilterAccount] = useState<string>('all')
-  const [activeTab, setActiveTab] = useState<'overview' | 'category' | 'accounts' | 'cashflow'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'category' | 'accounts' | 'cashflow' | 'labels'>('overview')
+  const [labelView, setLabelView] = useState<'breakdown' | '503020'>('breakdown')
 
   const filters: ReportFilters = useMemo(() => {
     if (preset === 'custom') {
@@ -194,6 +199,16 @@ export default function ReportsPage() {
   const cashFlow = useMemo(
     () => computeCashFlow(transactions, monthCount, filterAccount === 'all' ? undefined : filterAccount),
     [transactions, monthCount, filterAccount],
+  )
+
+  const labelBreakdown = useMemo(
+    () => computeLabelBreakdown(transactions, labels, filters),
+    [transactions, labels, filters],
+  )
+
+  const rule503020 = useMemo(
+    () => compute503020(transactions, labels, filters),
+    [transactions, labels, filters],
   )
 
   const hasData = transactions.length > 0
@@ -277,17 +292,17 @@ export default function ReportsPage() {
       </div>
 
       {/* ── Tab navigation ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-4 gap-1 rounded-xl bg-gray-100 p-1">
-        {(['overview', 'category', 'accounts', 'cashflow'] as const).map((t) => (
+      <div className="flex gap-1 flex-wrap rounded-xl bg-gray-100 p-1">
+        {(['overview', 'category', 'accounts', 'cashflow', 'labels'] as const).map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => setActiveTab(t)}
-            className={`rounded-lg py-1.5 text-xs font-medium transition-colors capitalize ${
+            className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors ${
               activeTab === t ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            {{ overview: 'Overview', category: 'Category', accounts: 'Accounts', cashflow: 'Cash Flow' }[t]}
+            {{ overview: 'Overview', category: 'Category', accounts: 'Accounts', cashflow: 'Cash Flow', labels: 'Labels' }[t]}
           </button>
         ))}
       </div>
@@ -469,6 +484,188 @@ export default function ReportsPage() {
                 )}
               </div>
             ))
+          )}
+        </div>
+      )}
+
+      {/* ── Labels tab ───────────────────────────────────────────────────── */}
+      {activeTab === 'labels' && (
+        <div className="space-y-5">
+          {/* Sub-view toggle */}
+          <div className="flex gap-1 rounded-lg bg-gray-100 p-1">
+            {(['breakdown', '503020'] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setLabelView(v)}
+                className={`flex-1 rounded-md py-1.5 text-xs font-medium transition-colors ${
+                  labelView === v ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {v === 'breakdown' ? 'Breakdown' : '50/30/20 Rule'}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Breakdown view ────────────────────────────────────────────── */}
+          {labelView === 'breakdown' && (
+            <div className="space-y-4">
+              {labelBreakdown.length === 0 ? (
+                <div className="rounded-2xl border bg-white p-6 text-center text-sm text-gray-400">
+                  No transactions in this period. Tag transactions with labels to see insights.
+                </div>
+              ) : (
+                labelBreakdown.map((slice) => (
+                  <div key={slice.labelId} className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
+                    {/* Label header */}
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-3 h-3 rounded-full shrink-0"
+                        style={{ background: slice.color }}
+                      />
+                      <span className="font-semibold text-sm text-gray-800">{slice.name}</span>
+                      <span className="ml-auto text-xs text-gray-400">{slice.txCount} transaction{slice.txCount !== 1 ? 's' : ''}</span>
+                    </div>
+                    {/* Income / Expenses / Net row */}
+                    <div className="grid grid-cols-3 divide-x rounded-xl bg-gray-50 overflow-hidden">
+                      {([
+                        { label: 'Income',   value: slice.income,   color: 'text-green-600' },
+                        { label: 'Expenses', value: slice.expenses, color: 'text-red-500' },
+                        { label: 'Net',      value: slice.net,      color: slice.net >= 0 ? 'text-indigo-600' : 'text-orange-500' },
+                      ] as const).map(({ label, value, color }) => (
+                        <div key={label} className="text-center py-3 px-2">
+                          <p className="text-[10px] uppercase tracking-wide text-gray-400">{label}</p>
+                          <p className={`text-sm font-bold mt-0.5 ${color}`}>{formatCurrency(value, baseCurrency)}</p>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Expense share bar */}
+                    {slice.expenses > 0 && (
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] text-gray-400">
+                          <span>Share of total expenses</span>
+                          <span>{slice.percent}%</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{ width: `${slice.percent}%`, background: slice.color }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* ── 50/30/20 view ─────────────────────────────────────────────── */}
+          {labelView === '503020' && (
+            <div className="space-y-4">
+              {/* Explainer */}
+              <div className="rounded-2xl border bg-indigo-50 border-indigo-200 p-4 space-y-1">
+                <p className="text-sm font-semibold text-indigo-800">50/30/20 Rule</p>
+                <p className="text-xs text-indigo-600 leading-relaxed">
+                  Tag your transactions with labels like <strong>Needs</strong>, <strong>Wants</strong>, and <strong>Savings</strong> to track your spending against this popular budgeting framework.
+                </p>
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {[{ label: 'Needs', target: '50%', color: 'bg-blue-100 text-blue-700' }, { label: 'Wants', target: '30%', color: 'bg-amber-100 text-amber-700' }, { label: 'Savings', target: '20%', color: 'bg-green-100 text-green-700' }].map((b) => (
+                    <span key={b.label} className={`text-xs px-2 py-0.5 rounded-full font-medium ${b.color}`}>
+                      {b.label} → {b.target}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {rule503020.buckets.length === 0 ? (
+                <div className="rounded-2xl border bg-white p-6 text-center text-sm text-gray-400">
+                  No labelled transactions in this period.
+                </div>
+              ) : (
+                <>
+                  {/* Stacked bar across total income */}
+                  {rule503020.totalIncome > 0 && (
+                    <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
+                      <SectionTitle>Spending vs Income</SectionTitle>
+                      <div className="flex h-5 rounded-full overflow-hidden w-full gap-px">
+                        {rule503020.buckets.map((b) => {
+                          const w = rule503020.totalIncome > 0
+                            ? Math.round((b.expenses / rule503020.totalIncome) * 100)
+                            : 0
+                          return w > 0 ? (
+                            <div
+                              key={b.labelId}
+                              className="h-full"
+                              style={{ width: `${w}%`, background: b.color }}
+                              title={`${b.label}: ${w}% of income`}
+                            />
+                          ) : null
+                        })}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {rule503020.buckets.map((b) => {
+                          const pct = rule503020.totalIncome > 0
+                            ? Math.round((b.expenses / rule503020.totalIncome) * 100)
+                            : 0
+                          return (
+                            <div key={b.labelId} className="flex items-center gap-1 text-xs">
+                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: b.color }} />
+                              <span className="text-gray-600">{b.label}</span>
+                              <span className="font-semibold text-gray-800">{pct}%</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <p className="text-[10px] text-gray-400">
+                        Total income: {formatCurrency(rule503020.totalIncome, baseCurrency)} · Total tagged expenses: {formatCurrency(rule503020.totalExpenses, baseCurrency)}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Per-bucket cards */}
+                  {rule503020.buckets.map((b) => {
+                    const pctOfIncome = rule503020.totalIncome > 0
+                      ? Math.round((b.expenses / rule503020.totalIncome) * 100)
+                      : 0
+                    const pctOfExpenses = rule503020.totalExpenses > 0
+                      ? Math.round((b.expenses / rule503020.totalExpenses) * 100)
+                      : 0
+                    return (
+                      <div key={b.labelId} className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded-full shrink-0" style={{ background: b.color }} />
+                          <span className="font-semibold text-sm text-gray-800">{b.label}</span>
+                          <span className="ml-auto text-xs text-gray-400">{b.txCount} tx</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="rounded-xl bg-gray-50 p-3 text-center">
+                            <p className="text-[10px] text-gray-400 uppercase">Expenses</p>
+                            <p className="text-base font-bold text-red-500 mt-0.5">{formatCurrency(b.expenses, baseCurrency)}</p>
+                          </div>
+                          <div className="rounded-xl bg-gray-50 p-3 text-center">
+                            <p className="text-[10px] text-gray-400 uppercase">% of Income</p>
+                            <p className="text-base font-bold text-indigo-600 mt-0.5">{pctOfIncome}%</p>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[10px] text-gray-400">
+                            <span>% of all tagged expenses</span>
+                            <span>{pctOfExpenses}%</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all"
+                              style={{ width: `${pctOfExpenses}%`, background: b.color }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </>
+              )}
+            </div>
           )}
         </div>
       )}
