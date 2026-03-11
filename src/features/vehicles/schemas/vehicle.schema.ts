@@ -29,6 +29,8 @@ export const fuelLogSchema = z.object({
     .string()
     .regex(/^\d+$/, 'Integer km only')
     .refine((v) => parseInt(v, 10) >= 0, 'Must be ≥ 0'),
+  accountId: z.string().min(1, 'Account is required'),
+  categoryId: z.string().min(1, 'Category is required'),
 })
 
 export type FuelLogFormValues = z.infer<typeof fuelLogSchema>
@@ -49,6 +51,8 @@ export const vehicleServiceSchema = z.object({
   notes: z.string().max(200).optional(),
   nextServiceKm: z.string().optional(),
   nextServiceDate: z.string().optional(),
+  accountId: z.string().min(1, 'Account is required'),
+  categoryId: z.string().min(1, 'Category is required'),
 })
 
 export type VehicleServiceFormValues = z.infer<typeof vehicleServiceSchema>

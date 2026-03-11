@@ -87,6 +87,7 @@ export interface FuelLog {
   liters: number
   totalCost: number           // integer cents
   odometer: number            // km reading at fill-up
+  transactionId?: string      // linked expense transaction
 }
 
 export interface VehicleService {
@@ -99,4 +100,5 @@ export interface VehicleService {
   notes?: string
   nextServiceKm?: number
   nextServiceDate?: string    // ISO 8601
+  transactionId?: string      // linked expense transaction
 }

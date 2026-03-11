@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useParams, useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { v4 as uuid } from 'uuid'
-import { ArrowLeft, Plus, Fuel, Wrench, Trash2, Gauge, TrendingDown } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Gauge, TrendingDown, Fuel } from 'lucide-react'
 
 import {
   fuelLogSchema,
@@ -13,6 +13,9 @@ import {
   type VehicleServiceFormValues,
 } from '../schemas/vehicle.schema'
 import { useVehiclesStore } from '@/stores/vehicles.store'
+import { useTransactionsStore } from '@/stores/transactions.store'
+import { useAccountsStore } from '@/stores/accounts.store'
+import { useCategoriesStore } from '@/stores/categories.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { formatCurrency } from '@/lib/currency'
 import { calcKmPerLiter, calcCostPerKm, calcKmSinceLastFill } from '@/lib/vehicles'
@@ -23,6 +26,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -36,35 +46,73 @@ import {
 function FuelLogDialog({
   open,
   vehicleId,
+  vehicleName,
   lastOdometer,
   onClose,
 }: {
   open: boolean
   vehicleId: string
+  vehicleName: string
   lastOdometer: number
   onClose: () => void
 }) {
   const { addFuelLog } = useVehiclesStore()
+  const { add: addTransaction } = useTransactionsStore()
+  const { accounts } = useAccountsStore()
+  const { categories } = useCategoriesStore()
   const { baseCurrency } = useSettingsStore()
+
+  const defaultAccount = accounts[0]
+  const fuelCategory = categories.find((c) => c.id === 'fuel-gas') ?? categories[0]
 
   const {
     register,
     handleSubmit,
+    setValue,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<FuelLogFormValues>({
     resolver: zodResolver(fuelLogSchema),
-    defaultValues: { date: format(new Date(), 'yyyy-MM-dd'), liters: '', totalCost: '', odometer: '' },
+    defaultValues: {
+      date: format(new Date(), 'yyyy-MM-dd'),
+      liters: '',
+      totalCost: '',
+      odometer: '',
+      accountId: defaultAccount?.id ?? '',
+      categoryId: fuelCategory?.id ?? '',
+    },
   })
 
   const onSubmit = async (values: FuelLogFormValues) => {
+    const account = accounts.find((a) => a.id === values.accountId)
+    const costCents = Math.round(parseFloat(values.totalCost) * 100)
+    const isoDate = new Date(values.date).toISOString()
+    const txId = uuid()
+    const logId = uuid()
+
+    // 1. Create the expense transaction
+    await addTransaction({
+      id: txId,
+      type: 'expense',
+      amount: costCents,
+      date: isoDate,
+      categoryId: values.categoryId,
+      accountId: values.accountId,
+      description: `Fuel – ${parseFloat(values.liters).toFixed(2)} L · ${vehicleName}`,
+      status: 'cleared',
+      currency: account?.currency ?? baseCurrency,
+      labels: [],
+    })
+
+    // 2. Create the fuel log linked to the transaction
     const log: FuelLog = {
-      id: uuid(),
+      id: logId,
       vehicleId,
-      date: new Date(values.date).toISOString(),
+      date: isoDate,
       liters: parseFloat(values.liters),
-      totalCost: Math.round(parseFloat(values.totalCost) * 100),
+      totalCost: costCents,
       odometer: parseInt(values.odometer, 10),
+      transactionId: txId,
     }
     await addFuelLog(log)
     reset()
@@ -75,7 +123,7 @@ function FuelLogDialog({
     <Dialog open={open} onOpenChange={(v) => { if (!v) { reset(); onClose() } }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Add Fuel Log</DialogTitle>
+          <DialogTitle>Add Fuel Fill-up</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-1">
           <div className="space-y-1">
@@ -90,7 +138,7 @@ function FuelLogDialog({
               {errors.liters && <p className="text-xs text-red-500">{errors.liters.message}</p>}
             </div>
             <div className="space-y-1">
-              <Label htmlFor="fCost">Total Cost ({baseCurrency})</Label>
+              <Label htmlFor="fCost">Total Cost</Label>
               <Input id="fCost" type="number" step="0.01" inputMode="decimal" placeholder="0.00" {...register('totalCost')} />
               {errors.totalCost && <p className="text-xs text-red-500">{errors.totalCost.message}</p>}
             </div>
@@ -99,6 +147,32 @@ function FuelLogDialog({
             <Label htmlFor="fOdo">Odometer (km)</Label>
             <Input id="fOdo" type="number" inputMode="numeric" placeholder={lastOdometer > 0 ? `Last: ${lastOdometer}` : '0'} {...register('odometer')} />
             {errors.odometer && <p className="text-xs text-red-500">{errors.odometer.message}</p>}
+          </div>
+          {/* Account */}
+          <div className="space-y-1">
+            <Label>Charge to Account</Label>
+            <Select defaultValue={defaultAccount?.id} onValueChange={(v) => setValue('accountId', v)}>
+              <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+              <SelectContent>
+                {accounts.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.accountId && <p className="text-xs text-red-500">{errors.accountId.message}</p>}
+          </div>
+          {/* Category */}
+          <div className="space-y-1">
+            <Label>Category</Label>
+            <Select defaultValue={fuelCategory?.id} onValueChange={(v) => setValue('categoryId', v)}>
+              <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+              <SelectContent>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.categoryId && <p className="text-xs text-red-500">{errors.categoryId.message}</p>}
           </div>
           <DialogFooter className="gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => { reset(); onClose() }}>Cancel</Button>
@@ -115,36 +189,75 @@ function FuelLogDialog({
 function ServiceDialog({
   open,
   vehicleId,
+  vehicleName,
   onClose,
 }: {
   open: boolean
   vehicleId: string
+  vehicleName: string
   onClose: () => void
 }) {
   const { addService } = useVehiclesStore()
+  const { add: addTransaction } = useTransactionsStore()
+  const { accounts } = useAccountsStore()
+  const { categories } = useCategoriesStore()
   const { baseCurrency } = useSettingsStore()
+
+  const defaultAccount = accounts[0]
+  const maintenanceCategory = categories.find((c) => c.id === 'vehicle-maintenance') ?? categories[0]
 
   const {
     register,
     handleSubmit,
+    setValue,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<VehicleServiceFormValues>({
     resolver: zodResolver(vehicleServiceSchema),
-    defaultValues: { date: format(new Date(), 'yyyy-MM-dd'), serviceType: '', cost: '', odometer: '' },
+    defaultValues: {
+      date: format(new Date(), 'yyyy-MM-dd'),
+      serviceType: '',
+      cost: '',
+      odometer: '',
+      accountId: defaultAccount?.id ?? '',
+      categoryId: maintenanceCategory?.id ?? '',
+    },
   })
 
   const onSubmit = async (values: VehicleServiceFormValues) => {
+    const account = accounts.find((a) => a.id === values.accountId)
+    const costCents = Math.round(parseFloat(values.cost) * 100)
+    const isoDate = new Date(values.date).toISOString()
+    const txId = uuid()
+    const svcId = uuid()
+
+    // 1. Create the expense transaction
+    await addTransaction({
+      id: txId,
+      type: 'expense',
+      amount: costCents,
+      date: isoDate,
+      categoryId: values.categoryId,
+      accountId: values.accountId,
+      description: `${values.serviceType} · ${vehicleName}`,
+      notes: values.notes || undefined,
+      status: 'cleared',
+      currency: account?.currency ?? baseCurrency,
+      labels: [],
+    })
+
+    // 2. Create the service record linked to the transaction
     const svc: VehicleService = {
-      id: uuid(),
+      id: svcId,
       vehicleId,
-      date: new Date(values.date).toISOString(),
+      date: isoDate,
       serviceType: values.serviceType,
-      cost: Math.round(parseFloat(values.cost) * 100),
+      cost: costCents,
       odometer: parseInt(values.odometer, 10),
       notes: values.notes || undefined,
       nextServiceKm: values.nextServiceKm ? parseInt(values.nextServiceKm, 10) : undefined,
       nextServiceDate: values.nextServiceDate ? new Date(values.nextServiceDate).toISOString() : undefined,
+      transactionId: txId,
     }
     await addService(svc)
     reset()
@@ -170,7 +283,7 @@ function ServiceDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="sCost">Cost ({baseCurrency})</Label>
+              <Label htmlFor="sCost">Cost</Label>
               <Input id="sCost" type="number" step="0.01" inputMode="decimal" placeholder="0.00" {...register('cost')} />
               {errors.cost && <p className="text-xs text-red-500">{errors.cost.message}</p>}
             </div>
@@ -179,6 +292,32 @@ function ServiceDialog({
               <Input id="sOdo" type="number" inputMode="numeric" placeholder="0" {...register('odometer')} />
               {errors.odometer && <p className="text-xs text-red-500">{errors.odometer.message}</p>}
             </div>
+          </div>
+          {/* Account */}
+          <div className="space-y-1">
+            <Label>Charge to Account</Label>
+            <Select defaultValue={defaultAccount?.id} onValueChange={(v) => setValue('accountId', v)}>
+              <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+              <SelectContent>
+                {accounts.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.accountId && <p className="text-xs text-red-500">{errors.accountId.message}</p>}
+          </div>
+          {/* Category */}
+          <div className="space-y-1">
+            <Label>Category</Label>
+            <Select defaultValue={maintenanceCategory?.id} onValueChange={(v) => setValue('categoryId', v)}>
+              <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+              <SelectContent>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.categoryId && <p className="text-xs text-red-500">{errors.categoryId.message}</p>}
           </div>
           <div className="space-y-1">
             <Label htmlFor="sNotes">Notes</Label>
@@ -334,6 +473,7 @@ export default function VehicleDetailPage() {
           <FuelLogDialog
             open={fuelDialog}
             vehicleId={vehicle.id}
+            vehicleName={vehicle.name}
             lastOdometer={logs[0]?.odometer ?? 0}
             onClose={() => setFuelDialog(false)}
           />
@@ -385,6 +525,7 @@ export default function VehicleDetailPage() {
           <ServiceDialog
             open={serviceDialog}
             vehicleId={vehicle.id}
+            vehicleName={vehicle.name}
             onClose={() => setServiceDialog(false)}
           />
         </>

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { toast } from 'sonner'
 import { db } from '@/db'
+import { useTransactionsStore } from './transactions.store'
 import type { Vehicle, FuelLog, VehicleService } from '@/types'
 
 interface VehiclesState {
@@ -60,8 +61,25 @@ export const useVehiclesStore = create<VehiclesState>((set) => ({
 
   removeVehicle: async (id) => {
     try {
+      // Cascade: delete all fuel logs + services + their linked transactions
+      const logs = await db.fuelLogs.where('vehicleId').equals(id).toArray()
+      const svcs = await db.vehicleServices.where('vehicleId').equals(id).toArray()
+      const txIds = [
+        ...logs.map((l) => l.transactionId),
+        ...svcs.map((s) => s.transactionId),
+      ].filter((txId): txId is string => Boolean(txId))
+      if (txIds.length > 0) {
+        await db.transactions.bulkDelete(txIds)
+        useTransactionsStore.getState().removeMany(txIds)
+      }
+      await db.fuelLogs.where('vehicleId').equals(id).delete()
+      await db.vehicleServices.where('vehicleId').equals(id).delete()
       await db.vehicles.delete(id)
-      set((s) => ({ vehicles: s.vehicles.filter((v) => v.id !== id) }))
+      set((s) => ({
+        vehicles: s.vehicles.filter((v) => v.id !== id),
+        fuelLogs: s.fuelLogs.filter((f) => f.vehicleId !== id),
+        vehicleServices: s.vehicleServices.filter((sv) => sv.vehicleId !== id),
+      }))
       toast.success('Vehicle deleted')
     } catch (err) {
       console.error(err)
@@ -82,6 +100,11 @@ export const useVehiclesStore = create<VehiclesState>((set) => ({
 
   removeFuelLog: async (id) => {
     try {
+      const log = await db.fuelLogs.get(id)
+      if (log?.transactionId) {
+        await db.transactions.delete(log.transactionId)
+        useTransactionsStore.getState().removeMany([log.transactionId])
+      }
       await db.fuelLogs.delete(id)
       set((s) => ({ fuelLogs: s.fuelLogs.filter((f) => f.id !== id) }))
       toast.success('Fuel log deleted')
@@ -104,8 +127,13 @@ export const useVehiclesStore = create<VehiclesState>((set) => ({
 
   removeService: async (id) => {
     try {
+      const svc = await db.vehicleServices.get(id)
+      if (svc?.transactionId) {
+        await db.transactions.delete(svc.transactionId)
+        useTransactionsStore.getState().removeMany([svc.transactionId])
+      }
       await db.vehicleServices.delete(id)
-      set((s) => ({ vehicleServices: s.vehicleServices.filter((s) => s.id !== id) }))
+      set((s) => ({ vehicleServices: s.vehicleServices.filter((sv) => sv.id !== id) }))
       toast.success('Service record deleted')
     } catch (err) {
       console.error(err)
