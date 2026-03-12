@@ -13,11 +13,19 @@
     "edit": "Edit",
     "delete": "Delete",
     "save": "Save",
+    "update": "Update",
     "cancel": "Cancel",
     "confirm": "Confirm",
     "loading": "Loading…",
     "error": "Something went wrong",
-    "comingSoon": "Coming soon"
+    "comingSoon": "Coming soon",
+    "optional": "Optional",
+    "amount": "Amount",
+    "date": "Date",
+    "time": "Time",
+    "status": "Status",
+    "notes": "Notes",
+    "toAccount": "To Account"
   },
   "dashboard": {
     "income": "Income",
@@ -32,11 +40,50 @@
     "income": "Income",
     "expense": "Expense",
     "transfer": "Transfer",
+    "date": "Date",
+    "time": "Time",
+    "account": "Account",
+    "selectAccount": "Select account",
+    "category": "Category",
+    "selectCategory": "Select category",
+    "statusLabel": "Status",
+    "labels": "Labels",
+    "notes": "Notes",
+    "notesPlaceholder": "Optional notes…",
+    "exchangeRate": "Exchange Rate",
+    "exchangeRateHelper": "1 {{currency}} = {{rate}} {{base}}",
+    "noTransactions": "No transactions yet. Tap + to add one.",
+    "noMatch": "No transactions match your filters.",
+    "clearFilters": "Clear filters",
+    "clearAll": "Clear all",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "record": "record",
+    "records": "records",
     "status": {
       "pending": "Pending",
       "cleared": "Cleared",
       "reconciled": "Reconciled",
       "cancelled": "Cancelled"
+    },
+    "filters": {
+      "button": "Filters",
+      "title": "Filter Transactions",
+      "keyword": "Keyword",
+      "keywordPlaceholder": "Search description or notes\u2026",
+      "type": "Type",
+      "all": "All",
+      "category": "Category",
+      "allCategories": "All categories",
+      "account": "Account",
+      "allAccounts": "All accounts",
+      "allLabels": "All labels",
+      "status": "Status",
+      "allStatuses": "All statuses",
+      "dateFrom": "From",
+      "dateTo": "To",
+      "apply": "Apply",
+      "reset": "Reset"
     }
   },
   "vehicles": {
@@ -50,7 +97,52 @@
     "archiveConfirm": "Archive this vehicle? Its history will be preserved.",
     "archivedSince": "Archived {{date}}",
     "noActive": "No active vehicles.",
-    "noArchived": "No archived vehicles."
+    "noArchived": "No archived vehicles.",
+    "initialOdometer": "Initial Odometer",
+    "fuelFillUp": "Fuel fill-up",
+    "editFuelLog": "Edit Fuel Log",
+    "addFuelLog": "Add Fuel Log",
+    "odometer": "Odometer",
+    "last": "Last",
+    "liters": "Liters",
+    "costPerLiter": "Cost / Liter",
+    "totalCost": "Total Cost",
+    "addFillUp": "Add Fill-up",
+    "noFuelLogs": "No fuel logs yet.",
+    "editService": "Edit Service",
+    "addService": "Add Service",
+    "serviceType": "Service Type",
+    "serviceTypePlaceholder": "Describe the service…",
+    "selectServiceType": "Select service type",
+    "cost": "Cost",
+    "nextServiceKm": "Next Service (km)",
+    "nextServiceDate": "Next Service Date",
+    "addServiceBtn": "Add Service",
+    "noServices": "No services logged yet.",
+    "notFound": "Vehicle not found.",
+    "backToList": "Back to vehicles",
+    "noDetails": "No details",
+    "costPerKm": "Cost / km",
+    "lastKm": "km since fill",
+    "fuelLogs": "Fuel",
+    "services": "Services",
+    "nextAt": "Next at",
+    "stats": {
+      "title": "Stats",
+      "totalFuelCost": "Total Fuel Cost",
+      "totalServiceCost": "Total Service Cost",
+      "totalCost": "Total Cost",
+      "avgKmPerL": "Avg km/L",
+      "totalDistance": "Total Distance",
+      "fillUps": "Fill-ups",
+      "totalLiters": "Total Liters",
+      "serviceCount": "Services",
+      "fuelCostByMonth": "Fuel Cost by Month",
+      "fillUpsByMonth": "Fill-ups by Month",
+      "serviceCostByMonth": "Service Cost by Month",
+      "serviceCostByType": "Service Cost by Type",
+      "noData": "Not enough data for charts."
+    }
   },
   "budgets": {
     "title": "Budgets",
@@ -129,14 +221,11 @@
     "offlineWarning": "Offline — showing cached rates",
     "autoFilled": "Auto-filled from cache"
   },
-  "transactions": {
-    "exchangeRate": "Exchange Rate",
-    "exchangeRateHelper": "1 {{currency}} = {{rate}} {{base}}"
-  },
   "validation": {
     "nameRequired":        "Name is required",
     "currencyRequired":    "Currency is required",
     "dateRequired":        "Date is required",
+    "timeRequired":        "Time is required",
     "accountRequired":     "Account is required",
     "toAccountRequired":   "Destination account is required for transfers",
     "categoryRequired":    "Category is required",
@@ -153,5 +242,39 @@
     "integerKmOnly":       "Whole kilometres only",
     "max30chars":          "Maximum 30 characters",
     "amountPositive":      "Amount must be greater than 0"
+  },
+  "accounts": {
+    "name": "Account Name",
+    "namePlaceholder": "e.g. Wallet, Main Bank",
+    "type": "Account Type",
+    "currency": "Currency",
+    "openingBalance": "Opening Balance",
+    "noAccounts": "No accounts yet.",
+    "addFirst": "Add your first account",
+    "types": {
+      "asset": "Asset",
+      "liability": "Liability"
+    },
+    "descriptions": {
+      "asset": "What you own",
+      "liability": "What you owe"
+    }
+  },
+  "categories": {
+    "newCategory": "New Category",
+    "editCategory": "Edit Category",
+    "categoryName": "Category Name",
+    "namePlaceholder": "e.g. Gym, Pet Care",
+    "type": "Type",
+    "icon": "Icon",
+    "custom": "Custom",
+    "default": "Default",
+    "archived": "Archived",
+    "restore": "Restore",
+    "types": {
+      "expense": "Expense",
+      "income": "Income",
+      "any": "Any"
+    }
   }
 }

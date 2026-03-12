@@ -179,8 +179,13 @@ export function computeAccountBalances(
   const prevMonthEnd = endOfMonth(subMonths(filters.from, 1))
 
   return accounts.map((account) => {
-    // All transactions for this account ever up to end of period
-    const allForAccount = transactions.filter((t) => t.accountId === account.id)
+    // All transactions for this account ever up to end of period.
+    // Transfers appear from BOTH sides: as source (accountId) and destination (toAccountId).
+    const allForAccount = transactions.filter(
+      (t) =>
+        t.accountId === account.id ||
+        (t.type === 'transfer' && t.toAccountId === account.id),
+    )
 
     // Transactions in current period
     const inPeriod = allForAccount.filter((t) => txInRange(t, filters.from, filters.to))
@@ -193,26 +198,30 @@ export function computeAccountBalances(
       .filter((t) => t.type === 'expense')
       .reduce((s, t) => s + t.amount, 0)
 
-    // Closing balance = opening + all income - all expenses up through period end
+    const applyTransaction = (s: number, t: Transaction): number => {
+      if (t.type === 'income') return s + t.amount
+      if (t.type === 'expense') return s - t.amount
+      if (t.type === 'transfer') {
+        // Outgoing: this account is the source
+        if (t.accountId === account.id) return s - t.amount
+        // Incoming: this account is the destination
+        return s + t.amount
+      }
+      return s
+    }
+
+    // Closing balance = opening + all movements up through period end
     const allUpToPeriodEnd = allForAccount.filter((t) =>
       parseISO(t.date) <= filters.to,
     )
-    const cumulativeNet = allUpToPeriodEnd.reduce((s, t) => {
-      if (t.type === 'income') return s + t.amount
-      if (t.type === 'expense') return s - t.amount
-      return s
-    }, 0)
+    const cumulativeNet = allUpToPeriodEnd.reduce(applyTransaction, 0)
     const closingBalance = account.openingBalance + cumulativeNet
 
     // Closing balance as of end of previous month (for delta)
     const allUpToPrevMonth = allForAccount.filter((t) =>
       parseISO(t.date) <= prevMonthEnd,
     )
-    const prevNet = allUpToPrevMonth.reduce((s, t) => {
-      if (t.type === 'income') return s + t.amount
-      if (t.type === 'expense') return s - t.amount
-      return s
-    }, 0)
+    const prevNet = allUpToPrevMonth.reduce(applyTransaction, 0)
     const prevClosing = account.openingBalance + prevNet
     const vsLastMonth = closingBalance - prevClosing
 

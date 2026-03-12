@@ -5,6 +5,7 @@ import {
   PawPrint, Camera, Smartphone, Wifi, BookOpen, Briefcase, DollarSign,
   CreditCard, Landmark, ShoppingBag, Scissors, Hammer, Paintbrush, Leaf,
   Sun, Moon, Star, Package, Truck, Headphones, Monitor, Gamepad2, Flower,
+  Banknote, Laptop, Percent, KeyRound, RotateCcw,
 } from 'lucide-react'
 
 import type { LucideIcon } from 'lucide-react'
@@ -60,6 +61,11 @@ export const ICON_MAP: Record<string, LucideIcon> = {
   Monitor,
   Gamepad2,
   Flower,
+  Banknote,
+  Laptop,
+  Percent,
+  KeyRound,
+  RotateCcw,
 }
 
 /** Render a category icon by its stored name string. Falls back to MoreHorizontal. */

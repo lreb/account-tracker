@@ -3,7 +3,7 @@ import { vm } from '@/lib/validation-messages'
 
 export const accountSchema = z.object({
   name: z.string().min(1, vm.nameRequired).max(50),
-  type: z.enum(['cash', 'bank', 'card', 'savings', 'investment', 'other']),
+  type: z.enum(['asset', 'liability']),
   currency: z.string().min(3, vm.currencyRequired).max(3),
   openingBalance: z
     .string()

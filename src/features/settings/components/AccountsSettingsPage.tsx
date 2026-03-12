@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
@@ -7,7 +7,9 @@ import { Pencil, Trash2, Plus, Wallet } from 'lucide-react'
 
 import { accountSchema, type AccountFormValues } from '../schemas/account.schema'
 import { useAccountsStore } from '@/stores/accounts.store'
-import type { Account } from '@/types'
+import { useTransactionsStore } from '@/stores/transactions.store'
+import type { Account, AccountType } from '@/types'
+import { formatCurrency } from '@/lib/currency'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,7 +29,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 
-const ACCOUNT_TYPES = ['cash', 'bank', 'card', 'savings', 'investment', 'other'] as const
+const ACCOUNT_TYPES = ['asset', 'liability'] as const
 
 const COMMON_CURRENCIES = [
   { code: 'USD', label: 'USD — US Dollar' },
@@ -48,6 +50,7 @@ interface AccountDialogProps {
 }
 
 function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
+  const { t } = useTranslation()
   const { add, update } = useAccountsStore()
 
   const {
@@ -59,7 +62,7 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
     reset,
   } = useForm<AccountFormValues>({
     resolver: zodResolver(accountSchema),
-    defaultValues: { type: 'cash', currency: 'USD', openingBalance: '0', name: '' },
+    defaultValues: { type: 'asset', currency: 'USD', openingBalance: '0', name: '' },
   })
 
   useEffect(() => {
@@ -72,7 +75,7 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
         openingBalance: (editing.openingBalance / 100).toFixed(2),
       })
     } else {
-      reset({ name: '', type: 'cash', currency: 'USD', openingBalance: '0' })
+      reset({ name: '', type: 'asset', currency: 'USD', openingBalance: '0' })
     }
   }, [open, editing, reset])
 
@@ -88,36 +91,38 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset({ name: '', type: 'cash', currency: 'USD', openingBalance: '0' }); onClose() } }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset({ name: '', type: 'asset', currency: 'USD', openingBalance: '0' }); onClose() } }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>
-            {editing ? 'Edit' : 'Add'} Account
+            {editing ? t('common.edit') : t('common.add')} {t('settings.accounts')}
           </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-1">
           {/* Name */}
           <div className="space-y-1">
-            <Label htmlFor="name">Account Name</Label>
-            <Input id="name" placeholder="e.g. Wallet, Main Bank" {...register('name')} />
+            <Label htmlFor="name">{t('accounts.name')}</Label>
+            <Input id="name" placeholder={t('accounts.namePlaceholder')} {...register('name')} />
             {errors.name && <p className="text-xs text-red-500">{t(errors.name.message!)}</p>}
           </div>
 
           {/* Type */}
           <div className="space-y-1">
-            <Label>Account Type</Label>
+            <Label>{t('accounts.type')}</Label>
             <Select
               value={watch('type')}
               onValueChange={(v) => setValue('type', v as AccountFormValues['type'])}
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue>
+                  {t(`accounts.types.${watch('type')}`)}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {ACCOUNT_TYPES.map((type) => (
-                  <SelectItem key={type} value={type} className="capitalize">
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  <SelectItem key={type} value={type}>
+                    {t(`accounts.types.${type}`)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -126,7 +131,7 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
 
           {/* Currency */}
           <div className="space-y-1">
-            <Label>Currency</Label>
+            <Label>{t('accounts.currency')}</Label>
             <Select
               value={watch('currency')}
               onValueChange={(v) => setValue('currency', v)}
@@ -147,7 +152,7 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
 
           {/* Opening Balance */}
           <div className="space-y-1">
-            <Label htmlFor="openingBalance">Opening Balance</Label>
+            <Label htmlFor="openingBalance">{t('accounts.openingBalance')}</Label>
             <Input
               id="openingBalance"
               type="number"
@@ -163,10 +168,10 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
 
           <DialogFooter className="gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              Save
+              {t('common.save')}
             </Button>
           </DialogFooter>
         </form>
@@ -178,6 +183,7 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
 export default function AccountsSettingsPage() {
   const { t } = useTranslation()
   const { accounts, remove } = useAccountsStore()
+  const { transactions } = useTransactionsStore()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Account | null>(null)
 
@@ -185,58 +191,121 @@ export default function AccountsSettingsPage() {
   const openEdit = (a: Account) => { setEditing(a); setDialogOpen(true) }
   const closeDialog = () => { setDialogOpen(false); setEditing(null) }
 
+  const accountBalances = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const account of accounts) {
+      const txs = transactions.filter(
+        (t) => t.accountId === account.id || (t.type === 'transfer' && t.toAccountId === account.id),
+      )
+      const net = txs.reduce((sum, t) => {
+        if (t.type === 'income') return sum + t.amount
+        if (t.type === 'expense') return sum - t.amount
+        if (t.type === 'transfer') {
+          return t.accountId === account.id ? sum - t.amount : sum + t.amount
+        }
+        return sum
+      }, 0)
+      map.set(account.id, account.openingBalance + net)
+    }
+    return map
+  }, [accounts, transactions])
+
+  const groupedAccounts = useMemo(() => {
+    const groups: Record<AccountType, Account[]> = { asset: [], liability: [] }
+    for (const account of accounts) {
+      if (account.type in groups) {
+        groups[account.type].push(account)
+      } else {
+        groups.asset.push(account)
+      }
+    }
+    return groups
+  }, [accounts])
+
+  const groupTotal = (type: AccountType) => {
+    const group = groupedAccounts[type]
+    return group.reduce((sum, a) => sum + (accountBalances.get(a.id) ?? a.openingBalance), 0)
+  }
+
   return (
     <div className="p-4">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold">{t('settings.accounts')}</h1>
         <Button size="sm" onClick={openAdd} className="gap-1">
           <Plus size={16} />
-          Add
+          {t('common.add')}
         </Button>
       </div>
 
       {accounts.length === 0 ? (
         <div className="text-center mt-16 space-y-2">
           <Wallet size={40} className="mx-auto text-gray-300" />
-          <p className="text-sm text-gray-400">No accounts yet.</p>
+          <p className="text-sm text-gray-400">{t('accounts.noAccounts')}</p>
           <Button variant="outline" size="sm" onClick={openAdd}>
-            Add your first account
+            {t('accounts.addFirst')}
           </Button>
         </div>
       ) : (
-        <ul className="space-y-2">
-          {accounts.map((account) => (
-            <li
-              key={account.id}
-              className="flex items-center gap-3 rounded-2xl border bg-white px-4 py-3"
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">{account.name}</p>
-                <p className="text-xs text-gray-400 capitalize">
-                  {account.type} · {account.currency}
-                </p>
-              </div>
-              <div className="flex gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => openEdit(account)}
-                >
-                  <Pencil size={15} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-red-500 hover:text-red-600"
-                  onClick={() => remove(account.id)}
-                >
-                  <Trash2 size={15} />
-                </Button>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-6">
+          {(Object.keys(groupedAccounts) as AccountType[]).map((type) => {
+            const group = groupedAccounts[type]
+            if (group.length === 0) return null
+            return (
+              <section key={type}>
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                    {t(`accounts.types.${type}`)}
+                    <span className="ml-1 text-xs font-normal normal-case text-gray-400">
+                      — {t(`accounts.descriptions.${type}`)}
+                    </span>
+                  </h2>
+                  <span className="text-sm font-semibold">
+                    {formatCurrency(groupTotal(type), accounts[0]?.currency ?? 'USD')}
+                  </span>
+                </div>
+                <ul className="space-y-2">
+                  {group.map((account) => {
+                    const balance = accountBalances.get(account.id) ?? account.openingBalance
+                    return (
+                      <li
+                        key={account.id}
+                        className="flex items-center gap-3 rounded-2xl border bg-white px-4 py-3"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">{account.name}</p>
+                          <p className="text-xs text-gray-400">
+                            {account.currency}
+                          </p>
+                        </div>
+                        <span className="text-sm font-semibold tabular-nums whitespace-nowrap">
+                          {formatCurrency(balance, account.currency)}
+                        </span>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => openEdit(account)}
+                          >
+                            <Pencil size={15} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-500 hover:text-red-600"
+                            onClick={() => remove(account.id)}
+                          >
+                            <Trash2 size={15} />
+                          </Button>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </section>
+            )
+          })}
+        </div>
       )}
 
       <AccountDialog open={dialogOpen} editing={editing} onClose={closeDialog} />

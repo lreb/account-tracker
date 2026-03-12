@@ -9,6 +9,7 @@ export const transactionSchema = z
       .min(1, vm.amountRequired)
       .refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) > 0, vm.mustBePositive),
     date: z.string().min(1, vm.dateRequired),
+    time: z.string().min(1, 'validation.timeRequired'),
     categoryId: z.string().min(1, vm.categoryRequired),
     accountId: z.string().min(1, vm.accountRequired),
     toAccountId: z.string().optional(),

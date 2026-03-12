@@ -1,4 +1,4 @@
-// Current DB version: 2
+// Current DB version: 4
 import Dexie, { type Table } from 'dexie'
 import type {
   Account,
@@ -42,6 +42,18 @@ class ExpenseTrackingDB extends Dexie {
     // Version 2: index archivedAt on vehicles for active/archived filtering
     this.version(2).stores({
       vehicles: 'id, archivedAt',
+    })
+    // Version 3: add type index on categories
+    this.version(3).stores({
+      categories: 'id, isCustom, type',
+    }).upgrade(tx => {
+      return tx.table('categories').toCollection().modify(cat => {
+        if (!cat.type) cat.type = 'expense'
+      })
+    })
+    // Version 4: add deletedAt index on categories for soft-delete
+    this.version(4).stores({
+      categories: 'id, isCustom, type, deletedAt',
     })
   }
 }

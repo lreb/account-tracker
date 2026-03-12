@@ -57,12 +57,12 @@ function VehicleDialog({
     formState: { errors, isSubmitting },
   } = useForm<VehicleFormValues>({
     resolver: zodResolver(vehicleSchema),
-    defaultValues: { name: '', make: '', model: '', year: '' },
+    defaultValues: { name: '', make: '', model: '', year: '', initialOdometer: '' },
   })
 
   const watchMake  = watch('make')
   const watchModel = watch('model')
-  const availableModels = MODEL_MAP[watchMake] ?? []
+  const availableModels = MODEL_MAP[watchMake ?? ''] ?? []
 
   useEffect(() => {
     if (!open) return
@@ -77,11 +77,12 @@ function VehicleDialog({
         make:  editing.make  ?? '',
         model: editing.model ?? '',
         year:  editing.year?.toString() ?? '',
+        initialOdometer: editing.initialOdometer?.toString() ?? '',
       })
     } else {
       setCustomMakeMode(false)
       setCustomModelMode(false)
-      reset({ name: '', make: '', model: '', year: '' })
+      reset({ name: '', make: '', model: '', year: '', initialOdometer: '' })
     }
   }, [open, editing, reset])
 
@@ -91,7 +92,8 @@ function VehicleDialog({
       name: values.name,
       make: values.make || undefined,
       model: values.model || undefined,
-      year: values.year,
+      year: values.year as number | undefined,
+      initialOdometer: values.initialOdometer ? parseInt(values.initialOdometer, 10) : undefined,
       archivedAt: editing?.archivedAt,
     }
     if (editing) {
@@ -152,7 +154,7 @@ function VehicleDialog({
                     setCustomMakeMode(true)
                     setValue('make', '')
                   } else {
-                    setValue('make', val)
+                    setValue('make', val as string)
                   }
                   // always reset model when make changes
                   setCustomModelMode(false)
@@ -183,7 +185,7 @@ function VehicleDialog({
                     setCustomModelMode(true)
                     setValue('model', '')
                   } else {
-                    setValue('model', val)
+                    setValue('model', val as string)
                   }
                 }}
               >
@@ -191,7 +193,7 @@ function VehicleDialog({
                   <SelectValue placeholder="Select model" />
                 </SelectTrigger>
                 <SelectContent className="max-h-60">
-                  {availableModels.map((m) => (
+                  {availableModels.map((m: string) => (
                     <SelectItem key={m} value={m}>{m}</SelectItem>
                   ))}
                   <SelectItem value="__other__">Other…</SelectItem>
@@ -232,6 +234,11 @@ function VehicleDialog({
             <Label htmlFor="vYear">Year</Label>
             <Input id="vYear" type="number" placeholder="2020" {...register('year')} />
             {errors.year && <p className="text-xs text-red-500">{t(errors.year.message!)}</p>}
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="vOdo">{t('vehicles.initialOdometer')}</Label>
+            <Input id="vOdo" type="number" inputMode="numeric" placeholder="0" {...register('initialOdometer')} />
           </div>
 
           <DialogFooter className="gap-2 pt-2">
