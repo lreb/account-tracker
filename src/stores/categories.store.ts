@@ -8,7 +8,9 @@ interface CategoriesState {
   categories: Category[]
   load: () => Promise<void>
   add: (c: Category) => Promise<void>
+  update: (c: Category) => Promise<void>
   remove: (id: string) => Promise<void>
+  restore: (id: string) => Promise<void>
 }
 
 export const useCategoriesStore = create<CategoriesState>((set) => ({
@@ -16,9 +18,13 @@ export const useCategoriesStore = create<CategoriesState>((set) => ({
 
   load: async () => {
     try {
-      const count = await db.categories.count()
-      if (count === 0) {
+      const existing = await db.categories.toArray()
+      if (existing.length === 0) {
         await db.categories.bulkAdd(DEFAULT_CATEGORIES)
+      } else {
+        const existingIds = new Set(existing.map((c) => c.id))
+        const missing = DEFAULT_CATEGORIES.filter((d) => !existingIds.has(d.id))
+        if (missing.length > 0) await db.categories.bulkAdd(missing)
       }
       const categories = await db.categories.toArray()
       set({ categories })
@@ -39,14 +45,45 @@ export const useCategoriesStore = create<CategoriesState>((set) => ({
     }
   },
 
-  remove: async (id) => {
+  update: async (category) => {
     try {
-      await db.categories.delete(id)
-      set((s) => ({ categories: s.categories.filter((c) => c.id !== id) }))
-      toast.success('Category deleted')
+      await db.categories.put(category)
+      set((s) => ({ categories: s.categories.map((c) => (c.id === category.id ? category : c)) }))
+      toast.success('Category updated')
     } catch (err) {
       console.error(err)
-      toast.error('Failed to delete category')
+      toast.error('Failed to update category')
+    }
+  },
+
+  remove: async (id) => {
+    try {
+      const deletedAt = new Date().toISOString()
+      await db.categories.update(id, { deletedAt })
+      set((s) => ({
+        categories: s.categories.map((c) => (c.id === id ? { ...c, deletedAt } : c)),
+      }))
+      toast.success('Category archived')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to archive category')
+    }
+  },
+
+  restore: async (id) => {
+    try {
+      await db.categories.update(id, { deletedAt: undefined })
+      set((s) => ({
+        categories: s.categories.map((c) => {
+          if (c.id !== id) return c
+          const { deletedAt: _, ...rest } = c
+          return rest as Category
+        }),
+      }))
+      toast.success('Category restored')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to restore category')
     }
   },
 }))

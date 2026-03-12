@@ -11,6 +11,8 @@ interface VehiclesState {
   load: () => Promise<void>
   addVehicle: (v: Vehicle) => Promise<void>
   updateVehicle: (v: Vehicle) => Promise<void>
+  archiveVehicle: (id: string) => Promise<void>
+  unarchiveVehicle: (id: string) => Promise<void>
   removeVehicle: (id: string) => Promise<void>
   addFuelLog: (f: FuelLog) => Promise<void>
   updateFuelLog: (log: FuelLog, linkedTx?: Transaction) => Promise<void>
@@ -58,6 +60,37 @@ export const useVehiclesStore = create<VehiclesState>((set) => ({
     } catch (err) {
       console.error(err)
       toast.error('Failed to update vehicle')
+    }
+  },
+
+  archiveVehicle: async (id) => {
+    try {
+      const archivedAt = new Date().toISOString()
+      await db.vehicles.update(id, { archivedAt })
+      set((s) => ({
+        vehicles: s.vehicles.map((v) => (v.id === id ? { ...v, archivedAt } : v)),
+      }))
+      toast.success('Vehicle archived')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to archive vehicle')
+    }
+  },
+
+  unarchiveVehicle: async (id) => {
+    try {
+      await db.vehicles.update(id, { archivedAt: undefined })
+      set((s) => ({
+        vehicles: s.vehicles.map((v) => {
+          if (v.id !== id) return v
+          const { archivedAt: _, ...rest } = v
+          return rest
+        }),
+      }))
+      toast.success('Vehicle restored')
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to restore vehicle')
     }
   },
 

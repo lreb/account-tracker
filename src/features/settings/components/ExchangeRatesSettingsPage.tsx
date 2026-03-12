@@ -192,7 +192,7 @@ export default function ExchangeRatesSettingsPage() {
                   </SelectContent>
                 </Select>
                 {errors.fromCurrency && (
-                  <p className="text-xs text-red-500">{errors.fromCurrency.message}</p>
+                  <p className="text-xs text-red-500">{t(errors.fromCurrency.message!)}</p>
                 )}
               </div>
               {/* To */}
@@ -212,7 +212,7 @@ export default function ExchangeRatesSettingsPage() {
                   </SelectContent>
                 </Select>
                 {errors.toCurrency && (
-                  <p className="text-xs text-red-500">{errors.toCurrency.message}</p>
+                  <p className="text-xs text-red-500">{t(errors.toCurrency.message!)}</p>
                 )}
               </div>
             </div>
@@ -233,7 +233,7 @@ export default function ExchangeRatesSettingsPage() {
                 </p>
               )}
               {errors.rate && (
-                <p className="text-xs text-red-500">{errors.rate.message}</p>
+                <p className="text-xs text-red-500">{t(errors.rate.message!)}</p>
               )}
             </div>
 
@@ -242,7 +242,7 @@ export default function ExchangeRatesSettingsPage() {
               <Label>{t('common.date', 'Date')}</Label>
               <Input type="date" {...register('date')} />
               {errors.date && (
-                <p className="text-xs text-red-500">{errors.date.message}</p>
+                <p className="text-xs text-red-500">{t(errors.date.message!)}</p>
               )}
             </div>
 

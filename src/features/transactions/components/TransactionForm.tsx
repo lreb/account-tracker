@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -7,6 +7,7 @@ import { format } from 'date-fns'
 import { v4 as uuid } from 'uuid'
 
 import { transactionSchema, type TransactionFormValues } from '../schemas/transaction.schema'
+import { formatCurrency } from '@/lib/currency'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useCategoriesStore } from '@/stores/categories.store'
@@ -45,20 +46,26 @@ export default function TransactionForm() {
   const { id } = useParams<{ id?: string }>()
   const isEdit = Boolean(id)
 
-  const { transactions, add, update } = useTransactionsStore()
+  const { transactions, loading, load: loadTransactions, add, update } = useTransactionsStore()
   const { accounts } = useAccountsStore()
   const { categories } = useCategoriesStore()
   const { labels, load: loadLabels } = useLabelsStore()
   const { getRateForPair, load: loadRates } = useExchangeRatesStore()
   const { baseCurrency, load: loadSettings } = useSettingsStore()
 
-  const existing = isEdit ? transactions.find((tx) => tx.id === id) : undefined
+  // Ensure the store is hydrated before we try to find the transaction.
+  // On a hard refresh to /transactions/:id the store starts empty.
+  const [storeReady, setStoreReady] = useState(!isEdit || transactions.length > 0)
 
   useEffect(() => {
-    loadLabels()
-    loadRates()
-    loadSettings()
-  }, [loadLabels, loadRates, loadSettings])
+    const tasks: Promise<void>[] = [loadLabels(), loadRates(), loadSettings()]
+    if (isEdit && transactions.length === 0) {
+      tasks.push(loadTransactions().then(() => setStoreReady(true)))
+    }
+    Promise.all(tasks)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const existing = isEdit ? transactions.find((tx) => tx.id === id) : undefined
 
   // local label selection — ids of chosen labels
   const [selectedLabels, setSelectedLabels] = useState<string[]>(
@@ -75,6 +82,7 @@ export default function TransactionForm() {
     handleSubmit,
     watch,
     setValue,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -82,7 +90,8 @@ export default function TransactionForm() {
       ? {
           type:         existing.type,
           amount:       (existing.amount / 100).toFixed(2),
-          date:         existing.date.slice(0, 10),
+          date:         format(new Date(existing.date), 'yyyy-MM-dd'),
+          time:         format(new Date(existing.date), 'HH:mm'),
           categoryId:   existing.categoryId,
           accountId:    existing.accountId,
           toAccountId:  existing.toAccountId ?? '',
@@ -95,6 +104,7 @@ export default function TransactionForm() {
       : {
           type:       'expense',
           date:       format(new Date(), 'yyyy-MM-dd'),
+          time:       format(new Date(), 'HH:mm'),
           status:     'cleared',
           currency:   accounts[0]?.currency ?? 'USD',
           amount:     '',
@@ -104,10 +114,121 @@ export default function TransactionForm() {
         },
   })
 
-  const watchType       = watch('type')
-  const watchAccountId  = watch('accountId')
-  const watchCurrency   = watch('currency')
-  const watchRate       = watch('exchangeRate')
+  // When the store finishes loading on a hard-refresh edit, populate the form
+  useEffect(() => {
+    if (!storeReady || !isEdit || !existing) return
+    reset({
+      type:         existing.type,
+      amount:       (existing.amount / 100).toFixed(2),
+      date:         format(new Date(existing.date), 'yyyy-MM-dd'),
+      time:         format(new Date(existing.date), 'HH:mm'),
+      categoryId:   existing.categoryId,
+      accountId:    existing.accountId,
+      toAccountId:  existing.toAccountId ?? '',
+      description:  existing.description,
+      notes:        existing.notes ?? '',
+      status:       existing.status,
+      currency:     existing.currency,
+      exchangeRate: existing.exchangeRate?.toString() ?? '',
+    })
+    setSelectedLabels(existing.labels ?? [])
+  }, [storeReady]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Current balance per account: openingBalance + income − expense ± transfers
+  const accountBalances = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const acct of accounts) {
+      map.set(acct.id, acct.openingBalance)
+    }
+    for (const tx of transactions) {
+      if (tx.type === 'income') {
+        map.set(tx.accountId, (map.get(tx.accountId) ?? 0) + tx.amount)
+      } else if (tx.type === 'expense') {
+        map.set(tx.accountId, (map.get(tx.accountId) ?? 0) - tx.amount)
+      } else if (tx.type === 'transfer') {
+        map.set(tx.accountId, (map.get(tx.accountId) ?? 0) - tx.amount)
+        if (tx.toAccountId) {
+          map.set(tx.toAccountId, (map.get(tx.toAccountId) ?? 0) + tx.amount)
+        }
+      }
+    }
+    return map
+  }, [accounts, transactions])
+
+  // Description auto-suggest: deduplicated map of description → most recent tx
+  const suggestionMap = useMemo(() => {
+    const map = new Map<string, typeof transactions[0]>()
+    for (const tx of transactions) {
+      const key = tx.description.toLowerCase()
+      const prev = map.get(key)
+      if (!prev || tx.date > prev.date) map.set(key, tx)
+    }
+    return map
+  }, [transactions])
+
+  const watchDescription = watch('description')
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const suggestionsRef = useRef<HTMLUListElement>(null)
+  const descriptionRef = useRef<HTMLInputElement | null>(null)
+
+  const suggestions = useMemo(() => {
+    const q = (watchDescription ?? '').trim().toLowerCase()
+    if (q.length < 2 || isEdit) return []
+    const results: { description: string; tx: typeof transactions[0] }[] = []
+    for (const [key, tx] of suggestionMap) {
+      if (key.includes(q)) results.push({ description: tx.description, tx })
+      if (results.length >= 5) break
+    }
+    return results
+  }, [watchDescription, suggestionMap, isEdit])
+
+  const applySuggestion = (tx: typeof transactions[0]) => {
+    setValue('description', tx.description)
+    setValue('type', tx.type)
+    setValue('categoryId', tx.categoryId)
+    setValue('accountId', tx.accountId)
+    setValue('toAccountId', tx.toAccountId ?? '')
+    setValue('status', tx.status)
+    setSelectedLabels(tx.labels ?? [])
+    setShowSuggestions(false)
+  }
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node) &&
+        descriptionRef.current && !descriptionRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const watchType        = watch('type')
+  const watchAccountId   = watch('accountId')
+  const watchToAccountId = watch('toAccountId')
+  const watchCategoryId  = watch('categoryId')
+  const watchStatus      = watch('status')
+  const watchCurrency    = watch('currency')
+  const watchRate        = watch('exchangeRate')
+
+  // Filter categories by selected transaction type and exclude soft-deleted
+  const filteredCategories = useMemo(() => {
+    const active = categories.filter((c) => {
+      if (c.deletedAt) return false
+      if (watchType === 'transfer') return true
+      return c.type === watchType || c.type === 'any'
+    })
+    // Keep the currently-assigned category visible even if deleted/mismatched
+    if (isEdit && existing && !active.find((c) => c.id === existing.categoryId)) {
+      const assigned = categories.find((c) => c.id === existing.categoryId)
+      if (assigned) active.unshift(assigned)
+    }
+    return active
+  }, [categories, watchType, isEdit, existing])
 
   // Keep currency in sync with selected account
   useEffect(() => {
@@ -131,9 +252,10 @@ export default function TransactionForm() {
     const base = {
       type:         values.type,
       amount:       amountCents,
-      date:         new Date(values.date).toISOString(),
+      date:         new Date(`${values.date}T${values.time}:00`).toISOString(),
       categoryId:   values.categoryId,
       accountId:    values.accountId,
+      toAccountId:  values.toAccountId || undefined,
       description:  values.description,
       notes:        values.notes || undefined,
       status:       values.status,
@@ -150,8 +272,58 @@ export default function TransactionForm() {
     navigate('/transactions')
   }
 
+  // Early returns after all hooks — guards for edit mode on hard refresh
+  if (isEdit && (loading || !storeReady)) {
+    return <p className="text-sm text-muted-foreground py-10 text-center">{t('common.loading')}</p>
+  }
+  if (isEdit && !existing) {
+    return <p className="text-sm text-red-500 py-10 text-center">{t('common.error')}</p>
+  }
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="p-4 space-y-5">
+
+      {/* Description */}
+      <div className="space-y-1">
+        <Label htmlFor="description">{t('common.description', 'Description')}</Label>
+        <div className="relative">
+          <Input
+            id="description"
+            placeholder="e.g. Grocery run"
+            autoComplete="off"
+            {...register('description')}
+            ref={(el) => {
+              register('description').ref(el)
+              descriptionRef.current = el
+            }}
+            onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+            onChange={(e) => {
+              register('description').onChange(e)
+              setShowSuggestions(true)
+            }}
+          />
+          {showSuggestions && suggestions.length > 0 && (
+            <ul
+              ref={suggestionsRef}
+              className="absolute z-50 mt-1 w-full rounded-md border bg-popover text-popover-foreground shadow-md max-h-48 overflow-y-auto"
+            >
+              {suggestions.map(({ description, tx }) => (
+                <li
+                  key={tx.id}
+                  className="flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-accent"
+                  onMouseDown={() => applySuggestion(tx)}
+                >
+                  <span className="truncate font-medium">{description}</span>
+                  <span className="ml-2 text-xs text-muted-foreground shrink-0">
+                    {categories.find(c => c.id === tx.categoryId)?.name ?? ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        {errors.description && <p className="text-xs text-red-500">{t(errors.description.message!)}</p>}
+      </div>
 
       {/* Type tabs */}
       <div className="grid grid-cols-3 gap-1 rounded-xl bg-gray-100 p-1">
@@ -182,63 +354,71 @@ export default function TransactionForm() {
           placeholder="0.00"
           {...register('amount')}
         />
-        {errors.amount && <p className="text-xs text-red-500">{errors.amount.message}</p>}
+        {errors.amount && <p className="text-xs text-red-500">{t(errors.amount.message!)}</p>}
       </div>
 
-      {/* Date */}
-      <div className="space-y-1">
-        <Label htmlFor="date">{t('common.date', 'Date')}</Label>
-        <Input id="date" type="date" {...register('date')} />
-        {errors.date && <p className="text-xs text-red-500">{errors.date.message}</p>}
-      </div>
-
-      {/* Description */}
-      <div className="space-y-1">
-        <Label htmlFor="description">{t('common.description', 'Description')}</Label>
-        <Input id="description" placeholder="e.g. Grocery run" {...register('description')} />
-        {errors.description && <p className="text-xs text-red-500">{errors.description.message}</p>}
+      {/* Date & Time */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label htmlFor="date">{t('common.date', 'Date')}</Label>
+          <Input id="date" type="date" {...register('date')} />
+          {errors.date && <p className="text-xs text-red-500">{t(errors.date.message!)}</p>}
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="time">{t('common.time', 'Time')}</Label>
+          <Input id="time" type="time" {...register('time')} />
+          {errors.time && <p className="text-xs text-red-500">{t(errors.time.message!)}</p>}
+        </div>
       </div>
 
       {/* Category */}
       <div className="space-y-1">
         <Label>{t('settings.categories')}</Label>
         <Select
-          defaultValue={existing?.categoryId}
+          value={watchCategoryId || undefined}
           onValueChange={(v) => setValue('categoryId', v)}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Select category" />
+            <SelectValue placeholder="Select category">
+              {categories.find((c) => c.id === watchCategoryId)?.name}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {categories.map((cat) => (
+            {filteredCategories.map((cat) => (
               <SelectItem key={cat.id} value={cat.id}>
                 {cat.name}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        {errors.categoryId && <p className="text-xs text-red-500">{errors.categoryId.message}</p>}
+        {errors.categoryId && <p className="text-xs text-red-500">{t(errors.categoryId.message!)}</p>}
       </div>
 
       {/* Account */}
       <div className="space-y-1">
         <Label>{t('settings.accounts')}</Label>
         <Select
-          defaultValue={existing?.accountId ?? accounts[0]?.id}
+          value={watchAccountId || undefined}
           onValueChange={(v) => setValue('accountId', v)}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Select account" />
+            <SelectValue placeholder="Select account">
+              {(() => {
+                const acct = accounts.find((a) => a.id === watchAccountId)
+                if (!acct) return undefined
+                return `${acct.name} · ${formatCurrency(accountBalances.get(acct.id) ?? acct.openingBalance, acct.currency)}`
+              })()}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {accounts.map((acct) => (
               <SelectItem key={acct.id} value={acct.id}>
-                {acct.name} ({acct.currency})
+                {acct.name} · {formatCurrency(accountBalances.get(acct.id) ?? acct.openingBalance, acct.currency)}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        {errors.accountId && <p className="text-xs text-red-500">{errors.accountId.message}</p>}
+        {errors.accountId && <p className="text-xs text-red-500">{t(errors.accountId.message!)}</p>}
       </div>
 
       {/* Destination account — transfers only */}
@@ -246,23 +426,29 @@ export default function TransactionForm() {
         <div className="space-y-1">
           <Label>{t('common.toAccount', 'To Account')}</Label>
           <Select
-            defaultValue={existing?.toAccountId}
+            value={watchToAccountId || undefined}
             onValueChange={(v) => setValue('toAccountId', v)}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select destination account" />
+              <SelectValue placeholder="Select destination account">
+                {(() => {
+                  const acct = accounts.find((a) => a.id === watchToAccountId)
+                  if (!acct) return undefined
+                  return `${acct.name} · ${formatCurrency(accountBalances.get(acct.id) ?? acct.openingBalance, acct.currency)}`
+                })()}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {accounts
                 .filter((a) => a.id !== watchAccountId)
                 .map((acct) => (
                   <SelectItem key={acct.id} value={acct.id}>
-                    {acct.name} ({acct.currency})
+                    {acct.name} · {formatCurrency(accountBalances.get(acct.id) ?? acct.openingBalance, acct.currency)}
                   </SelectItem>
                 ))}
             </SelectContent>
           </Select>
-          {errors.toAccountId && <p className="text-xs text-red-500">{errors.toAccountId.message}</p>}
+          {errors.toAccountId && <p className="text-xs text-red-500">{t(errors.toAccountId.message!)}</p>}
         </div>
       )}
 
@@ -270,7 +456,7 @@ export default function TransactionForm() {
       <div className="space-y-1">
         <Label>{t('common.status', 'Status')}</Label>
         <Select
-          defaultValue={existing?.status ?? 'cleared'}
+          value={watchStatus || undefined}
           onValueChange={(v) => setValue('status', v as TransactionFormValues['status'])}
         >
           <SelectTrigger>
@@ -309,7 +495,7 @@ export default function TransactionForm() {
             </p>
           )}
           {errors.exchangeRate && (
-            <p className="text-xs text-red-500">{errors.exchangeRate.message}</p>
+            <p className="text-xs text-red-500">{t(errors.exchangeRate.message!)}</p>
           )}
         </div>
       )}

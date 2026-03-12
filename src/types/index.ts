@@ -2,7 +2,8 @@
 
 export type TransactionType = 'income' | 'expense' | 'transfer'
 export type TransactionStatus = 'pending' | 'cleared' | 'reconciled' | 'cancelled'
-export type AccountType = 'cash' | 'bank' | 'card' | 'savings' | 'investment' | 'other'
+export type AccountType = 'asset' | 'liability'
+export type CategoryType = 'income' | 'expense' | 'any'
 export type BudgetPeriod = 'weekly' | 'monthly' | 'yearly'
 export type AppTheme = 'light' | 'dark' | 'system'
 
@@ -40,6 +41,8 @@ export interface Category {
   name: string
   icon: string                // lucide icon name
   isCustom: boolean
+  type: CategoryType          // 'income' | 'expense' | 'any'
+  deletedAt?: string          // ISO 8601 — set when soft-deleted, absent when active
 }
 
 export interface Label {
@@ -78,6 +81,8 @@ export interface Vehicle {
   make?: string
   model?: string
   year?: number
+  initialOdometer?: number   // km at registration
+  archivedAt?: string        // ISO 8601 — set when archived, absent when active
 }
 
 export interface FuelLog {
@@ -87,6 +92,7 @@ export interface FuelLog {
   liters: number
   totalCost: number           // integer cents
   odometer: number            // km reading at fill-up
+  notes?: string
   transactionId?: string      // linked expense transaction
 }
 

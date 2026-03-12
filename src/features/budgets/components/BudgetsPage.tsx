@@ -228,7 +228,7 @@ function BudgetDialog({
               </SelectContent>
             </Select>
             {errors.categoryId && (
-              <p className="text-xs text-red-500">{errors.categoryId.message}</p>
+              <p className="text-xs text-red-500">{t(errors.categoryId.message!)}</p>
             )}
           </div>
 
@@ -243,7 +243,7 @@ function BudgetDialog({
               placeholder="0.00"
               {...register('amount')}
             />
-            {errors.amount && <p className="text-xs text-red-500">{errors.amount.message}</p>}
+            {errors.amount && <p className="text-xs text-red-500">{t(errors.amount.message!)}</p>}
           </div>
 
           {/* Period */}
@@ -269,7 +269,7 @@ function BudgetDialog({
             <Label htmlFor="bStart">Start Date</Label>
             <Input id="bStart" type="date" {...register('startDate')} />
             {errors.startDate && (
-              <p className="text-xs text-red-500">{errors.startDate.message}</p>
+              <p className="text-xs text-red-500">{t(errors.startDate.message!)}</p>
             )}
           </div>
 

@@ -1,20 +1,22 @@
 import { z } from 'zod'
+import { vm } from '@/lib/validation-messages'
 
 export const transactionSchema = z
   .object({
     type: z.enum(['income', 'expense', 'transfer']),
     amount: z
       .string()
-      .min(1, 'Amount is required')
-      .refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) > 0, 'Must be a positive number'),
-    date: z.string().min(1, 'Date is required'),
-    categoryId: z.string().min(1, 'Category is required'),
-    accountId: z.string().min(1, 'Account is required'),
+      .min(1, vm.amountRequired)
+      .refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) > 0, vm.mustBePositive),
+    date: z.string().min(1, vm.dateRequired),
+    time: z.string().min(1, 'validation.timeRequired'),
+    categoryId: z.string().min(1, vm.categoryRequired),
+    accountId: z.string().min(1, vm.accountRequired),
     toAccountId: z.string().optional(),
-    description: z.string().min(1, 'Description is required').max(120),
+    description: z.string().min(1, vm.descriptionRequired).max(120),
     notes: z.string().max(500).optional(),
     status: z.enum(['pending', 'cleared', 'reconciled', 'cancelled']),
-    currency: z.string().min(3, 'Currency is required'),
+    currency: z.string().min(3, vm.currencyRequired),
     exchangeRate: z.string().optional(),
   })
   .refine(
@@ -22,7 +24,7 @@ export const transactionSchema = z
       if (data.type === 'transfer') return Boolean(data.toAccountId)
       return true
     },
-    { message: 'Destination account is required for transfers', path: ['toAccountId'] },
+    { message: vm.toAccountRequired, path: ['toAccountId'] },
   )
 
 export type TransactionFormValues = z.infer<typeof transactionSchema>

@@ -12,6 +12,7 @@ i18n
     },
     lng: 'en',
     fallbackLng: 'en',
+    initImmediate: false, // sync init — resources are bundled, no async loading needed
     interpolation: {
       escapeValue: false, // React escapes by default
     },
