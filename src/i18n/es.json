@@ -26,7 +26,10 @@
     "time": "Hora",
     "status": "Estado",
     "notes": "Notas",
-    "toAccount": "Cuenta destino"
+    "toAccount": "Cuenta destino",
+    "tryAgain": "Reintentar",
+    "goToDashboard": "Ir al inicio",
+    "errorBoundaryDescription": "Ocurrió un error inesperado en esta sección. Puedes reintentar o volver al inicio."
   },
   "dashboard": {
     "income": "Ingresos",

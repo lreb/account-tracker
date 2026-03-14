@@ -362,7 +362,7 @@ Data is persisted in **Dexie.js (IndexedDB)**. Zustand holds in-memory state and
 | 1 | Insights | `InsightsPage` is a stub ("coming soon"). Implement: recurring-pattern detection, category-vs-average alerts, savings suggestions, current-month projection. | ❌ Not started |
 | 2 | Settings | JSON full-data **export** (all tables → single `.json` file download). | ✅ Done |
 | 3 | Settings | JSON full-data **import / restore** (parse backup file, wipe DB, bulk-insert all tables). | ✅ Done |
-| 4 | Error handling | `ErrorBoundary` React component wrapping each feature route in `router.tsx` — prevents a single-page crash from white-screening the whole app. | ❌ Not started |
+| 4 | Error handling | `ErrorBoundary` React component wrapping each feature route in `router.tsx` — prevents a single-page crash from white-screening the whole app. | ✅ Done |
 | 5 | PWA / Offline | Install `vite-plugin-pwa`, configure Workbox, add `manifest.json` (name, icons, theme color, display: standalone). App must work fully offline and be installable on mobile. | ❌ Not started |
 
 ### v1.1 — Planned (post-launch)

@@ -26,7 +26,10 @@
     "time": "Time",
     "status": "Status",
     "notes": "Notes",
-    "toAccount": "To Account"
+    "toAccount": "To Account",
+    "tryAgain": "Try again",
+    "goToDashboard": "Go to dashboard",
+    "errorBoundaryDescription": "An unexpected error occurred in this section. You can try again or go back to the dashboard."
   },
   "dashboard": {
     "income": "Income",
