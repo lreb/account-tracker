@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next'
 const titleMap: Record<string, string> = {
   '/':                    'nav.dashboard',
   '/transactions':        'nav.transactions',
+  '/balance-sheet/':      'balanceSheet.detailTitle',
+  '/balance-sheet':       'balanceSheet.title',
   '/vehicles':            'nav.vehicles',
   '/reports':             'nav.reports',
   '/budgets':             'nav.budgets',

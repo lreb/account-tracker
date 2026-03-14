@@ -8,6 +8,7 @@ import {
   isWithinInterval,
 } from 'date-fns'
 import type { Transaction, Account, Category, Label } from '@/types'
+import { getVisibleAccounts, isTransactionForVisiblePrimaryAccount } from './accounts'
 import { convertToBase } from './currency'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -75,9 +76,11 @@ function txInRange(t: Transaction, from: Date, to: Date): boolean {
 export function computePeriodSummary(
   transactions: Transaction[],
   filters: ReportFilters,
+  visibleAccountIds?: Set<string>,
 ): PeriodSummary {
   const filtered = transactions.filter((t) => {
     if (!txInRange(t, filters.from, filters.to)) return false
+    if (visibleAccountIds && !isTransactionForVisiblePrimaryAccount(t, visibleAccountIds)) return false
     if (filters.accountId && t.accountId !== filters.accountId) return false
     return true
   })
@@ -99,6 +102,7 @@ export function computeMonthlyTrend(
   transactions: Transaction[],
   months = 6,
   accountId?: string,
+  visibleAccountIds?: Set<string>,
 ): MonthlyBar[] {
   const today = new Date()
   const start = startOfMonth(subMonths(today, months - 1))
@@ -111,6 +115,7 @@ export function computeMonthlyTrend(
 
     const relevant = transactions.filter((t) => {
       if (!txInRange(t, mStart, mEnd)) return false
+      if (visibleAccountIds && !isTransactionForVisiblePrimaryAccount(t, visibleAccountIds)) return false
       if (accountId && t.accountId !== accountId) return false
       return true
     })
@@ -139,10 +144,12 @@ export function computeCategoryBreakdown(
   categories: Category[],
   filters: ReportFilters,
   type: 'expense' | 'income' = 'expense',
+  visibleAccountIds?: Set<string>,
 ): CategorySlice[] {
   const filtered = transactions.filter((t) => {
     if (t.type !== type) return false
     if (!txInRange(t, filters.from, filters.to)) return false
+    if (visibleAccountIds && !isTransactionForVisiblePrimaryAccount(t, visibleAccountIds)) return false
     if (filters.accountId && t.accountId !== filters.accountId) return false
     return true
   })
@@ -177,8 +184,9 @@ export function computeAccountBalances(
   filters: ReportFilters,
 ): AccountBalance[] {
   const prevMonthEnd = endOfMonth(subMonths(filters.from, 1))
+  const visibleAccounts = getVisibleAccounts(accounts)
 
-  return accounts.map((account) => {
+  return visibleAccounts.map((account) => {
     // All transactions for this account ever up to end of period.
     // Transfers appear from BOTH sides: as source (accountId) and destination (toAccountId).
     const allForAccount = transactions.filter(
@@ -266,8 +274,9 @@ export function computeCashFlow(
   transactions: Transaction[],
   months = 6,
   accountId?: string,
+  visibleAccountIds?: Set<string>,
 ): CashFlowRow[] {
-  const trend = computeMonthlyTrend(transactions, months, accountId)
+  const trend = computeMonthlyTrend(transactions, months, accountId, visibleAccountIds)
   let cumulative = 0
   return trend.map((m) => {
     cumulative += m.net
@@ -302,9 +311,11 @@ export function computeLabelBreakdown(
   transactions: Transaction[],
   labels: Label[],
   filters: ReportFilters,
+  visibleAccountIds?: Set<string>,
 ): LabelSlice[] {
   const filtered = transactions.filter((t) => {
     if (!txInRange(t, filters.from, filters.to)) return false
+    if (visibleAccountIds && !isTransactionForVisiblePrimaryAccount(t, visibleAccountIds)) return false
     if (filters.accountId && t.accountId !== filters.accountId) return false
     return true
   })
@@ -374,12 +385,13 @@ export function compute503020(
   transactions: Transaction[],
   labels: Label[],
   filters: ReportFilters,
+  visibleAccountIds?: Set<string>,
 ): {
   buckets: BucketSummary[]
   totalIncome: number
   totalExpenses: number
 } {
-  const slices = computeLabelBreakdown(transactions, labels, filters)
+  const slices = computeLabelBreakdown(transactions, labels, filters, visibleAccountIds)
   const totalIncome   = slices.reduce((s, l) => s + l.income, 0)
   const totalExpenses = slices.reduce((s, l) => s + l.expenses, 0)
 

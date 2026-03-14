@@ -348,3 +348,43 @@ Data is persisted in **Dexie.js (IndexedDB)**. Zustand holds in-memory state and
   db.version(1).stores({ transactions: '++id, date, accountId' });
   db.version(2).stores({ transactions: '++id, date, accountId, categoryId', budgets: '++id, categoryId' });
   ```
+
+---
+
+## Release Tracker
+
+> Last audited: 2026-03-13. Update the status column as items are completed.
+
+### v1.0 — Blockers (must ship)
+
+| # | Area | Item | Status |
+|---|---|---|---|
+| 1 | Insights | `InsightsPage` is a stub ("coming soon"). Implement: recurring-pattern detection, category-vs-average alerts, savings suggestions, current-month projection. | ❌ Not started |
+| 2 | Settings | JSON full-data **export** (all tables → single `.json` file download). | ✅ Done |
+| 3 | Settings | JSON full-data **import / restore** (parse backup file, wipe DB, bulk-insert all tables). | ✅ Done |
+| 4 | Error handling | `ErrorBoundary` React component wrapping each feature route in `router.tsx` — prevents a single-page crash from white-screening the whole app. | ❌ Not started |
+| 5 | PWA / Offline | Install `vite-plugin-pwa`, configure Workbox, add `manifest.json` (name, icons, theme color, display: standalone). App must work fully offline and be installable on mobile. | ❌ Not started |
+
+### v1.1 — Planned (post-launch)
+
+| # | Area | Item | Notes |
+|---|---|---|---|
+| 6 | Reports | PDF export of report/transaction data (`@react-pdf/renderer`, client-side only). | Dep not installed; CSV export covers the need for v1 |
+| 7 | Android | Capacitor packaging for Google Play distribution. | PWA install covers mobile for v1 |
+| 8 | Cloud sync | Google Drive sync (OAuth2 PKCE flow, no client secrets). | ✅ Done |
+| 9 | Cloud sync | Dropbox sync (OAuth2 PKCE flow). | Same as above |
+| 10 | i18n | Spanish (`es`) translation completeness pass — verify all new keys added after initial build are present in `es.json`. | Partial; new keys are added as features ship |
+
+### Completed (shipped)
+
+| Date | Item |
+|---|---|
+| 2026-03-13 | `Account.hidden` flag — hide accounts from totals, reports, and selectors app-wide (`src/lib/accounts.ts`) |
+| 2026-03-13 | App-startup loading gate — spinner until all Dexie stores resolve, prevents flash of empty state |
+| 2026-03-13 | `useDeferredValue(transactions)` in DashboardPage and ReportsPage — keeps navigation instant during heavy memo recomputation |
+| 2026-03-13 | Skeleton loader in TransactionListPage — shimmer rows during initial load |
+| 2026-03-13 | JSON full backup export — `src/lib/backup.ts` + download trigger in SettingsPage |
+| 2026-03-13 | JSON full backup import/restore — confirmation dialog, wipe + bulk-insert all tables |
+| 2026-03-13 | Google Drive sync — OAuth2 implicit flow (`src/lib/google-drive.ts`), backup/restore to `appDataFolder`, `VITE_GOOGLE_CLIENT_ID` env var, `/oauth-callback` route, `.env.example` |
+| 2026-03-13 | Factory reset (Danger Zone) — wipes all 10 Dexie tables, confirmation dialog, `resetApp()` in `src/lib/backup.ts` |
+| 2026-03-13 | Language toggle (EN / ES) — persisted via `settings` table, applied on startup via `i18n.changeLanguage`, UI in SettingsPage |

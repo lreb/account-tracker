@@ -44,6 +44,7 @@ function LabelDialog({
   editing: Label | null
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const { add, update } = useLabelsStore()
   const [selectedColor, setSelectedColor] = useState(PRESET_COLORS[5])
 

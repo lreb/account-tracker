@@ -8,6 +8,11 @@ import { useCategoriesStore } from '@/stores/categories.store'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { useLabelsStore } from '@/stores/labels.store'
+import {
+  getVisibleAccountIds,
+  getVisibleAccounts,
+  isTransactionForVisiblePrimaryAccount,
+} from '@/lib/accounts'
 import { formatCurrency } from '@/lib/currency'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -70,11 +75,17 @@ const STATUS_OPTIONS: { value: TxStatus; label: string }[] = [
 
 export default function TransactionListPage() {
   const { t } = useTranslation()
-  const { transactions, load: loadTx } = useTransactionsStore()
+  const { transactions, loading, load: loadTx } = useTransactionsStore()
   const { categories } = useCategoriesStore()
   const { accounts } = useAccountsStore()
   const { baseCurrency } = useSettingsStore()
   const { labels, load: loadLabels } = useLabelsStore()
+  const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
+  const visibleAccountIds = useMemo(() => getVisibleAccountIds(accounts), [accounts])
+  const visibleTransactions = useMemo(
+    () => transactions.filter((transaction) => isTransactionForVisiblePrimaryAccount(transaction, visibleAccountIds)),
+    [transactions, visibleAccountIds],
+  )
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const [filters, setFiltersRaw] = useState<Filters>(persistedFilters)
@@ -100,7 +111,7 @@ export default function TransactionListPage() {
 
   const filtered = useMemo(() => {
     const q = filters.search.trim().toLowerCase()
-    return transactions.filter((tx) => {
+    return visibleTransactions.filter((tx) => {
       if (q && !tx.description.toLowerCase().includes(q) && !(tx.notes ?? '').toLowerCase().includes(q)) return false
       if (filters.type && tx.type !== filters.type) return false
       if (filters.categoryId && tx.categoryId !== filters.categoryId) return false
@@ -115,14 +126,14 @@ export default function TransactionListPage() {
       }
       return true
     })
-  }, [transactions, filters])
+  }, [visibleTransactions, filters])
 
   // Compute running balance per account across ALL transactions (sorted chronologically)
   const balanceAfterTx = useMemo(() => {
     const accBalances = new Map<string, number>()
-    for (const acc of accounts) accBalances.set(acc.id, acc.openingBalance)
+    for (const acc of visibleAccounts) accBalances.set(acc.id, acc.openingBalance)
 
-    const sorted = [...transactions].sort((a, b) => a.date.localeCompare(b.date))
+    const sorted = [...visibleTransactions].sort((a, b) => a.date.localeCompare(b.date))
     const result = new Map<string, { accountBalance: number; accountCurrency: string; toAccountBalance?: number; toAccountCurrency?: string }>()
 
     for (const tx of sorted) {
@@ -156,7 +167,7 @@ export default function TransactionListPage() {
       result.set(tx.id, entry)
     }
     return result
-  }, [transactions, accounts, baseCurrency])
+  }, [visibleTransactions, visibleAccounts, accounts, baseCurrency])
 
   const grouped = useMemo(() => {
     const map = new Map<string, typeof filtered>()
@@ -244,7 +255,13 @@ export default function TransactionListPage() {
       )}
 
       {/* List */}
-      {transactions.length === 0 ? (
+      {loading && visibleTransactions.length === 0 ? (
+        <div className="space-y-3 mt-2" aria-label="Loading transactions">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-[72px] rounded-2xl bg-gray-100 animate-pulse" />
+          ))}
+        </div>
+      ) : visibleTransactions.length === 0 ? (
         <p className="text-sm text-gray-400 text-center mt-12">
           {t('transactions.noTransactions')}
         </p>
@@ -393,7 +410,7 @@ export default function TransactionListPage() {
               <Label>{t('transactions.filters.category')}</Label>
               <Select
                 value={draft.categoryId || '__all__'}
-                onValueChange={(v) => setDraft((p) => ({ ...p, categoryId: v === '__all__' ? '' : v }))}
+                onValueChange={(v) => setDraft((p) => ({ ...p, categoryId: v === '__all__' ? '' : (v ?? '') }))}
               >
                 <SelectTrigger>
                   <SelectValue>
@@ -414,7 +431,7 @@ export default function TransactionListPage() {
               <Label>{t('transactions.filters.account')}</Label>
               <Select
                 value={draft.accountId || '__all__'}
-                onValueChange={(v) => setDraft((p) => ({ ...p, accountId: v === '__all__' ? '' : v }))}
+                onValueChange={(v) => setDraft((p) => ({ ...p, accountId: v === '__all__' ? '' : (v ?? '') }))}
               >
                 <SelectTrigger>
                   <SelectValue>
@@ -423,7 +440,7 @@ export default function TransactionListPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">{t('transactions.filters.allAccounts')}</SelectItem>
-                  {accounts.map((acc) => (
+                  {visibleAccounts.map((acc) => (
                     <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -436,7 +453,7 @@ export default function TransactionListPage() {
                 <Label>{t('settings.labels')}</Label>
                 <Select
                   value={draft.labelId || '__all__'}
-                  onValueChange={(v) => setDraft((p) => ({ ...p, labelId: v === '__all__' ? '' : v }))}
+                  onValueChange={(v) => setDraft((p) => ({ ...p, labelId: v === '__all__' ? '' : (v ?? '') }))}
                 >
                   <SelectTrigger>
                     <SelectValue>

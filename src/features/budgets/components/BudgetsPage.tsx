@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
@@ -7,7 +7,9 @@ import { v4 as uuid } from 'uuid'
 import { Plus, Pencil, Trash2, PiggyBank } from 'lucide-react'
 
 import { budgetSchema, type BudgetFormValues } from '../schemas/budget.schema'
+import { getVisibleAccountIds } from '@/lib/accounts'
 import { useBudgetsStore } from '@/stores/budgets.store'
+import { useAccountsStore } from '@/stores/accounts.store'
 import { useCategoriesStore } from '@/stores/categories.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { getBudgetUsage, type BudgetUsage } from '@/lib/budgets'
@@ -63,11 +65,13 @@ function BudgetCard({
 }) {
   const { categories } = useCategoriesStore()
   const { baseCurrency } = useSettingsStore()
+  const { accounts } = useAccountsStore()
   const [usage, setUsage] = useState<BudgetUsage | null>(null)
+  const visibleAccountIds = useMemo(() => getVisibleAccountIds(accounts), [accounts])
 
   useEffect(() => {
-    getBudgetUsage(budget).then(setUsage).catch(console.error)
-  }, [budget])
+    getBudgetUsage(budget, visibleAccountIds).then(setUsage).catch(console.error)
+  }, [budget, visibleAccountIds])
 
   const category = categories.find((c) => c.id === budget.categoryId)
   const percent = usage?.percent ?? 0
@@ -133,6 +137,7 @@ function BudgetDialog({
   editing: Budget | null
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const { add, update } = useBudgetsStore()
   const { categories } = useCategoriesStore()
   const { baseCurrency } = useSettingsStore()
@@ -214,7 +219,7 @@ function BudgetDialog({
             <Label>Category</Label>
             <Select
               value={watch('categoryId') || ''}
-              onValueChange={(v) => setValue('categoryId', v)}
+              onValueChange={(v) => setValue('categoryId', v ?? '')}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select category" />

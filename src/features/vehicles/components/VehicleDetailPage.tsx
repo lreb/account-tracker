@@ -15,6 +15,12 @@ import {
   type FuelLogFormValues,
   type VehicleServiceFormValues,
 } from '../schemas/vehicle.schema'
+import {
+  getAccountSelectOptions,
+  getVisibleAccountIds,
+  getVisibleAccounts,
+  isTransactionForVisiblePrimaryAccount,
+} from '@/lib/accounts'
 import { useVehiclesStore } from '@/stores/vehicles.store'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useAccountsStore } from '@/stores/accounts.store'
@@ -72,10 +78,11 @@ function FuelLogDialog({
   const { categories } = useCategoriesStore()
   const { baseCurrency } = useSettingsStore()
   const { labels, load: loadLabels } = useLabelsStore()
+  const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
 
   useEffect(() => { loadLabels() }, [loadLabels])
 
-  const defaultAccount = accounts[0]
+  const defaultAccount = visibleAccounts[0] ?? accounts[0]
   const fuelCategory = categories.find((c) => c.id === 'fuel-gas') ?? categories[0]
 
   const {
@@ -109,6 +116,10 @@ function FuelLogDialog({
   const watchLiters = watch('liters')
   const watchCostPerLiter = watch('costPerLiter')
   const watchTotalCost = watch('totalCost')
+  const availableAccounts = useMemo(
+    () => getAccountSelectOptions(accounts, [watchAccountId]),
+    [accounts, watchAccountId],
+  )
 
   // Auto-calc total cost when liters + cost/liter change
   const [lastEdited, setLastEdited] = useState<'costPerLiter' | 'totalCost'>('costPerLiter')
@@ -311,7 +322,7 @@ function FuelLogDialog({
             <Select value={watchAccountId || ''} onValueChange={(v) => setValue('accountId', v as string)}>
               <SelectTrigger><SelectValue>{accounts.find((a) => a.id === watchAccountId)?.name ?? t('transactions.selectAccount')}</SelectValue></SelectTrigger>
               <SelectContent>
-                {accounts.map((a) => (
+                {availableAccounts.map((a) => (
                   <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>
                 ))}
               </SelectContent>
@@ -409,11 +420,12 @@ function ServiceDialog({
   const { categories } = useCategoriesStore()
   const { baseCurrency } = useSettingsStore()
   const { labels, load: loadLabels } = useLabelsStore()
+  const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
 
   useEffect(() => { loadLabels() }, [loadLabels])
 
   const [customServiceType, setCustomServiceType] = useState(false)
-  const defaultAccount = accounts[0]
+  const defaultAccount = visibleAccounts[0] ?? accounts[0]
   const maintenanceCategory = categories.find((c) => c.id === 'vehicle-maintenance') ?? categories[0]
 
   const {
@@ -444,6 +456,10 @@ function ServiceDialog({
   const watchStatus = watch('status')
   const watchLabels = watch('labels') ?? []
   const watchServiceType = watch('serviceType')
+  const availableAccounts = useMemo(
+    () => getAccountSelectOptions(accounts, [watchAccountId]),
+    [accounts, watchAccountId],
+  )
 
   useEffect(() => {
     if (!open) return
@@ -642,7 +658,7 @@ function ServiceDialog({
             <Select value={watchAccountId || ''} onValueChange={(v) => setValue('accountId', v as string)}>
               <SelectTrigger><SelectValue>{accounts.find((a) => a.id === watchAccountId)?.name ?? t('transactions.selectAccount')}</SelectValue></SelectTrigger>
               <SelectContent>
-                {accounts.map((a) => (
+                {availableAccounts.map((a) => (
                   <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>
                 ))}
               </SelectContent>
@@ -945,6 +961,8 @@ export default function VehicleDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { vehicles, fuelLogs, vehicleServices, removeFuelLog, removeService } = useVehiclesStore()
+  const { transactions } = useTransactionsStore()
+  const { accounts } = useAccountsStore()
   const { baseCurrency } = useSettingsStore()
   const { labels } = useLabelsStore()
   const [tab, setTab] = useState<Tab>('fuel')
@@ -953,9 +971,26 @@ export default function VehicleDetailPage() {
   const [serviceDialog, setServiceDialog] = useState(false)
   const [editingSvc, setEditingSvc] = useState<VehicleService | null>(null)
 
+  const visibleAccountIds = useMemo(() => getVisibleAccountIds(accounts), [accounts])
+  const visibleTransactionIds = useMemo(() => {
+    return new Set(
+      transactions
+        .filter((transaction) => isTransactionForVisiblePrimaryAccount(transaction, visibleAccountIds))
+        .map((transaction) => transaction.id),
+    )
+  }, [transactions, visibleAccountIds])
+
   const vehicle = vehicles.find((v) => v.id === id)
-  const logs = fuelLogs.filter((f) => f.vehicleId === id)
-  const services = vehicleServices.filter((s) => s.vehicleId === id)
+  const logs = fuelLogs.filter((fuelLog) => {
+    if (fuelLog.vehicleId !== id) return false
+    if (!fuelLog.transactionId) return true
+    return visibleTransactionIds.has(fuelLog.transactionId)
+  })
+  const services = vehicleServices.filter((service) => {
+    if (service.vehicleId !== id) return false
+    if (!service.transactionId) return true
+    return visibleTransactionIds.has(service.transactionId)
+  })
 
   if (!vehicle) {
     return (
