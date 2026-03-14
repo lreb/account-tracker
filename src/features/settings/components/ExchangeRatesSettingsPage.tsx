@@ -180,7 +180,7 @@ export default function ExchangeRatesSettingsPage() {
                 <Label>{t('exchangeRates.from')}</Label>
                 <Select
                   value={watchFrom || ''}
-                  onValueChange={(v) => setValue('fromCurrency', v)}
+                  onValueChange={(v) => setValue('fromCurrency', v ?? '')}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="USD" />
@@ -200,7 +200,7 @@ export default function ExchangeRatesSettingsPage() {
                 <Label>{t('exchangeRates.to')}</Label>
                 <Select
                   value={watchTo || ''}
-                  onValueChange={(v) => setValue('toCurrency', v)}
+                  onValueChange={(v) => setValue('toCurrency', v ?? '')}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="EUR" />

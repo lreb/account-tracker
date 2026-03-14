@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useDeferredValue } from 'react'
 import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear } from 'date-fns'
 import {
   BarChart,
@@ -21,6 +21,7 @@ import { useAccountsStore } from '@/stores/accounts.store'
 import { useCategoriesStore } from '@/stores/categories.store'
 import { useLabelsStore } from '@/stores/labels.store'
 import { useSettingsStore } from '@/stores/settings.store'
+import { getVisibleAccountIds, getVisibleAccounts } from '@/lib/accounts'
 import { formatCurrency } from '@/lib/currency'
 import {
   computePeriodSummary,
@@ -34,8 +35,6 @@ import {
 } from '@/lib/reports'
 import { CategoryIcon } from '@/lib/icon-map'
 
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -134,11 +133,19 @@ function CurrencyTooltip({ active, payload, label, currency }: {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
-  const { transactions } = useTransactionsStore()
+  const { transactions: rawTransactions } = useTransactionsStore()
+  const transactions = useDeferredValue(rawTransactions)
+  const isComputing = rawTransactions !== transactions
   const { accounts } = useAccountsStore()
   const { categories } = useCategoriesStore()
   const { labels } = useLabelsStore()
   const { baseCurrency } = useSettingsStore()
+  const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
+  const visibleAccountIds = useMemo(() => getVisibleAccountIds(accounts), [accounts])
+  const hasData = useMemo(
+    () => transactions.some((transaction) => visibleAccountIds.has(transaction.accountId)),
+    [transactions, visibleAccountIds],
+  )
 
   // ── Filter state ─────────────────────────────────────────────────────────
   const [preset, setPreset] = useState<PresetKey>('thisMonth')
@@ -147,6 +154,12 @@ export default function ReportsPage() {
   const [filterAccount, setFilterAccount] = useState<string>('all')
   const [activeTab, setActiveTab] = useState<'overview' | 'category' | 'accounts' | 'cashflow' | 'labels'>('overview')
   const [labelView, setLabelView] = useState<'breakdown' | '503020'>('breakdown')
+
+  useEffect(() => {
+    if (filterAccount !== 'all' && !visibleAccounts.some((account) => account.id === filterAccount)) {
+      setFilterAccount('all')
+    }
+  }, [filterAccount, visibleAccounts])
 
   const filters: ReportFilters = useMemo(() => {
     if (preset === 'custom') {
@@ -165,30 +178,38 @@ export default function ReportsPage() {
   }, [preset, customFrom, customTo, filterAccount])
 
   // ── Derived data ─────────────────────────────────────────────────────────
-  const summary = useMemo(() => computePeriodSummary(transactions, filters), [transactions, filters])
+  const summary = useMemo(
+    () => computePeriodSummary(transactions, filters, visibleAccountIds),
+    [transactions, filters, visibleAccountIds],
+  )
 
   const lastMonthFilters: ReportFilters = useMemo(() => {
     const lm = subMonths(filters.from, 1)
     return { from: startOfMonth(lm), to: endOfMonth(lm), accountId: filters.accountId }
   }, [filters])
   const lastMonthSummary = useMemo(
-    () => computePeriodSummary(transactions, lastMonthFilters),
-    [transactions, lastMonthFilters],
+    () => computePeriodSummary(transactions, lastMonthFilters, visibleAccountIds),
+    [transactions, lastMonthFilters, visibleAccountIds],
   )
 
   const monthCount = preset === 'thisYear' ? 12 : preset === 'last6' ? 6 : preset === 'last3' ? 3 : 6
   const monthlyTrend = useMemo(
-    () => computeMonthlyTrend(transactions, monthCount, filterAccount === 'all' ? undefined : filterAccount),
-    [transactions, monthCount, filterAccount],
+    () => computeMonthlyTrend(
+      transactions,
+      monthCount,
+      filterAccount === 'all' ? undefined : filterAccount,
+      visibleAccountIds,
+    ),
+    [transactions, monthCount, filterAccount, visibleAccountIds],
   )
 
   const expensesByCategory = useMemo(
-    () => computeCategoryBreakdown(transactions, categories, filters, 'expense'),
-    [transactions, categories, filters],
+    () => computeCategoryBreakdown(transactions, categories, filters, 'expense', visibleAccountIds),
+    [transactions, categories, filters, visibleAccountIds],
   )
   const incomeByCategory = useMemo(
-    () => computeCategoryBreakdown(transactions, categories, filters, 'income'),
-    [transactions, categories, filters],
+    () => computeCategoryBreakdown(transactions, categories, filters, 'income', visibleAccountIds),
+    [transactions, categories, filters, visibleAccountIds],
   )
 
   const accountBalances = useMemo(
@@ -197,26 +218,35 @@ export default function ReportsPage() {
   )
 
   const cashFlow = useMemo(
-    () => computeCashFlow(transactions, monthCount, filterAccount === 'all' ? undefined : filterAccount),
-    [transactions, monthCount, filterAccount],
+    () => computeCashFlow(
+      transactions,
+      monthCount,
+      filterAccount === 'all' ? undefined : filterAccount,
+      visibleAccountIds,
+    ),
+    [transactions, monthCount, filterAccount, visibleAccountIds],
   )
 
   const labelBreakdown = useMemo(
-    () => computeLabelBreakdown(transactions, labels, filters),
-    [transactions, labels, filters],
+    () => computeLabelBreakdown(transactions, labels, filters, visibleAccountIds),
+    [transactions, labels, filters, visibleAccountIds],
   )
 
   const rule503020 = useMemo(
-    () => compute503020(transactions, labels, filters),
-    [transactions, labels, filters],
+    () => compute503020(transactions, labels, filters, visibleAccountIds),
+    [transactions, labels, filters, visibleAccountIds],
   )
-
-  const hasData = transactions.length > 0
 
   // ─── Render ─────────────────────────────────────────────────────────────
 
   return (
     <div className="p-4 pb-24 space-y-5">
+      {isComputing && (
+        <div className="fixed top-14 right-4 z-50 flex items-center gap-1.5 rounded-full bg-white/90 border shadow-sm px-2.5 py-1 text-xs text-gray-500">
+          <div className="h-3 w-3 animate-spin rounded-full border-2 border-indigo-400 border-t-transparent" />
+          Calculating…
+        </div>
+      )}
       <h1 className="text-xl font-bold">Reports</h1>
 
       {/* ── Period selector ─────────────────────────────────────────────── */}
@@ -252,13 +282,13 @@ export default function ReportsPage() {
         )}
 
         <div className="flex items-center gap-2">
-          <Select value={filterAccount} onValueChange={setFilterAccount}>
+          <Select value={filterAccount} onValueChange={(value) => setFilterAccount(value ?? 'all')}>
             <SelectTrigger className="h-8 text-xs w-44">
               <SelectValue placeholder="All accounts" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All accounts</SelectItem>
-              {accounts.map((a) => (
+              {visibleAccounts.map((a) => (
                 <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
               ))}
             </SelectContent>
@@ -372,7 +402,7 @@ export default function ReportsPage() {
                         <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(v: number) => formatCurrency(v, baseCurrency)} />
+                    <Tooltip formatter={(value) => typeof value === 'number' ? formatCurrency(value, baseCurrency) : ''} />
                   </PieChart>
                 </ResponsiveContainer>
                 <ul className="space-y-2 mt-2">
@@ -419,7 +449,7 @@ export default function ReportsPage() {
       {/* ── Accounts tab: balance sheet by account ───────────────────────── */}
       {activeTab === 'accounts' && (
         <div className="space-y-4">
-          {accounts.length === 0 ? (
+          {visibleAccounts.length === 0 ? (
             <p className="text-sm text-gray-400 text-center mt-8">No accounts yet.</p>
           ) : (
             accountBalances.map((ab) => (

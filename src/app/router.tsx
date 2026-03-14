@@ -6,6 +6,8 @@ import TransactionFormPage from '@/features/transactions/components/TransactionF
 import VehicleListPage from '@/features/vehicles/components/VehicleListPage'
 import VehicleDetailPage from '@/features/vehicles/components/VehicleDetailPage'
 import ReportsPage from '@/features/reports/components/ReportsPage'
+import BalanceSheetPage from '@/features/reports/components/BalanceSheetPage'
+import BalanceSheetDetailPage from '@/features/reports/components/BalanceSheetDetailPage'
 import BudgetsPage from '@/features/budgets/components/BudgetsPage'
 import InsightsPage from '@/features/insights/components/InsightsPage'
 import SettingsPage from '@/features/settings/components/SettingsPage'
@@ -13,14 +15,19 @@ import AccountsSettingsPage from '@/features/settings/components/AccountsSetting
 import CategoriesSettingsPage from '@/features/settings/components/CategoriesSettingsPage'
 import LabelsSettingsPage from '@/features/settings/components/LabelsSettingsPage'
 import ExchangeRatesSettingsPage from '@/features/settings/components/ExchangeRatesSettingsPage'
+import OAuthCallbackPage from '@/features/settings/components/OAuthCallbackPage'
 
 export const router = createBrowserRouter([
+  // OAuth callback — outside Shell so there's no nav chrome during the redirect
+  { path: '/oauth-callback', element: <OAuthCallbackPage /> },
   {
     path: '/',
     element: <Shell />,
     children: [
       { index: true, element: <DashboardPage /> },
       { path: 'transactions', element: <TransactionListPage /> },
+      { path: 'balance-sheet', element: <BalanceSheetPage /> },
+      { path: 'balance-sheet/:accountId', element: <BalanceSheetDetailPage /> },
       { path: 'transactions/new', element: <TransactionFormPage /> },
       { path: 'transactions/:id', element: <TransactionFormPage /> },
       { path: 'vehicles', element: <VehicleListPage /> },

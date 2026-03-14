@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { toast } from 'sonner'
 import { db } from '@/db'
+import { normalizeAccount } from '@/lib/accounts'
 import type { Account } from '@/types'
 
 interface AccountsState {
@@ -16,7 +17,7 @@ export const useAccountsStore = create<AccountsState>((set) => ({
 
   load: async () => {
     try {
-      const accounts = await db.accounts.toArray()
+      const accounts = (await db.accounts.toArray()).map(normalizeAccount)
       set({ accounts })
     } catch (err) {
       console.error(err)
@@ -26,8 +27,9 @@ export const useAccountsStore = create<AccountsState>((set) => ({
 
   add: async (account) => {
     try {
-      await db.accounts.add(account)
-      set((s) => ({ accounts: [...s.accounts, account] }))
+      const nextAccount = normalizeAccount(account)
+      await db.accounts.add(nextAccount)
+      set((s) => ({ accounts: [...s.accounts, nextAccount] }))
       toast.success('Account added')
     } catch (err) {
       console.error(err)
@@ -37,9 +39,10 @@ export const useAccountsStore = create<AccountsState>((set) => ({
 
   update: async (account) => {
     try {
-      await db.accounts.put(account)
+      const nextAccount = normalizeAccount(account)
+      await db.accounts.put(nextAccount)
       set((s) => ({
-        accounts: s.accounts.map((a) => (a.id === account.id ? account : a)),
+        accounts: s.accounts.map((a) => (a.id === nextAccount.id ? nextAccount : a)),
       }))
       toast.success('Account updated')
     } catch (err) {

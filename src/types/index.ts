@@ -34,6 +34,7 @@ export interface Account {
   type: AccountType
   openingBalance: number      // integer cents in account's currency
   currency: string            // ISO 4217
+  hidden?: boolean            // excluded from app totals and account selectors
 }
 
 export interface Category {
