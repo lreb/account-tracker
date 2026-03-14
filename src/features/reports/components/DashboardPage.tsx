@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useDeferredValue } from 'react'
 import { Link } from 'react-router-dom'
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns'
 import { TrendingUp, TrendingDown, ArrowRight } from 'lucide-react'
@@ -9,20 +9,33 @@ import { useBudgetsStore } from '@/stores/budgets.store'
 import { useCategoriesStore } from '@/stores/categories.store'
 import { useLabelsStore } from '@/stores/labels.store'
 import { useSettingsStore } from '@/stores/settings.store'
+import {
+  getVisibleAccountIds,
+  getVisibleAccounts,
+  isTransactionForVisiblePrimaryAccount,
+} from '@/lib/accounts'
 import { formatCurrency } from '@/lib/currency'
 import { computePeriodSummary, computeMonthlyTrend, compute503020, type ReportFilters } from '@/lib/reports'
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { Button } from '@/components/ui/button'
 
 export default function DashboardPage() {
-  const { transactions } = useTransactionsStore()
+  const { transactions: rawTransactions } = useTransactionsStore()
+  const transactions = useDeferredValue(rawTransactions)
+  const isComputing = rawTransactions !== transactions
   const { accounts } = useAccountsStore()
   const { budgets } = useBudgetsStore()
   const { categories } = useCategoriesStore()
   const { labels } = useLabelsStore()
   const { baseCurrency } = useSettingsStore()
+  const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
+  const visibleAccountIds = useMemo(() => getVisibleAccountIds(accounts), [accounts])
+  const visibleTransactions = useMemo(
+    () => transactions.filter((transaction) => isTransactionForVisiblePrimaryAccount(transaction, visibleAccountIds)),
+    [transactions, visibleAccountIds],
+  )
 
   const now = new Date()
 
@@ -38,30 +51,43 @@ export default function DashboardPage() {
     return { from: startOfMonth(lm), to: endOfMonth(lm) }
   }, [])
 
-  const summary = useMemo(() => computePeriodSummary(transactions, thisMonthFilters), [transactions, thisMonthFilters])
-  const lastMonth = useMemo(() => computePeriodSummary(transactions, lastMonthFilters), [transactions, lastMonthFilters])
-  const trend = useMemo(() => computeMonthlyTrend(transactions, 6), [transactions])
+  const summary = useMemo(
+    () => computePeriodSummary(transactions, thisMonthFilters, visibleAccountIds),
+    [transactions, thisMonthFilters, visibleAccountIds],
+  )
+  const lastMonth = useMemo(
+    () => computePeriodSummary(transactions, lastMonthFilters, visibleAccountIds),
+    [transactions, lastMonthFilters, visibleAccountIds],
+  )
+  const trend = useMemo(
+    () => computeMonthlyTrend(transactions, 6, undefined, visibleAccountIds),
+    [transactions, visibleAccountIds],
+  )
 
   // Net worth: sum of all account closing balances
   const netWorth = useMemo(() => {
-    return accounts.reduce((sum, acc) => {
-      const accTx = transactions.filter((t) => t.accountId === acc.id)
+    return visibleAccounts.reduce((sum, acc) => {
+      const accTx = transactions.filter((t) => t.accountId === acc.id || t.toAccountId === acc.id)
       const net = accTx.reduce((s, t) => {
         if (t.type === 'income') return s + t.amount
         if (t.type === 'expense') return s - t.amount
+        if (t.type === 'transfer') {
+          if (t.accountId === acc.id) return s - t.amount
+          return s + (t.originalAmount ?? t.amount)
+        }
         return s
       }, 0)
       return sum + acc.openingBalance + net
     }, 0)
-  }, [accounts, transactions])
+  }, [visibleAccounts, transactions])
 
   // Recent transactions (last 5)
-  const recent = useMemo(() => transactions.slice(0, 5), [transactions])
+  const recent = useMemo(() => visibleTransactions.slice(0, 5), [visibleTransactions])
 
   // 50/30/20 — only render when user has labelled transactions this month
   const rule503020 = useMemo(
-    () => compute503020(transactions, labels, thisMonthFilters),
-    [transactions, labels, thisMonthFilters],
+    () => compute503020(transactions, labels, thisMonthFilters, visibleAccountIds),
+    [transactions, labels, thisMonthFilters, visibleAccountIds],
   )
 
   // Budget health: top 3 budgets by percent used
@@ -70,19 +96,31 @@ export default function DashboardPage() {
     const endStr = endOfMonth(now).toISOString()
     return budgets.slice(0, 3).map((b) => {
       const spent = transactions
-        .filter((t) => t.type === 'expense' && t.categoryId === b.categoryId && t.date >= startStr && t.date <= endStr)
+        .filter((t) => (
+          t.type === 'expense'
+          && visibleAccountIds.has(t.accountId)
+          && t.categoryId === b.categoryId
+          && t.date >= startStr
+          && t.date <= endStr
+        ))
         .reduce((s, t) => s + t.amount, 0)
       const percent = b.amount > 0 ? Math.round((spent / b.amount) * 100) : 0
       const cat = categories.find((c) => c.id === b.categoryId)
       return { budget: b, spent, percent, catName: cat?.name ?? b.categoryId }
     })
-  }, [budgets, transactions, categories])
+  }, [budgets, transactions, categories, visibleAccountIds])
 
   const incDelta = summary.income - lastMonth.income
   const expDelta = summary.expenses - lastMonth.expenses
 
   return (
     <div className="p-4 pb-24 space-y-5">
+      {isComputing && (
+        <div className="fixed top-14 right-4 z-50 flex items-center gap-1.5 rounded-full bg-white/90 border shadow-sm px-2.5 py-1 text-xs text-gray-500">
+          <div className="h-3 w-3 animate-spin rounded-full border-2 border-indigo-400 border-t-transparent" />
+          Calculating…
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-gray-500 uppercase tracking-widest font-medium">
@@ -96,7 +134,7 @@ export default function DashboardPage() {
       <div className="rounded-2xl border bg-gradient-to-br from-indigo-600 to-indigo-800 p-4 text-white shadow-sm">
         <p className="text-xs uppercase tracking-widest opacity-75">Net Worth</p>
         <p className="text-3xl font-bold mt-1">{formatCurrency(netWorth, baseCurrency)}</p>
-        <p className="text-xs opacity-60 mt-1">{accounts.length} account{accounts.length !== 1 ? 's' : ''}</p>
+        <p className="text-xs opacity-60 mt-1">{visibleAccounts.length} account{visibleAccounts.length !== 1 ? 's' : ''}</p>
       </div>
 
       {/* ── This month summary ────────────────────────────────────────── */}
@@ -134,7 +172,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── 6-month trend mini chart ──────────────────────────────────── */}
-      {transactions.length > 0 && (
+      {visibleTransactions.length > 0 && (
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">6-Month Trend</p>
           <ResponsiveContainer width="100%" height={120}>
@@ -143,7 +181,13 @@ export default function DashboardPage() {
               <XAxis dataKey="month" tick={{ fontSize: 9 }} />
               <YAxis tick={{ fontSize: 9 }} />
               <Tooltip
-                formatter={(v: number, name: string) => [formatCurrency(v, baseCurrency), name]}
+                formatter={(value, name) => {
+                  if (typeof value !== 'number') {
+                    return ['', name]
+                  }
+
+                  return [formatCurrency(value, baseCurrency), name]
+                }}
                 contentStyle={{ fontSize: 11, borderRadius: 8 }}
               />
               <Bar dataKey="income" fill="#10b981" radius={[2, 2, 0, 0]} />
@@ -260,7 +304,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {transactions.length === 0 && (
+      {visibleTransactions.length === 0 && (
         <div className="text-center mt-10 space-y-3">
           <p className="text-sm text-gray-400">No transactions yet.</p>
           <Link to="/transactions/new">

@@ -2,6 +2,7 @@
   "nav": {
     "dashboard": "Inicio",
     "transactions": "Transacciones",
+    "balanceSheet": "Balance",
     "reports": "Reportes",
     "budgets": "Presupuestos",
     "settings": "Configuración",
@@ -168,7 +169,11 @@
     "exportCsvTransactions": "Exportar transacciones como CSV",
     "importCsvTransactions": "Importar transacciones desde CSV",
     "csvImportSuccess": "Se importaron {{count}} transacción(es) correctamente.",
+    "csvImportCreatedRefs": "Se crearon {{accounts}} cuenta(s), {{categories}} categoría(s) y {{labels}} etiqueta(s).",
+    "csvImportDuplicates": "Se omitieron {{count}} transacción(es) duplicadas.",
+    "csvImportDuplicatesOnly": "No se importaron transacciones nuevas. Se omitieron {{count}} transacción(es) duplicadas.",
     "csvImportSkipped": "{{skipped}} fila(s) omitidas por errores.",
+    "csvImportNoRows": "No se encontraron filas para importar.",
     "csvImportError": "No se pudo leer el archivo. Asegúrate de que sea un CSV válido."
   },
   "exchangeRates": {
@@ -213,6 +218,9 @@
     "type": "Tipo de Cuenta",
     "currency": "Moneda",
     "openingBalance": "Saldo Inicial",
+    "hideFromApp": "Ocultar cuenta de la aplicación",
+    "excludedFromTotals": "Se excluye de totales, reportes y selectores de cuenta.",
+    "hidden": "Oculta",
     "noAccounts": "Aún no hay cuentas.",
     "addFirst": "Agrega tu primera cuenta",
     "types": {
@@ -222,6 +230,50 @@
     "descriptions": {
       "asset": "Lo que posees",
       "liability": "Lo que debes"
+    }
+  },
+  "balanceSheet": {
+    "title": "Balance General",
+    "detailTitle": "Detalle del Balance",
+    "subtitle": "Sigue cada cuenta, su peso dentro de tu patrimonio neto y cómo cambió frente a la misma fecha de un periodo anterior.",
+    "netWorth": "Patrimonio neto",
+    "sectionNetWorth": "Patrimonio neto",
+    "currentBalance": "Saldo actual",
+    "change": "Cambio",
+    "comparisonWindow": "Ventana de comparación",
+    "sameDateComparison": "Comparado con {{period}} que termina el {{date}}",
+    "missingRates": "{{count}} cuenta(s) quedan fuera de los porcentajes hasta tener un tipo de cambio hacia {{currency}}.",
+    "noAccounts": "Agrega una cuenta primero para construir tu balance general.",
+    "manageAccounts": "Administrar cuentas",
+    "shareOfNetWorth": "Participación del patrimonio",
+    "netWorthImpact": "Impacto en patrimonio",
+    "unavailable": "No disponible",
+    "vsReference": "vs {{period}}",
+    "transactionsTitle": "Transacciones",
+    "transactionsSubtitle": "Actividad de la cuenta {{account}}",
+    "selectAccountPrompt": "Selecciona una cuenta para ver sus transacciones dentro del mismo contexto.",
+    "noTransactionsForAccount": "Todavía no hay transacciones para esta cuenta.",
+    "addTransaction": "Agregar transacción",
+    "backToOverview": "Volver al balance general",
+    "accountNotFound": "No se encontró esta cuenta.",
+    "accountContextLocked": "Esta cuenta queda preseleccionada cuando agregas una transacción desde el balance general.",
+    "periods": {
+      "lastWeek": "Última semana",
+      "last2Weeks": "Últimas 2 semanas",
+      "lastMonth": "Último mes",
+      "lastQuarter": "Último trimestre",
+      "lastYear": "Último año"
+    },
+    "periodLabels": {
+      "lastWeek": "la última semana",
+      "last2Weeks": "las últimas 2 semanas",
+      "lastMonth": "el último mes",
+      "lastQuarter": "el último trimestre",
+      "lastYear": "el último año"
+    },
+    "transactionKinds": {
+      "transferIn": "Transferencia recibida",
+      "transferOut": "Transferencia enviada"
     }
   },
   "categories": {

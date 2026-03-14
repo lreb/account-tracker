@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
 import { v4 as uuid } from 'uuid'
 
+import { getAccountSelectOptions, getVisibleAccounts } from '@/lib/accounts'
 import { transactionSchema, type TransactionFormValues } from '../schemas/transaction.schema'
 import { formatCurrency } from '@/lib/currency'
 import { useTransactionsStore } from '@/stores/transactions.store'
@@ -44,7 +45,10 @@ export default function TransactionForm() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { id } = useParams<{ id?: string }>()
+  const [searchParams] = useSearchParams()
   const isEdit = Boolean(id)
+  const accountContextId = searchParams.get('accountId')
+  const returnTo = searchParams.get('returnTo')
 
   const { transactions, loading, load: loadTransactions, add, update } = useTransactionsStore()
   const { accounts } = useAccountsStore()
@@ -52,6 +56,7 @@ export default function TransactionForm() {
   const { labels, load: loadLabels } = useLabelsStore()
   const { getRateForPair, load: loadRates } = useExchangeRatesStore()
   const { baseCurrency, load: loadSettings } = useSettingsStore()
+  const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
 
   // Ensure the store is hydrated before we try to find the transaction.
   // On a hard refresh to /transactions/:id the store starts empty.
@@ -66,6 +71,7 @@ export default function TransactionForm() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const existing = isEdit ? transactions.find((tx) => tx.id === id) : undefined
+  const defaultAccount = accounts.find((account) => account.id === accountContextId) ?? visibleAccounts[0] ?? accounts[0]
 
   // local label selection — ids of chosen labels
   const [selectedLabels, setSelectedLabels] = useState<string[]>(
@@ -106,13 +112,27 @@ export default function TransactionForm() {
           date:       format(new Date(), 'yyyy-MM-dd'),
           time:       format(new Date(), 'HH:mm'),
           status:     'cleared',
-          currency:   accounts[0]?.currency ?? 'USD',
+          currency:   defaultAccount?.currency ?? 'USD',
           amount:     '',
           categoryId: '',
-          accountId:  accounts[0]?.id ?? '',
+          accountId:  defaultAccount?.id ?? '',
           description: '',
         },
   })
+
+  useEffect(() => {
+    if (isEdit || !accountContextId) {
+      return
+    }
+
+    const contextAccount = accounts.find((account) => account.id === accountContextId)
+    if (!contextAccount) {
+      return
+    }
+
+    setValue('accountId', contextAccount.id)
+    setValue('currency', contextAccount.currency)
+  }, [isEdit, accountContextId, accounts, setValue])
 
   // When the store finishes loading on a hard-refresh edit, populate the form
   useEffect(() => {
@@ -215,6 +235,15 @@ export default function TransactionForm() {
   const watchCurrency    = watch('currency')
   const watchRate        = watch('exchangeRate')
 
+  const sourceAccountOptions = useMemo(() => {
+    return getAccountSelectOptions(accounts, [watchAccountId, accountContextId ?? '', existing?.accountId ?? ''])
+  }, [accounts, watchAccountId, accountContextId, existing])
+
+  const destinationAccountOptions = useMemo(() => {
+    return getAccountSelectOptions(accounts, [watchToAccountId ?? '', existing?.toAccountId ?? ''])
+      .filter((account) => account.id !== watchAccountId)
+  }, [accounts, watchAccountId, watchToAccountId, existing])
+
   // Filter categories by selected transaction type and exclude soft-deleted
   const filteredCategories = useMemo(() => {
     const active = categories.filter((c) => {
@@ -269,6 +298,11 @@ export default function TransactionForm() {
     } else {
       await add({ id: uuid(), ...base })
     }
+    if (returnTo?.startsWith('/')) {
+      navigate(returnTo)
+      return
+    }
+
     navigate('/transactions')
   }
 
@@ -376,7 +410,7 @@ export default function TransactionForm() {
         <Label>{t('settings.categories')}</Label>
         <Select
           value={watchCategoryId || undefined}
-          onValueChange={(v) => setValue('categoryId', v)}
+          onValueChange={(v) => setValue('categoryId', v ?? '')}
         >
           <SelectTrigger>
             <SelectValue placeholder="Select category">
@@ -397,9 +431,13 @@ export default function TransactionForm() {
       {/* Account */}
       <div className="space-y-1">
         <Label>{t('settings.accounts')}</Label>
+        {accountContextId && !isEdit && (
+          <p className="text-xs text-gray-500">{t('balanceSheet.accountContextLocked')}</p>
+        )}
         <Select
           value={watchAccountId || undefined}
-          onValueChange={(v) => setValue('accountId', v)}
+          onValueChange={(v) => setValue('accountId', v ?? '')}
+          disabled={Boolean(accountContextId) && !isEdit}
         >
           <SelectTrigger>
             <SelectValue placeholder="Select account">
@@ -411,7 +449,7 @@ export default function TransactionForm() {
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {accounts.map((acct) => (
+            {sourceAccountOptions.map((acct) => (
               <SelectItem key={acct.id} value={acct.id}>
                 {acct.name} · {formatCurrency(accountBalances.get(acct.id) ?? acct.openingBalance, acct.currency)}
               </SelectItem>
@@ -427,7 +465,7 @@ export default function TransactionForm() {
           <Label>{t('common.toAccount', 'To Account')}</Label>
           <Select
             value={watchToAccountId || undefined}
-            onValueChange={(v) => setValue('toAccountId', v)}
+            onValueChange={(v) => setValue('toAccountId', v ?? undefined)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select destination account">
@@ -439,9 +477,7 @@ export default function TransactionForm() {
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {accounts
-                .filter((a) => a.id !== watchAccountId)
-                .map((acct) => (
+              {destinationAccountOptions.map((acct) => (
                   <SelectItem key={acct.id} value={acct.id}>
                     {acct.name} · {formatCurrency(accountBalances.get(acct.id) ?? acct.openingBalance, acct.currency)}
                   </SelectItem>
@@ -536,7 +572,19 @@ export default function TransactionForm() {
 
       {/* Actions */}
       <div className="flex gap-3 pt-2">
-        <Button type="button" variant="outline" className="flex-1" onClick={() => navigate(-1)}>
+        <Button
+          type="button"
+          variant="outline"
+          className="flex-1"
+          onClick={() => {
+            if (returnTo?.startsWith('/')) {
+              navigate(returnTo)
+              return
+            }
+
+            navigate(-1)
+          }}
+        >
           {t('common.cancel')}
         </Button>
         <Button type="submit" className="flex-1" disabled={isSubmitting}>

@@ -2,6 +2,7 @@
   "nav": {
     "dashboard": "Dashboard",
     "transactions": "Transactions",
+    "balanceSheet": "Balance",
     "reports": "Reports",
     "budgets": "Budgets",
     "settings": "Settings",
@@ -204,7 +205,11 @@
     "exportCsvTransactions": "Export transactions as CSV",
     "importCsvTransactions": "Import transactions from CSV",
     "csvImportSuccess": "Imported {{count}} transaction(s) successfully.",
+    "csvImportCreatedRefs": "Created {{accounts}} account(s), {{categories}} categor(ies), and {{labels}} label(s).",
+    "csvImportDuplicates": "Skipped {{count}} duplicate transaction(s).",
+    "csvImportDuplicatesOnly": "No new transactions were imported. {{count}} duplicate transaction(s) were skipped.",
     "csvImportSkipped": "{{skipped}} row(s) were skipped due to errors.",
+    "csvImportNoRows": "No rows were found to import.",
     "csvImportError": "Could not read the file. Make sure it is a valid CSV."
   },
   "exchangeRates": {
@@ -249,6 +254,9 @@
     "type": "Account Type",
     "currency": "Currency",
     "openingBalance": "Opening Balance",
+    "hideFromApp": "Hide account from the app",
+    "excludedFromTotals": "Excluded from totals, reports, and account selectors.",
+    "hidden": "Hidden",
     "noAccounts": "No accounts yet.",
     "addFirst": "Add your first account",
     "types": {
@@ -258,6 +266,50 @@
     "descriptions": {
       "asset": "What you own",
       "liability": "What you owe"
+    }
+  },
+  "balanceSheet": {
+    "title": "Balance Sheet",
+    "detailTitle": "Balance Detail",
+    "subtitle": "Track each account, its weight in your net worth, and how it changed since the same date in a prior period.",
+    "netWorth": "Net Worth",
+    "sectionNetWorth": "Net worth",
+    "currentBalance": "Current balance",
+    "change": "Change",
+    "comparisonWindow": "Comparison window",
+    "sameDateComparison": "Compared with {{period}} ending on {{date}}",
+    "missingRates": "{{count}} account(s) are excluded from percentages until a {{currency}} exchange rate is available.",
+    "noAccounts": "Add an account first to build your balance sheet.",
+    "manageAccounts": "Manage accounts",
+    "shareOfNetWorth": "Share of net worth",
+    "netWorthImpact": "Net worth impact",
+    "unavailable": "Unavailable",
+    "vsReference": "vs {{period}}",
+    "transactionsTitle": "Transactions",
+    "transactionsSubtitle": "Account activity for {{account}}",
+    "selectAccountPrompt": "Select an account to see its transactions in context.",
+    "noTransactionsForAccount": "No transactions found for this account yet.",
+    "addTransaction": "Add transaction",
+    "backToOverview": "Back to balance sheet",
+    "accountNotFound": "This account could not be found.",
+    "accountContextLocked": "This account stays preselected while you add a transaction from the balance sheet.",
+    "periods": {
+      "lastWeek": "Last week",
+      "last2Weeks": "Last 2 weeks",
+      "lastMonth": "Last month",
+      "lastQuarter": "Last quarter",
+      "lastYear": "Last year"
+    },
+    "periodLabels": {
+      "lastWeek": "last week",
+      "last2Weeks": "last 2 weeks",
+      "lastMonth": "last month",
+      "lastQuarter": "last quarter",
+      "lastYear": "last year"
+    },
+    "transactionKinds": {
+      "transferIn": "Transfer in",
+      "transferOut": "Transfer out"
     }
   },
   "categories": {

@@ -5,8 +5,10 @@ import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { ChevronRight, Wallet, Tag, RefreshCw, Download, Upload, Table2 } from 'lucide-react'
 
+import { db } from '@/db'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useAccountsStore } from '@/stores/accounts.store'
+import { useCategoriesStore } from '@/stores/categories.store'
 import { useLabelsStore } from '@/stores/labels.store'
 import { exportTransactionsCsv, parseTransactionsCsv } from '@/lib/csv'
 
@@ -19,9 +21,10 @@ const settingsItems = [
 
 export default function SettingsPage() {
   const { t } = useTranslation()
-  const { transactions, add } = useTransactionsStore()
-  const { accounts } = useAccountsStore()
-  const { labels }   = useLabelsStore()
+  const { transactions, load: loadTransactions } = useTransactionsStore()
+  const { accounts, load: loadAccounts } = useAccountsStore()
+  const { categories, load: loadCategories } = useCategoriesStore()
+  const { labels, load: loadLabels } = useLabelsStore()
   const importRef = useRef<HTMLInputElement>(null)
 
   // ── Export ──────────────────────────────────────────────────────────────
@@ -44,29 +47,71 @@ export default function SettingsPage() {
     reader.onload = async (ev) => {
       try {
         const text = ev.target?.result as string
-        const { imported, skipped, errors } = parseTransactionsCsv(text, accounts, labels)
+        const {
+          imported,
+          skipped,
+          errors,
+          accountsToCreate,
+          categoriesToCreate,
+          labelsToCreate,
+        } = parseTransactionsCsv(text, accounts, labels, categories)
 
         const existingIds = new Set(transactions.map((tx) => tx.id))
         const newTxs = imported.filter((tx) => !existingIds.has(tx.id))
         const duplicates = imported.length - newTxs.length
 
-        for (const tx of newTxs) {
-          await add(tx)
+        if (newTxs.length > 0 || accountsToCreate.length > 0 || categoriesToCreate.length > 0 || labelsToCreate.length > 0) {
+          await db.transaction(
+            'rw',
+            db.accounts,
+            db.categories,
+            db.labels,
+            db.transactions,
+            async () => {
+              if (accountsToCreate.length > 0) {
+                await db.accounts.bulkPut(accountsToCreate)
+              }
+              if (categoriesToCreate.length > 0) {
+                await db.categories.bulkPut(categoriesToCreate)
+              }
+              if (labelsToCreate.length > 0) {
+                await db.labels.bulkPut(labelsToCreate)
+              }
+              if (newTxs.length > 0) {
+                await db.transactions.bulkPut(newTxs)
+              }
+            },
+          )
+
+          await Promise.all([
+            loadAccounts(),
+            loadCategories(),
+            loadLabels(),
+            loadTransactions(),
+          ])
         }
 
         const inserted = newTxs.length
         if (inserted > 0) {
-          toast.success(
-            t('settings.csvImportSuccess', { count: inserted }) +
-            (duplicates > 0 ? ` (${duplicates} duplicate(s) skipped)` : ''),
-          )
+          const extrasSummary = t('settings.csvImportCreatedRefs', {
+            accounts: accountsToCreate.length,
+            categories: categoriesToCreate.length,
+            labels: labelsToCreate.length,
+          })
+          const duplicateSummary = duplicates > 0
+            ? ` ${t('settings.csvImportDuplicates', { count: duplicates })}`
+            : ''
+
+          toast.success(`${t('settings.csvImportSuccess', { count: inserted })} ${extrasSummary}${duplicateSummary}`.trim())
+        } else if (duplicates > 0) {
+          toast.error(t('settings.csvImportDuplicatesOnly', { count: duplicates }))
         }
         if (skipped > 0) {
           toast.error(t('settings.csvImportSkipped', { skipped }))
           console.warn('CSV import skipped rows:', errors)
         }
         if (inserted === 0 && skipped === 0 && errors.length === 0) {
-          toast.error('No rows found to import.')
+          toast.error(t('settings.csvImportNoRows'))
         }
       } catch (err) {
         console.error(err)
