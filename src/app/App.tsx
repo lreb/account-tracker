@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { RouterProvider } from 'react-router-dom'
 import { router } from './router'
+import i18n from '@/i18n'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useCategoriesStore } from '@/stores/categories.store'
@@ -27,6 +28,10 @@ export default function App() {
   const loadBudgets      = useBudgetsStore((s) => s.load)
   const loadVehicles     = useVehiclesStore((s) => s.load)
   const loadSettings     = useSettingsStore((s) => s.load)
+  const language         = useSettingsStore((s) => s.language)
+
+  // Keep i18n in sync with the persisted language preference
+  useEffect(() => { void i18n.changeLanguage(language) }, [language])
 
   useEffect(() => {
     void Promise.all([
