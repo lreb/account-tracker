@@ -60,6 +60,14 @@
     "noMatch": "No transactions match your filters.",
     "clearFilters": "Clear filters",
     "clearAll": "Clear all",
+    "quickRange": {
+      "all": "All time",
+      "lastMonth": "Last month",
+      "lastQuarter": "Last quarter",
+      "last6Months": "Last 6 months",
+      "lastYear": "Last year",
+      "last2Years": "Last 2 years"
+    },
     "today": "Today",
     "yesterday": "Yesterday",
     "record": "record",

@@ -60,6 +60,14 @@
     "noMatch": "Ninguna transacci\u00f3n coincide con los filtros.",
     "clearFilters": "Limpiar filtros",
     "clearAll": "Limpiar todo",
+    "quickRange": {
+      "all": "Todo el tiempo",
+      "lastMonth": "Último mes",
+      "lastQuarter": "Último trimestre",
+      "last6Months": "Últimos 6 meses",
+      "lastYear": "Último año",
+      "last2Years": "Últimos 2 años"
+    },
     "today": "Hoy",
     "yesterday": "Ayer",
     "record": "registro",
