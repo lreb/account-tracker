@@ -13,7 +13,7 @@
  * never touches the user's My Drive files.
  */
 
-const CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ?? ''
+const ENV_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ?? ''
 const SCOPE = 'https://www.googleapis.com/auth/drive.appdata'
 const BACKUP_FILENAME = 'expense-tracking-backup.json'
 const TOKEN_KEY = '__gd_token__'
@@ -21,9 +21,9 @@ const RETURN_KEY = '__oauth_return__'
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 
-/** Returns true only when VITE_GOOGLE_CLIENT_ID is set in the environment. */
-export function isGoogleDriveConfigured(): boolean {
-  return CLIENT_ID.length > 0
+/** Returns true only when a Client ID is available (either provided or from env). */
+export function isGoogleDriveConfigured(clientId?: string): boolean {
+  return (clientId || ENV_CLIENT_ID).length > 0
 }
 
 // ── Token management ──────────────────────────────────────────────────────────
@@ -47,10 +47,13 @@ export function signOutOfGoogle(): void {
  * After the user grants permission, Google redirects to /oauth-callback,
  * which captures the token and navigates back to `returnTo`.
  */
-export function startGoogleSignIn(returnTo = '/settings'): void {
+export function startGoogleSignIn(clientId: string, returnTo = '/settings'): void {
+  const activeClientId = clientId || ENV_CLIENT_ID
+  if (!activeClientId) throw new Error('Missing Google Client ID')
+
   sessionStorage.setItem(RETURN_KEY, returnTo)
   const params = new URLSearchParams({
-    client_id: CLIENT_ID,
+    client_id: activeClientId,
     redirect_uri: `${window.location.origin}/oauth-callback`,
     response_type: 'token',
     scope: SCOPE,

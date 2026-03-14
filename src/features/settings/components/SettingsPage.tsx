@@ -50,7 +50,7 @@ export default function SettingsPage() {
   const { labels, load: loadLabels } = useLabelsStore()
   const { load: loadBudgets } = useBudgetsStore()
   const { load: loadVehicles } = useVehiclesStore()
-  const { load: loadSettings, saveSetting, language } = useSettingsStore()
+  const { load: loadSettings, saveSetting, language, googleClientId } = useSettingsStore()
   const { load: loadExchangeRates } = useExchangeRatesStore()
   const importRef = useRef<HTMLInputElement>(null)
   const jsonImportRef = useRef<HTMLInputElement>(null)
@@ -59,7 +59,12 @@ export default function SettingsPage() {
   const [confirmRestore, setConfirmRestore] = useState<null | (() => Promise<void>)>(null)
   const [confirmReset, setConfirmReset] = useState(false)
   const [driveSignedIn, setDriveSignedIn] = useState(isSignedInToGoogle)
-  const driveConfigured = isGoogleDriveConfigured()
+  
+  // Track if we're showing the "bring your own client ID" config UI
+  const [editingDriveConfig, setEditingDriveConfig] = useState(false)
+  const [tempClientId, setTempClientId] = useState(googleClientId)
+
+  const driveConfigured = isGoogleDriveConfigured(googleClientId)
 
   // ── Reload all stores (called after any restore) ───────────────────────────
   async function reloadAll() {
@@ -196,12 +201,25 @@ export default function SettingsPage() {
 
   // ── Google Drive: Connect / Disconnect ────────────────────────────────────
   function handleDriveConnect() {
-    startGoogleSignIn('/settings')
+    startGoogleSignIn(googleClientId, '/settings')
   }
   function handleDriveDisconnect() {
     signOutOfGoogle()
     setDriveSignedIn(false)
     toast.success(t('settings.driveDisconnected'))
+  }
+
+  async function handleSaveDriveConfig() {
+    setIsBusy(true)
+    try {
+      await saveSetting('googleClientId', tempClientId.trim())
+      setEditingDriveConfig(false)
+      toast.success(t('common.saved'))
+    } catch {
+      toast.error(t('settings.saveError', 'Failed to save config'))
+    } finally {
+      setIsBusy(false)
+    }
   }
 
   // ── Google Drive: Backup ──────────────────────────────────────────────────
@@ -339,22 +357,63 @@ export default function SettingsPage() {
       <div className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 px-1">{t('settings.sectionDrive')}</p>
 
-        {!driveConfigured ? (
-          <div className="rounded-2xl border bg-white px-4 py-3 flex items-start gap-3">
-            <Info size={16} className="text-gray-400 mt-0.5 shrink-0" />
-            <p className="text-xs text-gray-500">{t('settings.driveNotConfigured')}</p>
+        {!driveConfigured && !editingDriveConfig ? (
+          <div className="rounded-2xl border bg-white px-4 py-3 flex items-start gap-3 flex-col">
+            <div className="flex items-start gap-3">
+              <Info size={16} className="text-gray-400 mt-0.5 shrink-0" />
+              <div className="flex-1 text-left">
+                <p className="text-sm font-medium">{t('settings.driveNotConfigured')}</p>
+                <p className="text-xs text-gray-500 mt-1">{t('settings.driveByoDesc')}</p>
+              </div>
+            </div>
+            <Button variant="outline" className="w-full mt-2" size="sm" onClick={() => setEditingDriveConfig(true)}>
+              {t('settings.driveConfigureBtn')}
+            </Button>
+          </div>
+        ) : editingDriveConfig ? (
+          <div className="rounded-2xl border bg-white p-4 space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-700">{t('settings.driveClientId')}</label>
+              <input 
+                type="text" 
+                value={tempClientId} 
+                onChange={(e) => setTempClientId(e.target.value)}
+                placeholder="12345678-xxxx.apps.googleusercontent.com"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border text-gray-900"
+              />
+              <p className="text-[10px] text-gray-400 mt-1">
+                {t('settings.driveClientIdHelp')}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => { setEditingDriveConfig(false); setTempClientId(googleClientId); }}>
+                {t('common.cancel')}
+              </Button>
+              <Button className="flex-1" onClick={handleSaveDriveConfig} disabled={isBusy}>
+                {t('common.save')}
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="rounded-2xl border divide-y overflow-hidden bg-white">
             {!driveSignedIn ? (
-              <button type="button" onClick={handleDriveConnect}
-                className="flex w-full items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
-                <CloudUpload size={18} className="text-blue-500 shrink-0" />
-                <div className="flex-1 text-left">
-                  <p className="text-sm font-medium">{t('settings.driveConnect')}</p>
-                  <p className="text-xs text-gray-400">{t('settings.driveConnectDesc')}</p>
-                </div>
-              </button>
+              <>
+                <button type="button" onClick={handleDriveConnect}
+                  className="flex w-full items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
+                  <CloudUpload size={18} className="text-blue-500 shrink-0" />
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-medium">{t('settings.driveConnect')}</p>
+                    <p className="text-xs text-gray-400">{t('settings.driveConnectDesc')}</p>
+                  </div>
+                </button>
+                <button type="button" onClick={() => { setTempClientId(googleClientId); setEditingDriveConfig(true); }}
+                  className="flex w-full items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
+                  <Info size={18} className="text-gray-400 shrink-0" />
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-medium text-gray-600">{t('settings.driveConfigureBtn')}</p>
+                  </div>
+                </button>
+              </>
             ) : (
               <>
                 <div className="flex items-center gap-3 px-4 py-3">
