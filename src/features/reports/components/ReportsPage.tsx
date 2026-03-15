@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useDeferredValue } from 'react'
+import { useTranslation } from 'react-i18next'
 import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear } from 'date-fns'
 import {
   BarChart,
@@ -54,6 +55,23 @@ const PIE_COLORS = [
 
 type PresetKey = 'thisMonth' | 'lastMonth' | 'last3' | 'last6' | 'thisYear' | 'custom'
 
+const PRESET_TRANSLATION_KEY: Record<PresetKey, string> = {
+  thisMonth: 'thisMonth',
+  lastMonth: 'lastMonth',
+  last3: 'last3Months',
+  last6: 'last6Months',
+  thisYear: 'thisYear',
+  custom: 'custom',
+}
+
+const REPORT_TAB_TRANSLATION_KEY = {
+  overview: 'overview',
+  category: 'categories',
+  accounts: 'accounts',
+  cashflow: 'cashFlow',
+  labels: 'labelsTab',
+} as const
+
 function getPresetRange(key: PresetKey): { from: Date; to: Date } {
   const today = new Date()
   switch (key) {
@@ -102,9 +120,10 @@ function StatCard({
 }
 
 function EmptyChart() {
+  const { t } = useTranslation()
   return (
     <div className="flex items-center justify-center h-32 text-sm text-gray-400">
-      No data for selected period
+      {t('reports.noData')}
     </div>
   )
 }
@@ -133,6 +152,7 @@ function CurrencyTooltip({ active, payload, label, currency }: {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
+  const { t } = useTranslation()
   const { transactions: rawTransactions } = useTransactionsStore()
   const transactions = useDeferredValue(rawTransactions)
   const isComputing = rawTransactions !== transactions
@@ -244,10 +264,10 @@ export default function ReportsPage() {
       {isComputing && (
         <div className="fixed top-14 right-4 z-50 flex items-center gap-1.5 rounded-full bg-white/90 border shadow-sm px-2.5 py-1 text-xs text-gray-500">
           <div className="h-3 w-3 animate-spin rounded-full border-2 border-indigo-400 border-t-transparent" />
-          Calculating…
+          {t('reports.calculating')}
         </div>
       )}
-      <h1 className="text-xl font-bold">Reports</h1>
+      <h1 className="text-xl font-bold">{t('reports.title')}</h1>
 
       {/* ── Period selector ─────────────────────────────────────────────── */}
       <div className="space-y-3">
@@ -263,7 +283,7 @@ export default function ReportsPage() {
                   : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-400'
               }`}
             >
-              {{ thisMonth: 'This month', lastMonth: 'Last month', last3: '3 months', last6: '6 months', thisYear: 'This year', custom: 'Custom' }[k]}
+              {t(`reports.presets.${PRESET_TRANSLATION_KEY[k]}`)}
             </button>
           ))}
         </div>
@@ -271,11 +291,11 @@ export default function ReportsPage() {
         {preset === 'custom' && (
           <div className="flex gap-3 items-end">
             <div className="space-y-1">
-              <Label className="text-xs">From</Label>
+              <Label className="text-xs">{t('reports.from')}</Label>
               <Input type="date" className="h-8 text-xs" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">To</Label>
+              <Label className="text-xs">{t('reports.to')}</Label>
               <Input type="date" className="h-8 text-xs" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
             </div>
           </div>
@@ -284,10 +304,10 @@ export default function ReportsPage() {
         <div className="flex items-center gap-2">
           <Select value={filterAccount} onValueChange={(value) => setFilterAccount(value ?? 'all')}>
             <SelectTrigger className="h-8 text-xs w-44">
-              <SelectValue placeholder="All accounts" />
+              <SelectValue placeholder={t('reports.allAccounts')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All accounts</SelectItem>
+              <SelectItem value="all">{t('reports.allAccounts')}</SelectItem>
               {visibleAccounts.map((a) => (
                 <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
               ))}
@@ -323,16 +343,16 @@ export default function ReportsPage() {
 
       {/* ── Tab navigation ───────────────────────────────────────────────── */}
       <div className="flex gap-1 flex-wrap rounded-xl bg-gray-100 p-1">
-        {(['overview', 'category', 'accounts', 'cashflow', 'labels'] as const).map((t) => (
+        {(['overview', 'category', 'accounts', 'cashflow', 'labels'] as const).map((tab) => (
           <button
-            key={t}
+            key={tab}
             type="button"
-            onClick={() => setActiveTab(t)}
+            onClick={() => setActiveTab(tab)}
             className={`flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors ${
-              activeTab === t ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              activeTab === tab ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            {{ overview: 'Overview', category: 'Category', accounts: 'Accounts', cashflow: 'Cash Flow', labels: 'Labels' }[t]}
+            {t(`reports.${REPORT_TAB_TRANSLATION_KEY[tab]}`)}
           </button>
         ))}
       </div>
@@ -341,7 +361,7 @@ export default function ReportsPage() {
       {activeTab === 'overview' && (
         <div className="space-y-5">
           <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <SectionTitle>Monthly Income vs Expenses</SectionTitle>
+            <SectionTitle>{t('reports.monthlyIncomeVsExpenses')}</SectionTitle>
             {!hasData ? <EmptyChart /> : (
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={monthlyTrend} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
@@ -358,7 +378,7 @@ export default function ReportsPage() {
           </div>
 
           <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <SectionTitle>Net per Month</SectionTitle>
+            <SectionTitle>{t('reports.netPerMonth')}</SectionTitle>
             {!hasData ? <EmptyChart /> : (
               <ResponsiveContainer width="100%" height={160}>
                 <BarChart data={monthlyTrend} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
@@ -383,7 +403,7 @@ export default function ReportsPage() {
         <div className="space-y-5">
           {/* Expenses by category */}
           <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <SectionTitle>Expenses by Category</SectionTitle>
+            <SectionTitle>{t('reports.expensesByCategory')}</SectionTitle>
             {expensesByCategory.length === 0 ? <EmptyChart /> : (
               <>
                 <ResponsiveContainer width="100%" height={200}>
@@ -425,7 +445,7 @@ export default function ReportsPage() {
 
           {/* Income by category */}
           <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <SectionTitle>Income by Category</SectionTitle>
+            <SectionTitle>{t('reports.incomeByCategory')}</SectionTitle>
             {incomeByCategory.length === 0 ? <EmptyChart /> : (
               <ul className="space-y-2">
                 {incomeByCategory.map((slice, i) => (
@@ -450,7 +470,7 @@ export default function ReportsPage() {
       {activeTab === 'accounts' && (
         <div className="space-y-4">
           {visibleAccounts.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center mt-8">No accounts yet.</p>
+            <p className="text-sm text-gray-400 text-center mt-8">{t('reports.noAccountsYet')}</p>
           ) : (
             accountBalances.map((ab) => (
               <div key={ab.accountId} className="rounded-2xl border bg-white shadow-sm overflow-hidden">
@@ -490,7 +510,7 @@ export default function ReportsPage() {
                 {/* Expenses by category (for this account) */}
                 {ab.byCategory.length > 0 && (
                   <div className="px-4 pb-3 space-y-1.5">
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-2">Expenses by category</p>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-2">{t('reports.expensesByCategory')}</p>
                     {ab.byCategory.map((slice, i) => (
                       <div key={slice.categoryId} className="space-y-0.5">
                         <div className="flex items-center gap-2">
@@ -532,7 +552,7 @@ export default function ReportsPage() {
                   labelView === v ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                {v === 'breakdown' ? 'Breakdown' : '50/30/20 Rule'}
+                {v === 'breakdown' ? t('reports.breakdown') : t('reports.rule503020')}
               </button>
             ))}
           </div>
@@ -542,7 +562,7 @@ export default function ReportsPage() {
             <div className="space-y-4">
               {labelBreakdown.length === 0 ? (
                 <div className="rounded-2xl border bg-white p-6 text-center text-sm text-gray-400">
-                  No transactions in this period. Tag transactions with labels to see insights.
+                  {t('reports.noTransactionsPeriod')}
                 </div>
               ) : (
                 labelBreakdown.map((slice) => (
@@ -573,7 +593,7 @@ export default function ReportsPage() {
                     {slice.expenses > 0 && (
                       <div className="space-y-1">
                         <div className="flex justify-between text-[10px] text-gray-400">
-                          <span>Share of total expenses</span>
+                          <span>{t('reports.shareOfTotalExpenses')}</span>
                           <span>{slice.percent}%</span>
                         </div>
                         <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
@@ -595,9 +615,9 @@ export default function ReportsPage() {
             <div className="space-y-4">
               {/* Explainer */}
               <div className="rounded-2xl border bg-indigo-50 border-indigo-200 p-4 space-y-1">
-                <p className="text-sm font-semibold text-indigo-800">50/30/20 Rule</p>
+                <p className="text-sm font-semibold text-indigo-800">{t('reports.rule503020')}</p>
                 <p className="text-xs text-indigo-600 leading-relaxed">
-                  Tag your transactions with labels like <strong>Needs</strong>, <strong>Wants</strong>, and <strong>Savings</strong> to track your spending against this popular budgeting framework.
+                  {t('reports.tagYourTransactions')}<strong>{t('reports.needs')}</strong>, <strong>{t('reports.wants')}</strong>{t('reports.andStr')}<strong>{t('reports.savings')}</strong>{t('reports.toTrackSpending')}
                 </p>
                 <div className="flex gap-2 mt-2 flex-wrap">
                   {[{ label: 'Needs', target: '50%', color: 'bg-blue-100 text-blue-700' }, { label: 'Wants', target: '30%', color: 'bg-amber-100 text-amber-700' }, { label: 'Savings', target: '20%', color: 'bg-green-100 text-green-700' }].map((b) => (
@@ -610,14 +630,14 @@ export default function ReportsPage() {
 
               {rule503020.buckets.length === 0 ? (
                 <div className="rounded-2xl border bg-white p-6 text-center text-sm text-gray-400">
-                  No labelled transactions in this period.
+                  {t('reports.noLabelledTransactions')}
                 </div>
               ) : (
                 <>
                   {/* Stacked bar across total income */}
                   {rule503020.totalIncome > 0 && (
                     <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
-                      <SectionTitle>Spending vs Income</SectionTitle>
+                      <SectionTitle>{t('reports.spendingVsIncome')}</SectionTitle>
                       <div className="flex h-5 rounded-full overflow-hidden w-full gap-px">
                         {rule503020.buckets.map((b) => {
                           const w = rule503020.totalIncome > 0
@@ -674,13 +694,13 @@ export default function ReportsPage() {
                             <p className="text-base font-bold text-red-500 mt-0.5">{formatCurrency(b.expenses, baseCurrency)}</p>
                           </div>
                           <div className="rounded-xl bg-gray-50 p-3 text-center">
-                            <p className="text-[10px] text-gray-400 uppercase">% of Income</p>
+                            <p className="text-[10px] text-gray-400 uppercase">{t('reports.pctOfIncome')}</p>
                             <p className="text-base font-bold text-indigo-600 mt-0.5">{pctOfIncome}%</p>
                           </div>
                         </div>
                         <div className="space-y-1">
                           <div className="flex justify-between text-[10px] text-gray-400">
-                            <span>% of all tagged expenses</span>
+                            <span>{t('reports.pctOfAllTaggedExpenses')}</span>
                             <span>{pctOfExpenses}%</span>
                           </div>
                           <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
@@ -704,7 +724,7 @@ export default function ReportsPage() {
       {activeTab === 'cashflow' && (
         <div className="space-y-5">
           <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <SectionTitle>Cumulative Cash Flow</SectionTitle>
+            <SectionTitle>{t('reports.cumulativeCashFlow')}</SectionTitle>
             {!hasData ? <EmptyChart /> : (
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={cashFlow} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
@@ -719,7 +739,7 @@ export default function ReportsPage() {
           </div>
 
           <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <SectionTitle>Monthly Inflow vs Outflow</SectionTitle>
+            <SectionTitle>{t('reports.monthlyInflowVsOutflow')}</SectionTitle>
             {!hasData ? <EmptyChart /> : (
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={cashFlow} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
@@ -740,10 +760,10 @@ export default function ReportsPage() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-gray-50 border-b">
-                  <th className="text-left px-3 py-2 text-gray-500 font-medium">Month</th>
-                  <th className="text-right px-3 py-2 text-gray-500 font-medium">Inflow</th>
-                  <th className="text-right px-3 py-2 text-gray-500 font-medium">Outflow</th>
-                  <th className="text-right px-3 py-2 text-gray-500 font-medium">Cumulative</th>
+                  <th className="text-left px-3 py-2 text-gray-500 font-medium">{t('reports.month')}</th>
+                  <th className="text-right px-3 py-2 text-gray-500 font-medium">{t('reports.inflow')}</th>
+                  <th className="text-right px-3 py-2 text-gray-500 font-medium">{t('reports.outflow')}</th>
+                  <th className="text-right px-3 py-2 text-gray-500 font-medium">{t('reports.cumulative')}</th>
                 </tr>
               </thead>
               <tbody>

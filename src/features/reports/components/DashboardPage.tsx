@@ -1,4 +1,5 @@
 import { useMemo, useDeferredValue } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns'
 import { TrendingUp, TrendingDown, ArrowRight } from 'lucide-react'
@@ -22,6 +23,7 @@ import {
 import { Button } from '@/components/ui/button'
 
 export default function DashboardPage() {
+  const { t } = useTranslation()
   const { transactions: rawTransactions } = useTransactionsStore()
   const transactions = useDeferredValue(rawTransactions)
   const isComputing = rawTransactions !== transactions
@@ -126,21 +128,21 @@ export default function DashboardPage() {
           <p className="text-xs text-gray-500 uppercase tracking-widest font-medium">
             {format(now, 'MMMM yyyy')}
           </p>
-          <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
+          <h1 className="text-xl font-bold text-gray-900">{t('nav.dashboard')}</h1>
         </div>
       </div>
 
       {/* ── Net worth ──────────────────────────────────────────────────── */}
       <div className="rounded-2xl border bg-gradient-to-br from-indigo-600 to-indigo-800 p-4 text-white shadow-sm">
-        <p className="text-xs uppercase tracking-widest opacity-75">Net Worth</p>
+        <p className="text-xs uppercase tracking-widest opacity-75">{t('dashboard.netWorth')}</p>
         <p className="text-3xl font-bold mt-1">{formatCurrency(netWorth, baseCurrency)}</p>
-        <p className="text-xs opacity-60 mt-1">{visibleAccounts.length} account{visibleAccounts.length !== 1 ? 's' : ''}</p>
+        <p className="text-xs opacity-60 mt-1">{visibleAccounts.length} {visibleAccounts.length !== 1 ? t('dashboard.accounts') : t('dashboard.account')}</p>
       </div>
 
       {/* ── This month summary ────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <p className="text-xs text-gray-500 uppercase tracking-wide">Income</p>
+          <p className="text-xs text-gray-500 uppercase tracking-wide">{t('dashboard.income')}</p>
           <p className="text-xl font-bold text-green-600 mt-1">{formatCurrency(summary.income, baseCurrency)}</p>
           <div className={`flex items-center gap-1 text-xs mt-1 ${incDelta >= 0 ? 'text-green-500' : 'text-red-400'}`}>
             {incDelta >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
@@ -148,7 +150,7 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <p className="text-xs text-gray-500 uppercase tracking-wide">Expenses</p>
+          <p className="text-xs text-gray-500 uppercase tracking-wide">{t('dashboard.expenses')}</p>
           <p className="text-xl font-bold text-red-500 mt-1">{formatCurrency(summary.expenses, baseCurrency)}</p>
           <div className={`flex items-center gap-1 text-xs mt-1 ${expDelta <= 0 ? 'text-green-500' : 'text-red-400'}`}>
             {expDelta <= 0 ? <TrendingDown size={12} /> : <TrendingUp size={12} />}
@@ -159,7 +161,7 @@ export default function DashboardPage() {
 
       <div className="rounded-2xl border bg-white p-4 shadow-sm flex items-center justify-between">
         <div>
-          <p className="text-xs text-gray-500 uppercase tracking-wide">Net this month</p>
+          <p className="text-xs text-gray-500 uppercase tracking-wide">{t('dashboard.netThisMonth')}</p>
           <p className={`text-2xl font-bold mt-1 ${summary.net >= 0 ? 'text-indigo-600' : 'text-orange-500'}`}>
             {formatCurrency(summary.net, baseCurrency)}
           </p>
@@ -174,7 +176,7 @@ export default function DashboardPage() {
       {/* ── 6-month trend mini chart ──────────────────────────────────── */}
       {visibleTransactions.length > 0 && (
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">6-Month Trend</p>
+          <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">{t('dashboard.sixMonthTrend')}</p>
           <ResponsiveContainer width="100%" height={120}>
             <BarChart data={trend} margin={{ top: 2, right: 2, left: -30, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -201,8 +203,8 @@ export default function DashboardPage() {
       {rule503020.buckets.length > 0 && (
         <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider">50/30/20 Overview</p>
-            <Link to="/reports" className="text-xs text-indigo-600 hover:underline">Details</Link>
+            <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider">{t('dashboard.overview503020')}</p>
+            <Link to="/reports" className="text-xs text-indigo-600 hover:underline">{t('dashboard.details')}</Link>
           </div>
           {/* Stacked bar */}
           <div className="flex h-4 rounded-full overflow-hidden w-full gap-px">
@@ -243,8 +245,8 @@ export default function DashboardPage() {
       {topBudgets.length > 0 && (
         <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Budget Health</p>
-            <Link to="/budgets" className="text-xs text-indigo-600 hover:underline">View all</Link>
+            <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider">{t('dashboard.budgetHealth')}</p>
+            <Link to="/budgets" className="text-xs text-indigo-600 hover:underline">{t('dashboard.viewAll')}</Link>
           </div>
           {topBudgets.map(({ budget, spent, percent, catName }) => (
             <div key={budget.id} className="space-y-1">
@@ -274,9 +276,9 @@ export default function DashboardPage() {
       {recent.length > 0 && (
         <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b">
-            <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Recent</p>
+            <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider">{t('dashboard.recent')}</p>
             <Link to="/transactions" className="text-xs text-indigo-600 hover:underline flex items-center gap-1">
-              View all <ArrowRight size={11} />
+              {t('dashboard.viewAll')} <ArrowRight size={11} />
             </Link>
           </div>
           <ul className="divide-y">
@@ -306,9 +308,9 @@ export default function DashboardPage() {
 
       {visibleTransactions.length === 0 && (
         <div className="text-center mt-10 space-y-3">
-          <p className="text-sm text-gray-400">No transactions yet.</p>
+          <p className="text-sm text-gray-400">{t('dashboard.noTransactions')}</p>
           <Link to="/transactions/new">
-            <Button size="sm">Add your first transaction</Button>
+            <Button size="sm">{t('dashboard.addFirstTransaction')}</Button>
           </Link>
         </div>
       )}

@@ -14,6 +14,7 @@ import {
   getVisibleAccounts,
   isTransactionForVisiblePrimaryAccount,
 } from '@/lib/accounts'
+import { getTranslatedCategoryName } from '@/lib/categories'
 import { formatCurrency } from '@/lib/currency'
 import type { Transaction } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -59,9 +60,6 @@ const EMPTY_FILTERS: Filters = {
   dateTo: '',
 }
 
-// Persists across component mounts within the same session
-let persistedFilters: Filters = { ...EMPTY_FILTERS }
-
 const TYPE_OPTIONS: { value: TxType; label: string }[] = [
   { value: 'expense',  label: 'transactions.expense' },
   { value: 'income',   label: 'transactions.income' },
@@ -88,7 +86,27 @@ type FlatItem =
 
 type QuickRange = 'all' | '1m' | '3m' | '6m' | '1y' | '2y'
 
-let persistedQuickRange: QuickRange = 'all'
+const DEFAULT_QUICK_RANGE: QuickRange = '1y'
+
+function getQuickRangeDateFrom(range: QuickRange): string {
+  const today = new Date()
+  if (range === '1m') return format(subMonths(today, 1), 'yyyy-MM-dd')
+  if (range === '3m') return format(subMonths(today, 3), 'yyyy-MM-dd')
+  if (range === '6m') return format(subMonths(today, 6), 'yyyy-MM-dd')
+  if (range === '1y') return format(subYears(today, 1), 'yyyy-MM-dd')
+  if (range === '2y') return format(subYears(today, 2), 'yyyy-MM-dd')
+  return ''
+}
+
+const DEFAULT_FILTERS: Filters = {
+  ...EMPTY_FILTERS,
+  dateFrom: getQuickRangeDateFrom(DEFAULT_QUICK_RANGE),
+}
+
+// Persists across component mounts within the same session
+let persistedFilters: Filters = { ...DEFAULT_FILTERS }
+
+let persistedQuickRange: QuickRange = DEFAULT_QUICK_RANGE
 
 // Map quick range value to an ISO date cutoff for DB-level filtering (undefined = load all)
 function getQuickRangeSince(range: QuickRange): string | undefined {
@@ -139,13 +157,7 @@ export default function TransactionListPage() {
 
   const applyQuickRange = (range: QuickRange) => {
     setQuickRange(range)
-    const today = new Date()
-    let dateFrom = ''
-    if (range === '1m') dateFrom = format(subMonths(today, 1), 'yyyy-MM-dd')
-    else if (range === '3m') dateFrom = format(subMonths(today, 3), 'yyyy-MM-dd')
-    else if (range === '6m') dateFrom = format(subMonths(today, 6), 'yyyy-MM-dd')
-    else if (range === '1y') dateFrom = format(subYears(today, 1), 'yyyy-MM-dd')
-    else if (range === '2y') dateFrom = format(subYears(today, 2), 'yyyy-MM-dd')
+    const dateFrom = getQuickRangeDateFrom(range)
     loadTx(getQuickRangeSince(range))  // push date filter into IndexedDB — only load what's needed
     setFilters((prev) => ({ ...prev, dateFrom, dateTo: '' }))
   }
@@ -166,10 +178,10 @@ export default function TransactionListPage() {
     setSheetOpen(false)
   }
   const resetFilters = () => {
-    setDraft(EMPTY_FILTERS)
-    setFilters(EMPTY_FILTERS)
-    setQuickRange('all')
-    loadTx()  // no date filter — reload the full dataset
+    setDraft(DEFAULT_FILTERS)
+    setFilters(DEFAULT_FILTERS)
+    setQuickRange(DEFAULT_QUICK_RANGE)
+    loadTx(getQuickRangeSince(DEFAULT_QUICK_RANGE))
     setSheetOpen(false)
   }
   const removeChip = (key: keyof Filters) => {
@@ -303,7 +315,7 @@ export default function TransactionListPage() {
   const chips: { key: keyof Filters; label: string }[] = [
     filters.search    ? { key: 'search',     label: `"${filters.search}"` }                                              : null,
     filters.type      ? { key: 'type',        label: t(`transactions.${filters.type}`) }                                 : null,
-    filters.categoryId? { key: 'categoryId',  label: categories.find((c) => c.id === filters.categoryId)?.name ?? '' }   : null,
+    filters.categoryId? { key: 'categoryId',  label: getTranslatedCategoryName(categories.find((c) => c.id === filters.categoryId), t) }   : null,
     filters.accountId ? { key: 'accountId',   label: accounts.find((a) => a.id === filters.accountId)?.name ?? '' }      : null,
     filters.labelId   ? { key: 'labelId',      label: labels.find((l) => l.id === filters.labelId)?.name ?? '' }           : null,
     filters.status    ? { key: 'status',      label: t(`transactions.status.${filters.status}`) }                        : null,
@@ -453,7 +465,7 @@ export default function TransactionListPage() {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{tx.description}</p>
                             <p className="text-xs text-gray-400 truncate">
-                              {cat?.name ?? '—'} · {acc?.name ?? '—'} · {timeStr}
+                              {getTranslatedCategoryName(cat, t) || '—'} · {acc?.name ?? '—'} · {timeStr}
                             </p>
                             {(tx.labels ?? []).length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-1">
@@ -571,13 +583,15 @@ export default function TransactionListPage() {
               >
                 <SelectTrigger>
                   <SelectValue>
-                    {draft.categoryId ? categories.find((c) => c.id === draft.categoryId)?.name : t('transactions.filters.allCategories')}
+                    {draft.categoryId
+                      ? getTranslatedCategoryName(categories.find((c) => c.id === draft.categoryId), t)
+                      : t('transactions.filters.allCategories')}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">{t('transactions.filters.allCategories')}</SelectItem>
                   {categories.filter((cat) => !cat.deletedAt).map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                    <SelectItem key={cat.id} value={cat.id}>{getTranslatedCategoryName(cat, t)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

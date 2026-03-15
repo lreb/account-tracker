@@ -7,6 +7,7 @@ import { format } from 'date-fns'
 import { v4 as uuid } from 'uuid'
 
 import { getAccountSelectOptions, getVisibleAccounts } from '@/lib/accounts'
+import { getTranslatedCategoryName } from '@/lib/categories'
 import { transactionSchema, type TransactionFormValues } from '../schemas/transaction.schema'
 import { formatCurrency } from '@/lib/currency'
 import { useTransactionsStore } from '@/stores/transactions.store'
@@ -349,7 +350,7 @@ export default function TransactionForm() {
                 >
                   <span className="truncate font-medium">{description}</span>
                   <span className="ml-2 text-xs text-muted-foreground shrink-0">
-                    {categories.find(c => c.id === tx.categoryId)?.name ?? ''}
+                    {getTranslatedCategoryName(categories.find((c) => c.id === tx.categoryId), t)}
                   </span>
                 </li>
               ))}
@@ -414,13 +415,13 @@ export default function TransactionForm() {
         >
           <SelectTrigger>
             <SelectValue placeholder="Select category">
-              {categories.find((c) => c.id === watchCategoryId)?.name}
+              {getTranslatedCategoryName(categories.find((c) => c.id === watchCategoryId), t)}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {filteredCategories.map((cat) => (
               <SelectItem key={cat.id} value={cat.id}>
-                {cat.name}
+                {getTranslatedCategoryName(cat, t)}
               </SelectItem>
             ))}
           </SelectContent>

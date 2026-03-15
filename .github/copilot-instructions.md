@@ -373,7 +373,7 @@ Data is persisted in **Dexie.js (IndexedDB)**. Zustand holds in-memory state and
 | 7 | Android | Capacitor packaging for Google Play distribution. | PWA install covers mobile for v1 |
 | 8 | Cloud sync | Google Drive sync (OAuth2 PKCE flow, no client secrets). | ✅ Done |
 | 9 | Cloud sync | Dropbox sync (OAuth2 PKCE flow). | Same as above |
-| 10 | i18n | Spanish (`es`) translation completeness pass — verify all new keys added after initial build are present in `es.json`. | Partial; new keys are added as features ship |
+| 10 | i18n | Spanish (`es`) translation completeness pass — verify all new keys added after initial build are present in `es.json`. | ✅ Done |
 
 ### Completed (shipped)
 

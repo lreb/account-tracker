@@ -36,6 +36,52 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 
+const DEFAULT_CATEGORY_NAME_TO_ID: Record<string, string> = {
+  Transportation: 'transportation',
+  'Food & Groceries': 'food-groceries',
+  Health: 'health',
+  Housing: 'housing',
+  'Fuel / Gas': 'fuel-gas',
+  Restaurants: 'restaurants',
+  'Medical / Pharmacy': 'medical-pharmacy',
+  'Rent / Mortgage': 'rent-mortgage',
+  'Vehicle Maintenance': 'vehicle-maintenance',
+  Supermarket: 'supermarket',
+  'Health Insurance': 'health-insurance',
+  Utilities: 'utilities',
+  Entertainment: 'entertainment',
+  Education: 'education',
+  'Investments / Savings': 'investments-savings',
+  Salary: 'salary',
+  Freelance: 'freelance',
+  Interest: 'interest',
+  'Rental income': 'rental-income',
+  Refund: 'refund',
+  Other: 'other',
+}
+
+function getTranslatedCategoryName(
+  t: (key: string, options?: { defaultValue?: string }) => string,
+  category: { id: string; name: string },
+): string {
+  const keyById = `categories.names.${category.id}`
+  const byId = t(keyById)
+  if (byId !== keyById) {
+    return byId
+  }
+
+  const mappedId = DEFAULT_CATEGORY_NAME_TO_ID[category.name]
+  if (mappedId) {
+    const keyByNameMap = `categories.names.${mappedId}`
+    const byNameMap = t(keyByNameMap)
+    if (byNameMap !== keyByNameMap) {
+      return byNameMap
+    }
+  }
+
+  return category.name
+}
+
 // ─── Budget progress bar ─────────────────────────────────────────────────────
 
 function ProgressBar({ percent }: { percent: number }) {
@@ -63,6 +109,7 @@ function BudgetCard({
   onEdit: (b: Budget) => void
   onDelete: (id: string) => void
 }) {
+  const { t } = useTranslation()
   const { categories } = useCategoriesStore()
   const { baseCurrency } = useSettingsStore()
   const { accounts } = useAccountsStore()
@@ -74,6 +121,9 @@ function BudgetCard({
   }, [budget, visibleAccountIds])
 
   const category = categories.find((c) => c.id === budget.categoryId)
+  const categoryLabel = category
+    ? getTranslatedCategoryName(t, category)
+    : budget.categoryId
   const percent = usage?.percent ?? 0
   const statusColor =
     percent >= 100 ? 'text-red-500' : percent >= 75 ? 'text-amber-500' : 'text-emerald-600'
@@ -86,8 +136,8 @@ function BudgetCard({
           <CategoryIcon name={category?.icon ?? 'MoreHorizontal'} size={18} />
         </span>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold truncate">{category?.name ?? budget.categoryId}</p>
-          <p className="text-xs text-gray-400 capitalize">{budget.period}</p>
+          <p className="text-sm font-semibold truncate">{categoryLabel}</p>
+          <p className="text-xs text-gray-400 capitalize">{t(`budgets.periods.${budget.period}`)}</p>
         </div>
         <div className="flex gap-1 shrink-0">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(budget)}>
@@ -110,13 +160,13 @@ function BudgetCard({
       {/* Amounts */}
       <div className="flex items-center justify-between text-xs">
         <span className={`font-medium ${statusColor}`}>
-          {usage ? formatCurrency(usage.spent, baseCurrency) : '—'} spent
+          {usage ? formatCurrency(usage.spent, baseCurrency) : '—'} {t('budgets.spent')}
         </span>
         <span className="text-gray-400">
-          of {formatCurrency(budget.amount, baseCurrency)}
+          {t('budgets.of')} {formatCurrency(budget.amount, baseCurrency)}
           {budget.rollover && (
             <Badge variant="outline" className="ml-1.5 text-[10px] px-1.5 py-0">
-              rollover
+              {t('budgets.rollover')}
             </Badge>
           )}
         </span>
@@ -210,24 +260,24 @@ function BudgetDialog({
     <Dialog open={open} onOpenChange={(v) => { if (!v) { reset(); onClose() } }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>{editing ? 'Edit Budget' : 'New Budget'}</DialogTitle>
+          <DialogTitle>{editing ? t('budgets.editBudget') : t('budgets.newBudget')}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-1">
           {/* Category */}
           <div className="space-y-1">
-            <Label>Category</Label>
+            <Label>{t('budgets.category')}</Label>
             <Select
               value={watch('categoryId') || ''}
               onValueChange={(v) => setValue('categoryId', v ?? '')}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select category" />
+                <SelectValue placeholder={t('budgets.selectCategory')} />
               </SelectTrigger>
               <SelectContent>
                 {categories.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id}>
-                    {cat.name}
+                    {getTranslatedCategoryName(t, cat)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -239,7 +289,7 @@ function BudgetDialog({
 
           {/* Limit amount */}
           <div className="space-y-1">
-            <Label htmlFor="bAmount">Limit ({baseCurrency})</Label>
+            <Label htmlFor="bAmount">{t('budgets.limitWithCurrency', { currency: baseCurrency })}</Label>
             <Input
               id="bAmount"
               type="number"
@@ -253,7 +303,7 @@ function BudgetDialog({
 
           {/* Period */}
           <div className="space-y-1">
-            <Label>Period</Label>
+            <Label>{t('budgets.period')}</Label>
             <Select
               value={watch('period') || 'monthly'}
               onValueChange={(v) => setValue('period', v as BudgetFormValues['period'])}
@@ -262,16 +312,16 @@ function BudgetDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="weekly">Weekly</SelectItem>
-                <SelectItem value="monthly">Monthly</SelectItem>
-                <SelectItem value="yearly">Yearly</SelectItem>
+                <SelectItem value="weekly">{t('budgets.periods.weekly')}</SelectItem>
+                <SelectItem value="monthly">{t('budgets.periods.monthly')}</SelectItem>
+                <SelectItem value="yearly">{t('budgets.periods.yearly')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {/* Start date */}
           <div className="space-y-1">
-            <Label htmlFor="bStart">Start Date</Label>
+            <Label htmlFor="bStart">{t('budgets.startDate')}</Label>
             <Input id="bStart" type="date" {...register('startDate')} />
             {errors.startDate && (
               <p className="text-xs text-red-500">{t(errors.startDate.message!)}</p>
@@ -280,7 +330,7 @@ function BudgetDialog({
 
           {/* End date (optional) */}
           <div className="space-y-1">
-            <Label htmlFor="bEnd">End Date <span className="text-gray-400">(optional)</span></Label>
+            <Label htmlFor="bEnd">{t('budgets.endDate')} <span className="text-gray-400">({t('common.optional')})</span></Label>
             <Input id="bEnd" type="date" {...register('endDate')} />
           </div>
 
@@ -307,15 +357,15 @@ function BudgetDialog({
                 </button>
               )}
             />
-            <Label className="cursor-pointer">Roll over unspent balance</Label>
+            <Label className="cursor-pointer">{t('budgets.rolloverLabel')}</Label>
           </div>
 
           <DialogFooter className="gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => { reset(); onClose() }}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              Save
+              {t('common.save')}
             </Button>
           </DialogFooter>
         </form>
@@ -342,16 +392,16 @@ export default function BudgetsPage() {
         <h1 className="text-xl font-bold">{t('budgets.title')}</h1>
         <Button size="sm" onClick={openAdd} className="gap-1">
           <Plus size={16} />
-          Add
+          {t('common.add')}
         </Button>
       </div>
 
       {budgets.length === 0 ? (
         <div className="text-center mt-16 space-y-2">
           <PiggyBank size={40} className="mx-auto text-gray-300" />
-          <p className="text-sm text-gray-400">No budgets yet.</p>
+          <p className="text-sm text-gray-400">{t('budgets.noBudgets')}</p>
           <Button variant="outline" size="sm" onClick={openAdd}>
-            Create your first budget
+            {t('budgets.createFirstBudget')}
           </Button>
         </div>
       ) : (
