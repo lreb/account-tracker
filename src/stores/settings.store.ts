@@ -7,6 +7,7 @@ interface SettingsState {
   baseCurrency: string
   language: string
   theme: AppTheme
+  googleClientId: string
   load: () => Promise<void>
   saveSetting: (key: string, value: string) => Promise<void>
 }
@@ -15,6 +16,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   baseCurrency: 'USD',
   language: 'en',
   theme: 'system',
+  googleClientId: '',
 
   load: async () => {
     try {
@@ -24,6 +26,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
         baseCurrency: map['baseCurrency'] ?? 'USD',
         language: map['language'] ?? 'en',
         theme: (map['theme'] as AppTheme) ?? 'system',
+        googleClientId: map['googleClientId'] ?? '',
       })
     } catch (err) {
       console.error(err)
@@ -37,6 +40,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       if (key === 'baseCurrency') set({ baseCurrency: value })
       else if (key === 'language') set({ language: value })
       else if (key === 'theme') set({ theme: value as AppTheme })
+      else if (key === 'googleClientId') set({ googleClientId: value })
     } catch (err) {
       console.error(err)
       toast.error('Failed to save setting')

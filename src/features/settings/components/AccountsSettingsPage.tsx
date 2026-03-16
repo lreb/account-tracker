@@ -3,13 +3,16 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
 import { v4 as uuid } from 'uuid'
-import { Pencil, Trash2, Plus, Wallet } from 'lucide-react'
+import { Eye, EyeOff, Pencil, Trash2, Plus, Wallet } from 'lucide-react'
 
 import { accountSchema, type AccountFormValues } from '../schemas/account.schema'
+import { getVisibleAccounts } from '@/lib/accounts'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useTransactionsStore } from '@/stores/transactions.store'
+import { useSettingsStore } from '@/stores/settings.store'
 import type { Account, AccountType } from '@/types'
 import { formatCurrency } from '@/lib/currency'
+import { db } from '@/db'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -46,12 +49,15 @@ const COMMON_CURRENCIES = [
 interface AccountDialogProps {
   open: boolean
   editing: Account | null
+  showOnboarding: boolean
+  onOnboardingDone: () => void
   onClose: () => void
 }
 
-function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
+function AccountDialog({ open, editing, showOnboarding, onOnboardingDone, onClose }: AccountDialogProps) {
   const { t } = useTranslation()
   const { add, update } = useAccountsStore()
+  const { baseCurrency } = useSettingsStore()
 
   const {
     register,
@@ -62,7 +68,7 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
     reset,
   } = useForm<AccountFormValues>({
     resolver: zodResolver(accountSchema),
-    defaultValues: { type: 'asset', currency: 'USD', openingBalance: '0', name: '' },
+    defaultValues: { type: 'asset', currency: baseCurrency || 'USD', hidden: false, openingBalance: '0', name: '' },
   })
 
   useEffect(() => {
@@ -72,12 +78,13 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
         name: editing.name,
         type: editing.type,
         currency: editing.currency,
+        hidden: editing.hidden ?? false,
         openingBalance: (editing.openingBalance / 100).toFixed(2),
       })
     } else {
-      reset({ name: '', type: 'asset', currency: 'USD', openingBalance: '0' })
+      reset({ name: '', type: 'asset', currency: baseCurrency || 'USD', hidden: false, openingBalance: '0' })
     }
-  }, [open, editing, reset])
+  }, [open, editing, reset, baseCurrency])
 
   const onSubmit = async (values: AccountFormValues) => {
     const balanceCents = Math.round(parseFloat(values.openingBalance) * 100)
@@ -86,12 +93,17 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
     } else {
       await add({ id: uuid(), ...values, openingBalance: balanceCents })
     }
+
+    if (showOnboarding) {
+      onOnboardingDone()
+    }
+
     reset()
     onClose()
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset({ name: '', type: 'asset', currency: 'USD', openingBalance: '0' }); onClose() } }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset({ name: '', type: 'asset', currency: baseCurrency || 'USD', hidden: false, openingBalance: '0' }); onClose() } }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>
@@ -100,16 +112,24 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-1">
+          {showOnboarding && (
+            <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-900 space-y-1">
+              <p className="font-semibold">{t('accounts.onboardingTitle')}</p>
+              <p>{t('accounts.onboardingDesc')}</p>
+              <p>{t('accounts.requiredHint')}</p>
+            </div>
+          )}
+
           {/* Name */}
           <div className="space-y-1">
-            <Label htmlFor="name">{t('accounts.name')}</Label>
+            <Label htmlFor="name">{t('accounts.name')} <span className="text-red-500">*</span></Label>
             <Input id="name" placeholder={t('accounts.namePlaceholder')} {...register('name')} />
             {errors.name && <p className="text-xs text-red-500">{t(errors.name.message!)}</p>}
           </div>
 
           {/* Type */}
           <div className="space-y-1">
-            <Label>{t('accounts.type')}</Label>
+            <Label>{t('accounts.type')} <span className="text-red-500">*</span></Label>
             <Select
               value={watch('type')}
               onValueChange={(v) => setValue('type', v as AccountFormValues['type'])}
@@ -131,10 +151,10 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
 
           {/* Currency */}
           <div className="space-y-1">
-            <Label>{t('accounts.currency')}</Label>
+            <Label>{t('accounts.currency')} <span className="text-red-500">*</span></Label>
             <Select
               value={watch('currency')}
-              onValueChange={(v) => setValue('currency', v)}
+              onValueChange={(v) => setValue('currency', v ?? '')}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -166,10 +186,44 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
             )}
           </div>
 
+          <div className="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-2">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={watch('hidden')}
+              onClick={() => setValue('hidden', !watch('hidden'))}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                watch('hidden') ? 'bg-gray-900' : 'bg-gray-200'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                  watch('hidden') ? 'translate-x-4' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+            <div className="min-w-0">
+              <Label className="cursor-pointer">{t('accounts.hideFromApp')}</Label>
+              <p className="text-xs text-gray-500">{t('accounts.excludedFromTotals')}</p>
+            </div>
+          </div>
+
           <DialogFooter className="gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose}>
               {t('common.cancel')}
             </Button>
+            {showOnboarding && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  onOnboardingDone()
+                  onClose()
+                }}
+              >
+                {t('accounts.skipTour')}
+              </Button>
+            )}
             <Button type="submit" disabled={isSubmitting}>
               {t('common.save')}
             </Button>
@@ -182,14 +236,41 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
 
 export default function AccountsSettingsPage() {
   const { t } = useTranslation()
-  const { accounts, remove } = useAccountsStore()
+  const { accounts, remove, update } = useAccountsStore()
   const { transactions } = useTransactionsStore()
+  const { saveSetting } = useSettingsStore()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Account | null>(null)
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
   const openAdd = () => { setEditing(null); setDialogOpen(true) }
   const openEdit = (a: Account) => { setEditing(a); setDialogOpen(true) }
   const closeDialog = () => { setDialogOpen(false); setEditing(null) }
+
+  useEffect(() => {
+    let mounted = true
+
+    async function maybeStartOnboarding() {
+      const row = await db.settings.get('accountsOnboardingSeen')
+      if (!mounted || row?.value === '1') return
+      if (accounts.length === 0) return
+
+      setShowOnboarding(true)
+      setEditing(accounts[0])
+      setDialogOpen(true)
+    }
+
+    void maybeStartOnboarding()
+
+    return () => {
+      mounted = false
+    }
+  }, [accounts])
+
+  async function markOnboardingDone() {
+    setShowOnboarding(false)
+    await saveSetting('accountsOnboardingSeen', '1')
+  }
 
   const accountBalances = useMemo(() => {
     const map = new Map<string, number>()
@@ -210,6 +291,8 @@ export default function AccountsSettingsPage() {
     return map
   }, [accounts, transactions])
 
+  const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
+
   const groupedAccounts = useMemo(() => {
     const groups: Record<AccountType, Account[]> = { asset: [], liability: [] }
     for (const account of accounts) {
@@ -223,7 +306,7 @@ export default function AccountsSettingsPage() {
   }, [accounts])
 
   const groupTotal = (type: AccountType) => {
-    const group = groupedAccounts[type]
+    const group = visibleAccounts.filter((account) => account.type === type)
     return group.reduce((sum, a) => sum + (accountBalances.get(a.id) ?? a.openingBalance), 0)
   }
 
@@ -275,12 +358,24 @@ export default function AccountsSettingsPage() {
                           <p className="text-sm font-medium">{account.name}</p>
                           <p className="text-xs text-gray-400">
                             {account.currency}
+                            {account.hidden ? ` · ${t('accounts.hidden')}` : ''}
                           </p>
+                          {account.hidden && (
+                            <p className="text-xs text-amber-600">{t('accounts.excludedFromTotals')}</p>
+                          )}
                         </div>
                         <span className="text-sm font-semibold tabular-nums whitespace-nowrap">
                           {formatCurrency(balance, account.currency)}
                         </span>
                         <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => update({ ...account, hidden: !(account.hidden ?? false) })}
+                          >
+                            {account.hidden ? <Eye size={15} /> : <EyeOff size={15} />}
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -308,7 +403,13 @@ export default function AccountsSettingsPage() {
         </div>
       )}
 
-      <AccountDialog open={dialogOpen} editing={editing} onClose={closeDialog} />
+      <AccountDialog
+        open={dialogOpen}
+        editing={editing}
+        showOnboarding={showOnboarding}
+        onOnboardingDone={() => { void markOnboardingDone() }}
+        onClose={closeDialog}
+      />
     </div>
   )
 }

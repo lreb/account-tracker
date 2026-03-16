@@ -109,23 +109,23 @@ function VehicleDialog({
     <Dialog open={open} onOpenChange={(v) => { if (!v) { reset(); onClose() } }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>{editing ? 'Edit Vehicle' : 'Add Vehicle'}</DialogTitle>
+          <DialogTitle>{editing ? t('vehicles.editVehicle') : t('vehicles.addVehicle')}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-1">
           <div className="space-y-1">
-            <Label htmlFor="vName">Display Name *</Label>
-            <Input id="vName" placeholder="e.g. My Car, Work Truck" {...register('name')} />
+            <Label htmlFor="vName">{t('vehicles.displayName')} *</Label>
+            <Input id="vName" placeholder={t('vehicles.displayNamePlaceholder')} {...register('name')} />
             {errors.name && <p className="text-xs text-red-500">{t(errors.name.message!)}</p>}
           </div>
 
           {/* Make */}
           <div className="space-y-1">
-            <Label>Make</Label>
+            <Label>{t('vehicles.make')}</Label>
             {customMakeMode ? (
               <div className="flex gap-2">
                 <Input
-                  placeholder="Enter make"
+                  placeholder={t('vehicles.enterMake')}
                   className="flex-1"
                   autoFocus
                   {...register('make')}
@@ -135,7 +135,7 @@ function VehicleDialog({
                   variant="outline"
                   size="icon"
                   className="shrink-0"
-                  title="Back to list"
+                  title={t('vehicles.backToList')}
                   onClick={() => {
                     setCustomMakeMode(false)
                     setCustomModelMode(false)
@@ -162,13 +162,13 @@ function VehicleDialog({
                 }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select make" />
+                  <SelectValue placeholder={t('vehicles.selectMake')} />
                 </SelectTrigger>
                 <SelectContent className="max-h-60">
                   {MAKES.map((m) => (
                     <SelectItem key={m} value={m}>{m}</SelectItem>
                   ))}
-                  <SelectItem value="__other__">Other…</SelectItem>
+                  <SelectItem value="__other__">{t('vehicles.other')}</SelectItem>
                 </SelectContent>
               </Select>
             )}
@@ -176,7 +176,7 @@ function VehicleDialog({
 
           {/* Model */}
           <div className="space-y-1">
-            <Label>Model</Label>
+            <Label>{t('vehicles.model')}</Label>
             {!customModelMode && availableModels.length > 0 ? (
               <Select
                 value={watchModel || ''}
@@ -190,13 +190,13 @@ function VehicleDialog({
                 }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select model" />
+                  <SelectValue placeholder={t('vehicles.selectModel')} />
                 </SelectTrigger>
                 <SelectContent className="max-h-60">
                   {availableModels.map((m: string) => (
                     <SelectItem key={m} value={m}>{m}</SelectItem>
                   ))}
-                  <SelectItem value="__other__">Other…</SelectItem>
+                  <SelectItem value="__other__">{t('vehicles.other')}</SelectItem>
                 </SelectContent>
               </Select>
             ) : (
@@ -204,8 +204,8 @@ function VehicleDialog({
                 <Input
                   placeholder={
                     !watchMake && !customMakeMode
-                      ? 'Select a make first'
-                      : 'Enter model'
+                      ? t('vehicles.selectMakeFirst')
+                      : t('vehicles.enterModel')
                   }
                   disabled={!watchMake && !customMakeMode}
                   className="flex-1"
@@ -217,7 +217,7 @@ function VehicleDialog({
                     variant="outline"
                     size="icon"
                     className="shrink-0"
-                    title="Back to list"
+                    title={t('vehicles.backToList')}
                     onClick={() => {
                       setCustomModelMode(false)
                       setValue('model', '')
@@ -231,7 +231,7 @@ function VehicleDialog({
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="vYear">Year</Label>
+            <Label htmlFor="vYear">{t('vehicles.year')}</Label>
             <Input id="vYear" type="number" placeholder="2020" {...register('year')} />
             {errors.year && <p className="text-xs text-red-500">{t(errors.year.message!)}</p>}
           </div>
@@ -243,10 +243,10 @@ function VehicleDialog({
 
           <DialogFooter className="gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => { reset(); onClose() }}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              Save
+              {t('common.save')}
             </Button>
           </DialogFooter>
         </form>
@@ -295,7 +295,7 @@ function VehicleRow({
           )}
         </div>
         <p className="text-xs text-gray-400">
-          {[vehicle.make, vehicle.model, vehicle.year].filter(Boolean).join(' · ') || 'No details'}
+          {[vehicle.make, vehicle.model, vehicle.year].filter(Boolean).join(' · ') || t('vehicles.noDetails')}
         </p>
         {isArchived && vehicle.archivedAt && (
           <p className="text-[10px] text-gray-400 mt-0.5">
@@ -311,7 +311,7 @@ function VehicleRow({
             size="icon"
             className="h-8 w-8"
             onClick={() => onEdit(vehicle)}
-            title="Edit"
+            title={t('common.edit')}
           >
             <Pencil size={14} />
           </Button>
@@ -373,7 +373,7 @@ export default function VehicleListPage() {
         <h1 className="text-xl font-bold">{t('vehicles.title')}</h1>
         <Button size="sm" onClick={openAdd} className="gap-1">
           <Plus size={16} />
-          Add
+          {t('common.add')}
         </Button>
       </div>
 
@@ -383,7 +383,7 @@ export default function VehicleListPage() {
           <Car size={40} className="mx-auto text-gray-300" />
           <p className="text-sm text-gray-400">{t('vehicles.noActive')}</p>
           <Button variant="outline" size="sm" onClick={openAdd}>
-            Add your first vehicle
+            {t('vehicles.addFirstVehicle')}
           </Button>
         </div>
       ) : (

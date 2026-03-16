@@ -1,13 +1,19 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import BottomNav from './BottomNav'
 import Header from './Header'
+import ErrorBoundary from './ErrorBoundary'
 
 export default function Shell() {
+  const { pathname } = useLocation()
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
       <Header />
       <main className="flex-1 overflow-y-auto pb-16">
-        <Outlet />
+        {/* key={pathname} resets the boundary on every navigation so a crash in one route never bleeds into another */}
+        <ErrorBoundary key={pathname}>
+          <Outlet />
+        </ErrorBoundary>
       </main>
       <BottomNav />
     </div>

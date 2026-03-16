@@ -4,10 +4,9 @@ import {
   subMonths,
   eachMonthOfInterval,
   format,
-  parseISO,
-  isWithinInterval,
 } from 'date-fns'
 import type { Transaction, Account, Category, Label } from '@/types'
+import { getVisibleAccounts, isTransactionForVisiblePrimaryAccount } from './accounts'
 import { convertToBase } from './currency'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -65,9 +64,9 @@ function toBase(t: Transaction): number {
   return t.exchangeRate ? convertToBase(t.amount, t.exchangeRate) : t.amount
 }
 
-function txInRange(t: Transaction, from: Date, to: Date): boolean {
-  const d = parseISO(t.date)
-  return isWithinInterval(d, { start: from, end: to })
+// Compare ISO strings lexically — avoids parseISO() per transaction (best practice: strings for storage/sort, parse once for math)
+function txInRange(t: Transaction, fromISO: string, toISO: string): boolean {
+  return t.date >= fromISO && t.date <= toISO
 }
 
 // ─── Summaries ────────────────────────────────────────────────────────────────
@@ -75,9 +74,14 @@ function txInRange(t: Transaction, from: Date, to: Date): boolean {
 export function computePeriodSummary(
   transactions: Transaction[],
   filters: ReportFilters,
+  visibleAccountIds?: Set<string>,
 ): PeriodSummary {
+  // Parse Date boundaries once — reuse ISO strings inside the filter loop
+  const fromISO = filters.from.toISOString()
+  const toISO   = filters.to.toISOString()
   const filtered = transactions.filter((t) => {
-    if (!txInRange(t, filters.from, filters.to)) return false
+    if (!txInRange(t, fromISO, toISO)) return false
+    if (visibleAccountIds && !isTransactionForVisiblePrimaryAccount(t, visibleAccountIds)) return false
     if (filters.accountId && t.accountId !== filters.accountId) return false
     return true
   })
@@ -99,6 +103,7 @@ export function computeMonthlyTrend(
   transactions: Transaction[],
   months = 6,
   accountId?: string,
+  visibleAccountIds?: Set<string>,
 ): MonthlyBar[] {
   const today = new Date()
   const start = startOfMonth(subMonths(today, months - 1))
@@ -107,10 +112,13 @@ export function computeMonthlyTrend(
 
   return intervals.map((monthDate) => {
     const mStart = startOfMonth(monthDate)
-    const mEnd = endOfMonth(monthDate)
-
+    const mEnd   = endOfMonth(monthDate)
+    // Convert to ISO once per month interval — not per transaction
+    const mStartISO = mStart.toISOString()
+    const mEndISO   = mEnd.toISOString()
     const relevant = transactions.filter((t) => {
-      if (!txInRange(t, mStart, mEnd)) return false
+      if (!txInRange(t, mStartISO, mEndISO)) return false
+      if (visibleAccountIds && !isTransactionForVisiblePrimaryAccount(t, visibleAccountIds)) return false
       if (accountId && t.accountId !== accountId) return false
       return true
     })
@@ -139,10 +147,14 @@ export function computeCategoryBreakdown(
   categories: Category[],
   filters: ReportFilters,
   type: 'expense' | 'income' = 'expense',
+  visibleAccountIds?: Set<string>,
 ): CategorySlice[] {
+  const fromISO = filters.from.toISOString()
+  const toISO   = filters.to.toISOString()
   const filtered = transactions.filter((t) => {
     if (t.type !== type) return false
-    if (!txInRange(t, filters.from, filters.to)) return false
+    if (!txInRange(t, fromISO, toISO)) return false
+    if (visibleAccountIds && !isTransactionForVisiblePrimaryAccount(t, visibleAccountIds)) return false
     if (filters.accountId && t.accountId !== filters.accountId) return false
     return true
   })
@@ -177,8 +189,13 @@ export function computeAccountBalances(
   filters: ReportFilters,
 ): AccountBalance[] {
   const prevMonthEnd = endOfMonth(subMonths(filters.from, 1))
+  // Pre-compute ISO strings once outside the account loop (best practice: parse once, reuse)
+  const fromISO        = filters.from.toISOString()
+  const toISO          = filters.to.toISOString()
+  const prevMonthEndISO = prevMonthEnd.toISOString()
+  const visibleAccounts = getVisibleAccounts(accounts)
 
-  return accounts.map((account) => {
+  return visibleAccounts.map((account) => {
     // All transactions for this account ever up to end of period.
     // Transfers appear from BOTH sides: as source (accountId) and destination (toAccountId).
     const allForAccount = transactions.filter(
@@ -188,7 +205,7 @@ export function computeAccountBalances(
     )
 
     // Transactions in current period
-    const inPeriod = allForAccount.filter((t) => txInRange(t, filters.from, filters.to))
+    const inPeriod = allForAccount.filter((t) => txInRange(t, fromISO, toISO))
 
     const totalIncome = inPeriod
       .filter((t) => t.type === 'income')
@@ -212,14 +229,14 @@ export function computeAccountBalances(
 
     // Closing balance = opening + all movements up through period end
     const allUpToPeriodEnd = allForAccount.filter((t) =>
-      parseISO(t.date) <= filters.to,
+      t.date <= toISO,
     )
     const cumulativeNet = allUpToPeriodEnd.reduce(applyTransaction, 0)
     const closingBalance = account.openingBalance + cumulativeNet
 
     // Closing balance as of end of previous month (for delta)
     const allUpToPrevMonth = allForAccount.filter((t) =>
-      parseISO(t.date) <= prevMonthEnd,
+      t.date <= prevMonthEndISO,
     )
     const prevNet = allUpToPrevMonth.reduce(applyTransaction, 0)
     const prevClosing = account.openingBalance + prevNet
@@ -266,8 +283,9 @@ export function computeCashFlow(
   transactions: Transaction[],
   months = 6,
   accountId?: string,
+  visibleAccountIds?: Set<string>,
 ): CashFlowRow[] {
-  const trend = computeMonthlyTrend(transactions, months, accountId)
+  const trend = computeMonthlyTrend(transactions, months, accountId, visibleAccountIds)
   let cumulative = 0
   return trend.map((m) => {
     cumulative += m.net
@@ -302,9 +320,13 @@ export function computeLabelBreakdown(
   transactions: Transaction[],
   labels: Label[],
   filters: ReportFilters,
+  visibleAccountIds?: Set<string>,
 ): LabelSlice[] {
+  const fromISO = filters.from.toISOString()
+  const toISO   = filters.to.toISOString()
   const filtered = transactions.filter((t) => {
-    if (!txInRange(t, filters.from, filters.to)) return false
+    if (!txInRange(t, fromISO, toISO)) return false
+    if (visibleAccountIds && !isTransactionForVisiblePrimaryAccount(t, visibleAccountIds)) return false
     if (filters.accountId && t.accountId !== filters.accountId) return false
     return true
   })
@@ -374,12 +396,13 @@ export function compute503020(
   transactions: Transaction[],
   labels: Label[],
   filters: ReportFilters,
+  visibleAccountIds?: Set<string>,
 ): {
   buckets: BucketSummary[]
   totalIncome: number
   totalExpenses: number
 } {
-  const slices = computeLabelBreakdown(transactions, labels, filters)
+  const slices = computeLabelBreakdown(transactions, labels, filters, visibleAccountIds)
   const totalIncome   = slices.reduce((s, l) => s + l.income, 0)
   const totalExpenses = slices.reduce((s, l) => s + l.expenses, 0)
 

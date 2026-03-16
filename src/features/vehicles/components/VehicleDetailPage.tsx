@@ -15,6 +15,13 @@ import {
   type FuelLogFormValues,
   type VehicleServiceFormValues,
 } from '../schemas/vehicle.schema'
+import {
+  getAccountSelectOptions,
+  getVisibleAccountIds,
+  getVisibleAccounts,
+  isTransactionForVisiblePrimaryAccount,
+} from '@/lib/accounts'
+import { getTranslatedCategoryName } from '@/lib/categories'
 import { useVehiclesStore } from '@/stores/vehicles.store'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useAccountsStore } from '@/stores/accounts.store'
@@ -48,6 +55,32 @@ import {
 // Palette for charts
 const CHART_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316']
 
+const SERVICE_TYPE_KEY_MAP: Record<string, string> = {
+  'Oil change': 'vehicles.serviceTypes.oilChange',
+  'Tire rotation': 'vehicles.serviceTypes.tireRotation',
+  'Tire replacement': 'vehicles.serviceTypes.tireReplacement',
+  'Brake pads': 'vehicles.serviceTypes.brakePads',
+  'Brake discs': 'vehicles.serviceTypes.brakeDiscs',
+  'Battery replacement': 'vehicles.serviceTypes.batteryReplacement',
+  'Timing belt': 'vehicles.serviceTypes.timingBelt',
+  'Spark plugs': 'vehicles.serviceTypes.sparkPlugs',
+  'Air filter': 'vehicles.serviceTypes.airFilter',
+  'Cabin filter': 'vehicles.serviceTypes.cabinFilter',
+  'Fuel filter': 'vehicles.serviceTypes.fuelFilter',
+  'Transmission fluid': 'vehicles.serviceTypes.transmissionFluid',
+  'Coolant flush': 'vehicles.serviceTypes.coolantFlush',
+  Alignment: 'vehicles.serviceTypes.alignment',
+  Suspension: 'vehicles.serviceTypes.suspension',
+  'AC service': 'vehicles.serviceTypes.acService',
+  'General inspection': 'vehicles.serviceTypes.generalInspection',
+  Other: 'vehicles.serviceTypes.other',
+}
+
+function getServiceTypeLabel(serviceType: string, t: (key: string) => string): string {
+  const key = SERVICE_TYPE_KEY_MAP[serviceType]
+  return key ? t(key) : serviceType
+}
+
 // ─── Fuel Log dialog (add + edit) ────────────────────────────────────────────
 
 function FuelLogDialog({
@@ -72,10 +105,11 @@ function FuelLogDialog({
   const { categories } = useCategoriesStore()
   const { baseCurrency } = useSettingsStore()
   const { labels, load: loadLabels } = useLabelsStore()
+  const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
 
   useEffect(() => { loadLabels() }, [loadLabels])
 
-  const defaultAccount = accounts[0]
+  const defaultAccount = visibleAccounts[0] ?? accounts[0]
   const fuelCategory = categories.find((c) => c.id === 'fuel-gas') ?? categories[0]
 
   const {
@@ -109,6 +143,10 @@ function FuelLogDialog({
   const watchLiters = watch('liters')
   const watchCostPerLiter = watch('costPerLiter')
   const watchTotalCost = watch('totalCost')
+  const availableAccounts = useMemo(
+    () => getAccountSelectOptions(accounts, [watchAccountId]),
+    [accounts, watchAccountId],
+  )
 
   // Auto-calc total cost when liters + cost/liter change
   const [lastEdited, setLastEdited] = useState<'costPerLiter' | 'totalCost'>('costPerLiter')
@@ -311,7 +349,7 @@ function FuelLogDialog({
             <Select value={watchAccountId || ''} onValueChange={(v) => setValue('accountId', v as string)}>
               <SelectTrigger><SelectValue>{accounts.find((a) => a.id === watchAccountId)?.name ?? t('transactions.selectAccount')}</SelectValue></SelectTrigger>
               <SelectContent>
-                {accounts.map((a) => (
+                {availableAccounts.map((a) => (
                   <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>
                 ))}
               </SelectContent>
@@ -323,10 +361,10 @@ function FuelLogDialog({
           <div className="space-y-1">
             <FormLabel>{t('transactions.category')}</FormLabel>
             <Select value={watchCategoryId || ''} onValueChange={(v) => setValue('categoryId', v as string)}>
-              <SelectTrigger><SelectValue>{filteredCategories.find((c) => c.id === watchCategoryId)?.name ?? t('transactions.selectCategory')}</SelectValue></SelectTrigger>
+              <SelectTrigger><SelectValue>{getTranslatedCategoryName(filteredCategories.find((c) => c.id === watchCategoryId), t) || t('transactions.selectCategory')}</SelectValue></SelectTrigger>
               <SelectContent>
                 {filteredCategories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  <SelectItem key={c.id} value={c.id}>{getTranslatedCategoryName(c, t)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -409,11 +447,12 @@ function ServiceDialog({
   const { categories } = useCategoriesStore()
   const { baseCurrency } = useSettingsStore()
   const { labels, load: loadLabels } = useLabelsStore()
+  const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
 
   useEffect(() => { loadLabels() }, [loadLabels])
 
   const [customServiceType, setCustomServiceType] = useState(false)
-  const defaultAccount = accounts[0]
+  const defaultAccount = visibleAccounts[0] ?? accounts[0]
   const maintenanceCategory = categories.find((c) => c.id === 'vehicle-maintenance') ?? categories[0]
 
   const {
@@ -444,6 +483,10 @@ function ServiceDialog({
   const watchStatus = watch('status')
   const watchLabels = watch('labels') ?? []
   const watchServiceType = watch('serviceType')
+  const availableAccounts = useMemo(
+    () => getAccountSelectOptions(accounts, [watchAccountId]),
+    [accounts, watchAccountId],
+  )
 
   useEffect(() => {
     if (!open) return
@@ -614,7 +657,7 @@ function ServiceDialog({
                 </SelectTrigger>
                 <SelectContent className="max-h-60">
                   {SERVICE_TYPES.map((st) => (
-                    <SelectItem key={st} value={st}>{st}</SelectItem>
+                    <SelectItem key={st} value={st}>{getServiceTypeLabel(st, t)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -642,7 +685,7 @@ function ServiceDialog({
             <Select value={watchAccountId || ''} onValueChange={(v) => setValue('accountId', v as string)}>
               <SelectTrigger><SelectValue>{accounts.find((a) => a.id === watchAccountId)?.name ?? t('transactions.selectAccount')}</SelectValue></SelectTrigger>
               <SelectContent>
-                {accounts.map((a) => (
+                {availableAccounts.map((a) => (
                   <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>
                 ))}
               </SelectContent>
@@ -654,10 +697,10 @@ function ServiceDialog({
           <div className="space-y-1">
             <FormLabel>{t('transactions.category')}</FormLabel>
             <Select value={watchCategoryId || ''} onValueChange={(v) => setValue('categoryId', v as string)}>
-              <SelectTrigger><SelectValue>{filteredCategories.find((c) => c.id === watchCategoryId)?.name ?? t('transactions.selectCategory')}</SelectValue></SelectTrigger>
+              <SelectTrigger><SelectValue>{getTranslatedCategoryName(filteredCategories.find((c) => c.id === watchCategoryId), t) || t('transactions.selectCategory')}</SelectValue></SelectTrigger>
               <SelectContent>
                 {filteredCategories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  <SelectItem key={c.id} value={c.id}>{getTranslatedCategoryName(c, t)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -792,9 +835,9 @@ function VehicleStats({
       map.set(s.serviceType, (map.get(s.serviceType) ?? 0) + s.cost)
     }
     return Array.from(map.entries())
-      .map(([name, value]) => ({ name, value: value / 100 }))
+      .map(([name, value]) => ({ name: getServiceTypeLabel(name, t), value: value / 100 }))
       .sort((a, b) => b.value - a.value)
-  }, [services])
+  }, [services, t])
 
   // Summary stats
   const stats = useMemo(() => {
@@ -945,6 +988,8 @@ export default function VehicleDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { vehicles, fuelLogs, vehicleServices, removeFuelLog, removeService } = useVehiclesStore()
+  const { transactions } = useTransactionsStore()
+  const { accounts } = useAccountsStore()
   const { baseCurrency } = useSettingsStore()
   const { labels } = useLabelsStore()
   const [tab, setTab] = useState<Tab>('fuel')
@@ -953,9 +998,26 @@ export default function VehicleDetailPage() {
   const [serviceDialog, setServiceDialog] = useState(false)
   const [editingSvc, setEditingSvc] = useState<VehicleService | null>(null)
 
+  const visibleAccountIds = useMemo(() => getVisibleAccountIds(accounts), [accounts])
+  const visibleTransactionIds = useMemo(() => {
+    return new Set(
+      transactions
+        .filter((transaction) => isTransactionForVisiblePrimaryAccount(transaction, visibleAccountIds))
+        .map((transaction) => transaction.id),
+    )
+  }, [transactions, visibleAccountIds])
+
   const vehicle = vehicles.find((v) => v.id === id)
-  const logs = fuelLogs.filter((f) => f.vehicleId === id)
-  const services = vehicleServices.filter((s) => s.vehicleId === id)
+  const logs = fuelLogs.filter((fuelLog) => {
+    if (fuelLog.vehicleId !== id) return false
+    if (!fuelLog.transactionId) return true
+    return visibleTransactionIds.has(fuelLog.transactionId)
+  })
+  const services = vehicleServices.filter((service) => {
+    if (service.vehicleId !== id) return false
+    if (!service.transactionId) return true
+    return visibleTransactionIds.has(service.transactionId)
+  })
 
   if (!vehicle) {
     return (
@@ -1127,7 +1189,7 @@ export default function VehicleDetailPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="space-y-0.5 flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium truncate">{svc.serviceType}</p>
+                          <p className="text-sm font-medium truncate">{getServiceTypeLabel(svc.serviceType, t)}</p>
                           {svc.nextServiceKm && (
                             <Badge variant="outline" className="text-[10px] px-1.5 shrink-0">
                               {t('vehicles.nextAt')}: {svc.nextServiceKm.toLocaleString()} km

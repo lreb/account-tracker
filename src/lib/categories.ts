@@ -23,3 +23,31 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'refund',               name: 'Refund',                icon: 'RotateCcw',       isCustom: false, type: 'income' },
   { id: 'other',                name: 'Other',                 icon: 'MoreHorizontal',  isCustom: false, type: 'any' },
 ]
+
+const DEFAULT_CATEGORY_IDS = new Set(DEFAULT_CATEGORIES.map((category) => category.id))
+const DEFAULT_CATEGORY_NAME_TO_ID = Object.fromEntries(
+  DEFAULT_CATEGORIES.map((category) => [category.name, category.id]),
+) as Record<string, string>
+
+// Default categories are translated from locale resources by id.
+// Custom categories keep the user-provided name.
+export function getTranslatedCategoryName(
+  category: Pick<Category, 'id' | 'name' | 'isCustom'> | undefined,
+  t: (key: string) => string,
+): string {
+  if (!category) return ''
+  if (category.isCustom) return category.name
+
+  const keyById = `categories.names.${category.id}`
+  const translatedById = t(keyById)
+  if (translatedById !== keyById) return translatedById
+
+  const mappedId = DEFAULT_CATEGORY_NAME_TO_ID[category.name]
+  if (mappedId && DEFAULT_CATEGORY_IDS.has(mappedId)) {
+    const keyByNameMap = `categories.names.${mappedId}`
+    const translatedByName = t(keyByNameMap)
+    if (translatedByName !== keyByNameMap) return translatedByName
+  }
+
+  return category.name
+}

@@ -1,4 +1,4 @@
-// Current DB version: 4
+// Current DB version: 5
 import Dexie, { type Table } from 'dexie'
 import type {
   Account,
@@ -54,6 +54,14 @@ class ExpenseTrackingDB extends Dexie {
     // Version 4: add deletedAt index on categories for soft-delete
     this.version(4).stores({
       categories: 'id, isCustom, type, deletedAt',
+    })
+    // Version 5: add hidden index on accounts for app-wide exclusion
+    this.version(5).stores({
+      accounts: 'id, type, currency, hidden',
+    }).upgrade((tx) => {
+      return tx.table('accounts').toCollection().modify((account) => {
+        if (account.hidden == null) account.hidden = false
+      })
     })
   }
 }

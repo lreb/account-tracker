@@ -6,7 +6,7 @@ import type { Transaction } from '@/types'
 interface TransactionsState {
   transactions: Transaction[]
   loading: boolean
-  load: () => Promise<void>
+  load: (since?: string) => Promise<void>
   add: (t: Transaction) => Promise<void>
   update: (t: Transaction) => Promise<void>
   remove: (id: string) => Promise<void>
@@ -17,10 +17,14 @@ export const useTransactionsStore = create<TransactionsState>((set) => ({
   transactions: [],
   loading: false,
 
-  load: async () => {
+  load: async (since?: string) => {
     set({ loading: true })
     try {
-      const transactions = await db.transactions.orderBy('date').reverse().toArray()
+      // When a cutoff date is provided, use the indexed 'date' field to filter inside
+      // IndexedDB — only the rows we need cross the JS boundary (Option E).
+      const transactions = since
+        ? await db.transactions.where('date').aboveOrEqual(since).reverse().toArray()
+        : await db.transactions.orderBy('date').reverse().toArray()
       set({ transactions })
     } catch (err) {
       console.error(err)

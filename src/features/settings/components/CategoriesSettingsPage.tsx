@@ -8,6 +8,7 @@ import { Pencil, Trash2, Plus, RotateCcw } from 'lucide-react'
 import { categorySchema, type CategoryFormValues } from '../schemas/category.schema'
 import { useCategoriesStore } from '@/stores/categories.store'
 import { ICON_MAP, CategoryIcon } from '@/lib/icon-map'
+import { getTranslatedCategoryName } from '@/lib/categories'
 import type { Category, CategoryType } from '@/types'
 
 import { Button } from '@/components/ui/button'
@@ -211,7 +212,7 @@ function CategorySection({
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100">
               <CategoryIcon name={cat.icon} size={18} />
             </span>
-            <span className="flex-1 min-w-0 text-sm font-medium truncate">{cat.name}</span>
+            <span className="flex-1 min-w-0 text-sm font-medium truncate">{getTranslatedCategoryName(cat, t)}</span>
             <Button
               variant="ghost"
               size="icon"
@@ -247,7 +248,7 @@ function CategorySection({
                   <CategoryIcon name={cat.icon} size={18} className="text-gray-400" />
                 </span>
                 <span className="flex-1 min-w-0 text-sm font-medium text-gray-500 truncate line-through">
-                  {cat.name}
+                  {getTranslatedCategoryName(cat, t)}
                 </span>
                 <Button
                   variant="ghost"
