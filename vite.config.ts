@@ -4,7 +4,15 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
 
+function getBasePath(): string {
+  const repo = process.env.GITHUB_REPOSITORY?.split('/')[1]
+  if (!repo) return '/'
+  if (repo.endsWith('.github.io')) return '/'
+  return `/${repo}/`
+}
+
 export default defineConfig({
+  base: process.env.GITHUB_ACTIONS ? getBasePath() : '/',
   plugins: [
     react(),
     tailwindcss(),
