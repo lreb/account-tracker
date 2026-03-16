@@ -119,6 +119,14 @@ function getQuickRangeSince(range: QuickRange): string | undefined {
   return undefined
 }
 
+function getUtcStartIso(dateValue: string): string {
+  return `${dateValue}T00:00:00.000Z`
+}
+
+function getUtcEndIso(dateValue: string): string {
+  return `${dateValue}T23:59:59.999Z`
+}
+
 export default function TransactionListPage() {
   const { t } = useTranslation()
   const { transactions, loading, load: loadTx } = useTransactionsStore()
@@ -174,7 +182,7 @@ export default function TransactionListPage() {
   const applyFilters = () => {
     setFilters(draft)
     setQuickRange('all')
-    loadTx(draft.dateFrom ? new Date(draft.dateFrom).toISOString() : undefined)
+    loadTx(draft.dateFrom ? getUtcStartIso(draft.dateFrom) : undefined)
     setSheetOpen(false)
   }
   const resetFilters = () => {
@@ -196,11 +204,8 @@ export default function TransactionListPage() {
 
   const filtered = useMemo(() => {
     const q = filters.search.trim().toLowerCase()
-    // Parse date boundaries once outside the loop — not per row (best practice: parse once, reuse)
-    const dateFromISO = filters.dateFrom ? new Date(filters.dateFrom).toISOString() : ''
-    const dateToISO   = filters.dateTo
-      ? (() => { const d = new Date(filters.dateTo); d.setHours(23, 59, 59, 999); return d.toISOString() })()
-      : ''
+    const dateFromISO = filters.dateFrom ? getUtcStartIso(filters.dateFrom) : ''
+    const dateToISO = filters.dateTo ? getUtcEndIso(filters.dateTo) : ''
     return visibleTransactions.filter((tx) => {
       if (q && !tx.description.toLowerCase().includes(q) && !(tx.notes ?? '').toLowerCase().includes(q)) return false
       if (filters.type && tx.type !== filters.type) return false

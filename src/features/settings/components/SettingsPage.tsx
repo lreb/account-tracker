@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 
 import { db } from '@/db'
+import { createDefaultAccount } from '@/lib/accounts'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useCategoriesStore } from '@/stores/categories.store'
@@ -20,6 +21,11 @@ import { useVehiclesStore } from '@/stores/vehicles.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { useExchangeRatesStore } from '@/stores/exchange-rates.store'
 import { exportTransactionsCsv, parseTransactionsCsv } from '@/lib/csv'
+import {
+  compactTransactionsYear,
+  getCompactableTransactionYears,
+  getCompactableTransactionsForYear,
+} from '@/lib/retention'
 import {
   buildFullBackup, downloadBackupFile,
   parseBackupFile, restoreFromBackup, resetApp,
@@ -34,6 +40,26 @@ import {
   DialogFooter, DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+
+const SUPPORTED_CURRENCIES = [
+  { code: 'USD', label: 'USD - US Dollar' },
+  { code: 'EUR', label: 'EUR - Euro' },
+  { code: 'MXN', label: 'MXN - Mexican Peso' },
+  { code: 'GBP', label: 'GBP - British Pound' },
+  { code: 'CAD', label: 'CAD - Canadian Dollar' },
+  { code: 'BRL', label: 'BRL - Brazilian Real' },
+  { code: 'COP', label: 'COP - Colombian Peso' },
+  { code: 'ARS', label: 'ARS - Argentine Peso' },
+  { code: 'CLP', label: 'CLP - Chilean Peso' },
+] as const
 
 const settingsItems = [
   { to: '/settings/accounts',       icon: Wallet,    labelKey: 'settings.accounts' },
@@ -50,7 +76,7 @@ export default function SettingsPage() {
   const { labels, load: loadLabels } = useLabelsStore()
   const { load: loadBudgets } = useBudgetsStore()
   const { load: loadVehicles } = useVehiclesStore()
-  const { load: loadSettings, saveSetting, language, googleClientId } = useSettingsStore()
+  const { load: loadSettings, saveSetting, language, baseCurrency, googleClientId } = useSettingsStore()
   const { load: loadExchangeRates } = useExchangeRatesStore()
   const importRef = useRef<HTMLInputElement>(null)
   const jsonImportRef = useRef<HTMLInputElement>(null)
@@ -58,6 +84,13 @@ export default function SettingsPage() {
   const [isBusy, setIsBusy] = useState(false)
   const [confirmRestore, setConfirmRestore] = useState<null | (() => Promise<void>)>(null)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [confirmCompaction, setConfirmCompaction] = useState(false)
+  const [postResetSetupOpen, setPostResetSetupOpen] = useState(false)
+  const [postResetLanguage, setPostResetLanguage] = useState<'en' | 'es'>('en')
+  const [postResetCurrency, setPostResetCurrency] = useState('USD')
+  const [compactableYears, setCompactableYears] = useState<number[]>([])
+  const [selectedCompactionYear, setSelectedCompactionYear] = useState<string>('')
+  const [exportPreparedYear, setExportPreparedYear] = useState<number | null>(null)
   const [driveSignedIn, setDriveSignedIn] = useState(isSignedInToGoogle)
   
   // Track if we're showing the "bring your own client ID" config UI
@@ -65,6 +98,26 @@ export default function SettingsPage() {
   const [tempClientId, setTempClientId] = useState(googleClientId)
 
   const driveConfigured = isGoogleDriveConfigured(googleClientId)
+
+  useEffect(() => {
+    void refreshCompactionYears()
+  }, [transactions.length])
+
+  async function refreshCompactionYears() {
+    const years = await getCompactableTransactionYears()
+    setCompactableYears(years)
+
+    setSelectedCompactionYear((current) => {
+      if (years.length === 0) return ''
+      if (current && years.includes(Number(current))) return current
+      return String(years[0])
+    })
+
+    setExportPreparedYear((current) => {
+      if (current && years.includes(current)) return current
+      return null
+    })
+  }
 
   // ── Reload all stores (called after any restore) ───────────────────────────
   async function reloadAll() {
@@ -79,6 +132,62 @@ export default function SettingsPage() {
   async function handleLanguageChange(lang: string) {
     await saveSetting('language', lang)
     await i18n.changeLanguage(lang)
+  }
+
+  // ── Base Currency ─────────────────────────────────────────────────────────
+  async function handleBaseCurrencyChange(currency: string) {
+    const nextCurrency = (currency || 'USD').toUpperCase()
+    await saveSetting('baseCurrency', nextCurrency)
+    toast.success(t('common.saved'))
+  }
+
+  // ── Data retention / manual compaction ───────────────────────────────────
+  async function handleExportCompactionYear() {
+    const year = Number(selectedCompactionYear)
+    if (!year) return
+
+    const txs = await getCompactableTransactionsForYear(year)
+    if (txs.length === 0) {
+      toast.error(t('settings.compactionNoTransactions'))
+      return
+    }
+
+    const filename = `transactions_${year}_pre-compaction_${format(new Date(), 'yyyy-MM-dd')}.csv`
+    exportTransactionsCsv(txs, accounts, labels, filename)
+    setExportPreparedYear(year)
+    toast.success(t('settings.compactionExportSuccess', { count: txs.length, year }))
+  }
+
+  async function handleCompactSelectedYear() {
+    const year = Number(selectedCompactionYear)
+    if (!year) return
+    if (exportPreparedYear !== year) {
+      toast.error(t('settings.compactionExportRequired'))
+      return
+    }
+
+    setIsBusy(true)
+    try {
+      const result = await compactTransactionsYear(year)
+      if (result.compactedCount === 0) {
+        toast.error(t('settings.compactionNoTransactions'))
+        return
+      }
+
+      await reloadAll()
+      await refreshCompactionYears()
+      setConfirmCompaction(false)
+      toast.success(t('settings.compactionSuccess', {
+        year,
+        compacted: result.compactedCount,
+        generated: result.generatedCount,
+      }))
+    } catch (err) {
+      console.error(err)
+      toast.error(t('settings.compactionError'))
+    } finally {
+      setIsBusy(false)
+    }
   }
 
   // ── CSV Export ─────────────────────────────────────────────────────────────
@@ -188,20 +297,50 @@ export default function SettingsPage() {
     setIsBusy(true)
     try {
       await resetApp()
+      setConfirmReset(false)
+      setPostResetLanguage((language === 'es' ? 'es' : 'en'))
+      setPostResetCurrency((baseCurrency || 'USD').toUpperCase())
+      setPostResetSetupOpen(true)
+    } catch (err) {
+      console.error(err)
+      toast.error(t('settings.resetError'))
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function handlePostResetSetupSave() {
+    setIsBusy(true)
+    try {
+      await saveSetting('language', postResetLanguage)
+      await saveSetting('baseCurrency', postResetCurrency)
+      await saveSetting('initialSetupDone', '1')
+      await i18n.changeLanguage(postResetLanguage)
+
+      const count = await db.accounts.count()
+      if (count === 0) {
+        await db.accounts.add(createDefaultAccount(postResetCurrency))
+      }
+
       await reloadAll()
+      setPostResetSetupOpen(false)
       toast.success(t('settings.resetSuccess'))
     } catch (err) {
       console.error(err)
       toast.error(t('settings.resetError'))
     } finally {
       setIsBusy(false)
-      setConfirmReset(false)
     }
   }
 
   // ── Google Drive: Connect / Disconnect ────────────────────────────────────
   function handleDriveConnect() {
-    startGoogleSignIn(googleClientId, '/settings')
+    try {
+      startGoogleSignIn(googleClientId, '/settings')
+    } catch (err) {
+      console.error(err)
+      toast.error(t('settings.driveNotConfigured'))
+    }
   }
   function handleDriveDisconnect() {
     signOutOfGoogle()
@@ -212,9 +351,17 @@ export default function SettingsPage() {
   async function handleSaveDriveConfig() {
     setIsBusy(true)
     try {
-      await saveSetting('googleClientId', tempClientId.trim())
+      const clientId = tempClientId.trim()
+      if (!clientId) {
+        toast.error(t('settings.driveNotConfigured'))
+        return
+      }
+
+      await saveSetting('googleClientId', clientId)
       setEditingDriveConfig(false)
       toast.success(t('common.saved'))
+      // Start OAuth immediately after config so user can connect in one flow.
+      startGoogleSignIn(clientId, '/settings')
     } catch {
       toast.error(t('settings.saveError', 'Failed to save config'))
     } finally {
@@ -303,6 +450,86 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* ── Base currency section ───────────────────────────────────────── */}
+      <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 px-1">{t('settings.baseCurrency')}</p>
+        <div className="rounded-2xl border overflow-hidden bg-white p-3">
+          <Select
+            value={baseCurrency || 'USD'}
+            onValueChange={(v) => { void handleBaseCurrencyChange(v ?? 'USD') }}
+            disabled={isBusy}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SUPPORTED_CURRENCIES.map(({ code, label }) => (
+                <SelectItem key={code} value={code}>{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* ── Data retention / manual compaction ──────────────────────────── */}
+      <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 px-1">{t('settings.sectionRetention')}</p>
+        <div className="rounded-2xl border bg-white p-4 space-y-3">
+          <p className="text-xs text-gray-500">{t('settings.compactionDescription')}</p>
+
+          <div className="space-y-1">
+            <Label>{t('settings.compactionYear')}</Label>
+            <Select
+              value={selectedCompactionYear || undefined}
+              onValueChange={(v) => {
+                const next = v ?? ''
+                setSelectedCompactionYear(next)
+                if (Number(next) !== exportPreparedYear) {
+                  setExportPreparedYear(null)
+                }
+              }}
+              disabled={isBusy || compactableYears.length === 0}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={t('settings.compactionNoYears')} />
+              </SelectTrigger>
+              <SelectContent>
+                {compactableYears.map((year) => (
+                  <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              disabled={isBusy || !selectedCompactionYear}
+              onClick={handleExportCompactionYear}
+            >
+              {t('settings.compactionExportFirst')}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              className="flex-1"
+              disabled={isBusy || !selectedCompactionYear || exportPreparedYear !== Number(selectedCompactionYear)}
+              onClick={() => setConfirmCompaction(true)}
+            >
+              {t('settings.compactionAction')}
+            </Button>
+          </div>
+
+          {selectedCompactionYear && exportPreparedYear === Number(selectedCompactionYear) ? (
+            <p className="text-xs text-emerald-600">{t('settings.compactionExportReady', { year: selectedCompactionYear })}</p>
+          ) : (
+            <p className="text-xs text-amber-600">{t('settings.compactionExportRequired')}</p>
+          )}
+        </div>
+      </div>
+
       {/* ── CSV Data section ─────────────────────────────────────────────── */}
       <div className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 px-1">{t('settings.sectionCsv')}</p>
@@ -357,20 +584,7 @@ export default function SettingsPage() {
       <div className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 px-1">{t('settings.sectionDrive')}</p>
 
-        {!driveConfigured && !editingDriveConfig ? (
-          <div className="rounded-2xl border bg-white px-4 py-3 flex items-start gap-3 flex-col">
-            <div className="flex items-start gap-3">
-              <Info size={16} className="text-gray-400 mt-0.5 shrink-0" />
-              <div className="flex-1 text-left">
-                <p className="text-sm font-medium">{t('settings.driveNotConfigured')}</p>
-                <p className="text-xs text-gray-500 mt-1">{t('settings.driveByoDesc')}</p>
-              </div>
-            </div>
-            <Button variant="outline" className="w-full mt-2" size="sm" onClick={() => setEditingDriveConfig(true)}>
-              {t('settings.driveConfigureBtn')}
-            </Button>
-          </div>
-        ) : editingDriveConfig ? (
+        {editingDriveConfig ? (
           <div className="rounded-2xl border bg-white p-4 space-y-3">
             <div>
               <label className="text-sm font-medium text-gray-700">{t('settings.driveClientId')}</label>
@@ -403,7 +617,9 @@ export default function SettingsPage() {
                   <CloudUpload size={18} className="text-blue-500 shrink-0" />
                   <div className="flex-1 text-left">
                     <p className="text-sm font-medium">{t('settings.driveConnect')}</p>
-                    <p className="text-xs text-gray-400">{t('settings.driveConnectDesc')}</p>
+                    <p className="text-xs text-gray-400">
+                      {driveConfigured ? t('settings.driveConnectDesc') : t('settings.driveNotConfigured')}
+                    </p>
                   </div>
                 </button>
                 <button type="button" onClick={() => { setTempClientId(googleClientId); setEditingDriveConfig(true); }}
@@ -503,6 +719,75 @@ export default function SettingsPage() {
             </Button>
             <Button variant="destructive" disabled={isBusy} onClick={handleResetConfirm}>
               {isBusy ? t('common.loading') : t('settings.resetConfirmAction')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Post-reset setup dialog (required) ───────────────────────────── */}
+      <Dialog open={postResetSetupOpen} onOpenChange={() => {}}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('settings.resetSetupTitle')}</DialogTitle>
+            <DialogDescription>{t('settings.resetSetupDesc')}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">1. {t('settings.sectionLanguage')}</p>
+              <div className="rounded-xl border overflow-hidden">
+                {(['en', 'es'] as const).map((lang) => (
+                  <button
+                    key={lang}
+                    type="button"
+                    onClick={() => setPostResetLanguage(lang)}
+                    className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-gray-50"
+                  >
+                    <span>{lang === 'en' ? t('settings.languageEnglish') : t('settings.languageSpanish')}</span>
+                    {postResetLanguage === lang ? <span className="h-2 w-2 rounded-full bg-indigo-500" /> : null}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">2. {t('settings.baseCurrency')}</p>
+              <Select value={postResetCurrency} onValueChange={(v) => setPostResetCurrency(v ?? 'USD')}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SUPPORTED_CURRENCIES.map(({ code, label }) => (
+                    <SelectItem key={code} value={code}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button onClick={handlePostResetSetupSave} disabled={isBusy}>
+              {isBusy ? t('common.loading') : t('settings.resetSetupAction')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Retention compaction confirmation dialog ─────────────────────── */}
+      <Dialog open={confirmCompaction} onOpenChange={(open) => { if (!open && !isBusy) setConfirmCompaction(false) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('settings.compactionConfirmTitle')}</DialogTitle>
+            <DialogDescription>
+              {t('settings.compactionConfirmDesc', { year: selectedCompactionYear || '-' })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmCompaction(false)} disabled={isBusy}>
+              {t('common.cancel')}
+            </Button>
+            <Button variant="destructive" onClick={handleCompactSelectedYear} disabled={isBusy}>
+              {isBusy ? t('common.loading') : t('settings.compactionAction')}
             </Button>
           </DialogFooter>
         </DialogContent>

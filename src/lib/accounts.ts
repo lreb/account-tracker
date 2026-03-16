@@ -1,5 +1,18 @@
 import type { Account, Transaction } from '@/types'
 
+export const DEFAULT_ACCOUNT_ID = 'default-account'
+
+export function createDefaultAccount(currency = 'USD'): Account {
+  return {
+    id: DEFAULT_ACCOUNT_ID,
+    name: 'Main Account',
+    type: 'asset',
+    openingBalance: 0,
+    currency,
+    hidden: false,
+  }
+}
+
 export function normalizeAccount(account: Account): Account {
   return {
     ...account,

@@ -113,7 +113,7 @@ export default function TransactionForm() {
           date:       format(new Date(), 'yyyy-MM-dd'),
           time:       format(new Date(), 'HH:mm'),
           status:     'cleared',
-          currency:   defaultAccount?.currency ?? 'USD',
+          currency:   defaultAccount?.currency ?? baseCurrency,
           amount:     '',
           categoryId: '',
           accountId:  defaultAccount?.id ?? '',

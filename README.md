@@ -41,6 +41,7 @@ The app will be available at **http://localhost:5173** (Vite may pick 5174+ if 5
 | `npm run dev` | Start Vite dev server with hot-reload |
 | `npm run build` | Type-check + production build → `dist/` |
 | `npm run preview` | Serve the production build locally |
+| `npm run publish:intranet` | Build and expose PWA on local network (PowerShell helper) |
 
 ---
 
@@ -171,6 +172,24 @@ To preview the production build locally:
 npm run preview
 # Available at http://localhost:4173
 ```
+
+### Publish To Intranet (LAN)
+
+For Android/local-network testing, use the helper script:
+
+```bash
+npm run publish:intranet
+```
+
+It will:
+
+- install dependencies (unless skipped)
+- build production assets
+- start Vite preview on `0.0.0.0:4173`
+- validate `/`, `/manifest.webmanifest`, and `/sw.js`
+- print intranet URLs (`http://<your-ip>:4173/`)
+
+Full manual and advanced options are documented in [docs/PWA-INTRANET-MANUAL.md](docs/PWA-INTRANET-MANUAL.md).
 
 ---
 

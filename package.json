@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "publish:intranet": "powershell -ExecutionPolicy Bypass -File ./scripts/publish-pwa-intranet.ps1"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",

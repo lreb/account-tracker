@@ -14,10 +14,15 @@
  */
 
 const ENV_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ?? ''
+const ENV_REDIRECT_URI = (import.meta.env.VITE_GOOGLE_REDIRECT_URI as string | undefined)?.trim() ?? ''
 const SCOPE = 'https://www.googleapis.com/auth/drive.appdata'
 const BACKUP_FILENAME = 'expense-tracking-backup.json'
 const TOKEN_KEY = '__gd_token__'
 const RETURN_KEY = '__oauth_return__'
+
+function getOAuthRedirectUri(): string {
+  return ENV_REDIRECT_URI || `${window.location.origin}/oauth-callback`
+}
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 
@@ -54,11 +59,13 @@ export function startGoogleSignIn(clientId: string, returnTo = '/settings'): voi
   sessionStorage.setItem(RETURN_KEY, returnTo)
   const params = new URLSearchParams({
     client_id: activeClientId,
-    redirect_uri: `${window.location.origin}/oauth-callback`,
+    redirect_uri: getOAuthRedirectUri(),
     response_type: 'token',
+    response_mode: 'fragment',
     scope: SCOPE,
     include_granted_scopes: 'true',
-    prompt: 'select_account',
+    // Force consent so Drive appDataFolder scope is explicitly granted.
+    prompt: 'consent select_account',
   })
   window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`
 }
@@ -68,9 +75,24 @@ export function startGoogleSignIn(clientId: string, returnTo = '/settings'): voi
  * stores it in sessionStorage, and returns the path to navigate back to.
  */
 export function handleOAuthCallback(hash: string): string {
-  const params = new URLSearchParams(hash.replace(/^#/, ''))
-  const token = params.get('access_token')
-  if (!token) throw new Error('No access_token found in OAuth redirect.')
+  const fragmentParams = new URLSearchParams(hash.replace(/^#/, ''))
+  const queryParams = new URLSearchParams(window.location.search)
+
+  const oauthError = fragmentParams.get('error') || queryParams.get('error')
+  if (oauthError) {
+    const description = fragmentParams.get('error_description') || queryParams.get('error_description') || ''
+    throw new Error(description || oauthError)
+  }
+
+  const token = fragmentParams.get('access_token') || queryParams.get('access_token')
+  if (!token) {
+    const code = fragmentParams.get('code') || queryParams.get('code')
+    if (code) {
+      throw new Error('OAuth returned an authorization code instead of an access token.')
+    }
+    throw new Error('No access_token found in OAuth redirect.')
+  }
+
   sessionStorage.setItem(TOKEN_KEY, token)
   const returnTo = sessionStorage.getItem(RETURN_KEY) ?? '/settings'
   sessionStorage.removeItem(RETURN_KEY)
@@ -89,6 +111,44 @@ async function driveRequest(path: string, options: RequestInit = {}): Promise<Re
       ...(options.headers ?? {}),
     },
   })
+
+  if (!res.ok) {
+    let details = ''
+    try {
+      const cloned = res.clone()
+      const payload = await cloned.json() as {
+        error?: {
+          message?: string
+          status?: string
+          errors?: Array<{ reason?: string; message?: string }>
+        }
+      }
+      const err = payload.error
+      if (err) {
+        const reason = err.errors?.[0]?.reason
+        const message = err.message || err.errors?.[0]?.message || err.status
+        details = [reason, message].filter(Boolean).join(': ')
+      }
+    } catch {
+      // Ignore JSON parse errors; we'll use status text fallback below.
+    }
+
+    if (!details) {
+      details = res.statusText || `HTTP ${res.status}`
+    }
+
+    if (res.status === 401) {
+      signOutOfGoogle()
+      throw new Error('Google session expired — please reconnect.')
+    }
+
+    if (res.status === 403) {
+      throw new Error(`Drive access denied (403): ${details}. Ensure Google Drive API is enabled for this OAuth project and reconnect Google.`)
+    }
+
+    throw new Error(`Drive request failed (${res.status}): ${details}`)
+  }
+
   if (res.status === 401) {
     signOutOfGoogle()
     throw new Error('Google session expired — please reconnect.')

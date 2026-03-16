@@ -9,8 +9,10 @@ import { accountSchema, type AccountFormValues } from '../schemas/account.schema
 import { getVisibleAccounts } from '@/lib/accounts'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useTransactionsStore } from '@/stores/transactions.store'
+import { useSettingsStore } from '@/stores/settings.store'
 import type { Account, AccountType } from '@/types'
 import { formatCurrency } from '@/lib/currency'
+import { db } from '@/db'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -47,12 +49,15 @@ const COMMON_CURRENCIES = [
 interface AccountDialogProps {
   open: boolean
   editing: Account | null
+  showOnboarding: boolean
+  onOnboardingDone: () => void
   onClose: () => void
 }
 
-function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
+function AccountDialog({ open, editing, showOnboarding, onOnboardingDone, onClose }: AccountDialogProps) {
   const { t } = useTranslation()
   const { add, update } = useAccountsStore()
+  const { baseCurrency } = useSettingsStore()
 
   const {
     register,
@@ -63,7 +68,7 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
     reset,
   } = useForm<AccountFormValues>({
     resolver: zodResolver(accountSchema),
-    defaultValues: { type: 'asset', currency: 'USD', hidden: false, openingBalance: '0', name: '' },
+    defaultValues: { type: 'asset', currency: baseCurrency || 'USD', hidden: false, openingBalance: '0', name: '' },
   })
 
   useEffect(() => {
@@ -77,9 +82,9 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
         openingBalance: (editing.openingBalance / 100).toFixed(2),
       })
     } else {
-      reset({ name: '', type: 'asset', currency: 'USD', hidden: false, openingBalance: '0' })
+      reset({ name: '', type: 'asset', currency: baseCurrency || 'USD', hidden: false, openingBalance: '0' })
     }
-  }, [open, editing, reset])
+  }, [open, editing, reset, baseCurrency])
 
   const onSubmit = async (values: AccountFormValues) => {
     const balanceCents = Math.round(parseFloat(values.openingBalance) * 100)
@@ -88,12 +93,17 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
     } else {
       await add({ id: uuid(), ...values, openingBalance: balanceCents })
     }
+
+    if (showOnboarding) {
+      onOnboardingDone()
+    }
+
     reset()
     onClose()
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset({ name: '', type: 'asset', currency: 'USD', hidden: false, openingBalance: '0' }); onClose() } }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset({ name: '', type: 'asset', currency: baseCurrency || 'USD', hidden: false, openingBalance: '0' }); onClose() } }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>
@@ -102,16 +112,24 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-1">
+          {showOnboarding && (
+            <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-900 space-y-1">
+              <p className="font-semibold">{t('accounts.onboardingTitle')}</p>
+              <p>{t('accounts.onboardingDesc')}</p>
+              <p>{t('accounts.requiredHint')}</p>
+            </div>
+          )}
+
           {/* Name */}
           <div className="space-y-1">
-            <Label htmlFor="name">{t('accounts.name')}</Label>
+            <Label htmlFor="name">{t('accounts.name')} <span className="text-red-500">*</span></Label>
             <Input id="name" placeholder={t('accounts.namePlaceholder')} {...register('name')} />
             {errors.name && <p className="text-xs text-red-500">{t(errors.name.message!)}</p>}
           </div>
 
           {/* Type */}
           <div className="space-y-1">
-            <Label>{t('accounts.type')}</Label>
+            <Label>{t('accounts.type')} <span className="text-red-500">*</span></Label>
             <Select
               value={watch('type')}
               onValueChange={(v) => setValue('type', v as AccountFormValues['type'])}
@@ -133,7 +151,7 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
 
           {/* Currency */}
           <div className="space-y-1">
-            <Label>{t('accounts.currency')}</Label>
+            <Label>{t('accounts.currency')} <span className="text-red-500">*</span></Label>
             <Select
               value={watch('currency')}
               onValueChange={(v) => setValue('currency', v ?? '')}
@@ -194,6 +212,18 @@ function AccountDialog({ open, editing, onClose }: AccountDialogProps) {
             <Button type="button" variant="outline" onClick={onClose}>
               {t('common.cancel')}
             </Button>
+            {showOnboarding && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  onOnboardingDone()
+                  onClose()
+                }}
+              >
+                {t('accounts.skipTour')}
+              </Button>
+            )}
             <Button type="submit" disabled={isSubmitting}>
               {t('common.save')}
             </Button>
@@ -208,12 +238,39 @@ export default function AccountsSettingsPage() {
   const { t } = useTranslation()
   const { accounts, remove, update } = useAccountsStore()
   const { transactions } = useTransactionsStore()
+  const { saveSetting } = useSettingsStore()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Account | null>(null)
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
   const openAdd = () => { setEditing(null); setDialogOpen(true) }
   const openEdit = (a: Account) => { setEditing(a); setDialogOpen(true) }
   const closeDialog = () => { setDialogOpen(false); setEditing(null) }
+
+  useEffect(() => {
+    let mounted = true
+
+    async function maybeStartOnboarding() {
+      const row = await db.settings.get('accountsOnboardingSeen')
+      if (!mounted || row?.value === '1') return
+      if (accounts.length === 0) return
+
+      setShowOnboarding(true)
+      setEditing(accounts[0])
+      setDialogOpen(true)
+    }
+
+    void maybeStartOnboarding()
+
+    return () => {
+      mounted = false
+    }
+  }, [accounts])
+
+  async function markOnboardingDone() {
+    setShowOnboarding(false)
+    await saveSetting('accountsOnboardingSeen', '1')
+  }
 
   const accountBalances = useMemo(() => {
     const map = new Map<string, number>()
@@ -346,7 +403,13 @@ export default function AccountsSettingsPage() {
         </div>
       )}
 
-      <AccountDialog open={dialogOpen} editing={editing} onClose={closeDialog} />
+      <AccountDialog
+        open={dialogOpen}
+        editing={editing}
+        showOnboarding={showOnboarding}
+        onOnboardingDone={() => { void markOnboardingDone() }}
+        onClose={closeDialog}
+      />
     </div>
   )
 }

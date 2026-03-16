@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
@@ -12,8 +12,12 @@ import { handleOAuthCallback, signOutOfGoogle } from '@/lib/google-drive'
 export default function OAuthCallbackPage() {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const handledRef = useRef(false)
 
   useEffect(() => {
+    if (handledRef.current) return
+    handledRef.current = true
+
     let returnTo = '/settings'
     try {
       returnTo = handleOAuthCallback(window.location.hash)

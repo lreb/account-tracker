@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { toast } from 'sonner'
 import { db } from '@/db'
-import { normalizeAccount } from '@/lib/accounts'
+import { createDefaultAccount, normalizeAccount } from '@/lib/accounts'
 import type { Account } from '@/types'
 
 interface AccountsState {
@@ -17,6 +17,13 @@ export const useAccountsStore = create<AccountsState>((set) => ({
 
   load: async () => {
     try {
+      const existing = await db.accounts.toArray()
+      if (existing.length === 0) {
+        const baseCurrencySetting = await db.settings.get('baseCurrency')
+        const seedCurrency = (baseCurrencySetting?.value || 'USD').toUpperCase()
+        await db.accounts.add(createDefaultAccount(seedCurrency))
+      }
+
       const accounts = (await db.accounts.toArray()).map(normalizeAccount)
       set({ accounts })
     } catch (err) {
