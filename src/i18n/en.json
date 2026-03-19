@@ -30,7 +30,8 @@
     "tryAgain": "Try again",
     "goToDashboard": "Go to dashboard",
     "errorBoundaryDescription": "An unexpected error occurred in this section. You can try again or go back to the dashboard.",
-    "saved": "Saved"
+    "saved": "Saved",
+    "scrollToTop": "Scroll to top"
   },
   "dashboard": {
     "income": "Income",
