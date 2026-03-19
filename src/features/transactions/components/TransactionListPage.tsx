@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { Plus, SlidersHorizontal, X } from 'lucide-react'
+import { ChevronUp, Plus, SlidersHorizontal, X } from 'lucide-react'
 import { format, isToday, isYesterday, parseISO, subMonths, subYears } from 'date-fns'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useTransactionsStore } from '@/stores/transactions.store'
@@ -149,6 +149,7 @@ export default function TransactionListPage() {
   // draft = filters being edited inside the sheet; only committed on Apply
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS)
   const [quickRange, setQuickRangeRaw] = useState<QuickRange>(persistedQuickRange)
+  const [showScrollTop, setShowScrollTop] = useState(false)
 
   // Keep module-level caches in sync so state survives navigation
   const setFilters = (next: Filters | ((prev: Filters) => Filters)) => {
@@ -307,6 +308,23 @@ export default function TransactionListPage() {
 
   // ── Virtual list ────────────────────────────────────────────────────────────
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    const onScroll = () => {
+      setShowScrollTop(container.scrollTop > 320)
+    }
+
+    onScroll()
+    container.addEventListener('scroll', onScroll, { passive: true })
+    return () => container.removeEventListener('scroll', onScroll)
+  }, [])
+
+  const scrollToTop = () => {
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   const rowVirtualizer = useVirtualizer({
     count: flatItems.length,
     getScrollElement: () => scrollContainerRef.current,
@@ -521,6 +539,17 @@ export default function TransactionListPage() {
           </div>
         )}
       </div>
+
+      <button
+        type="button"
+        onClick={scrollToTop}
+        aria-label={t('common.scrollToTop')}
+        className={`fixed right-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg transition-all duration-200 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+          showScrollTop ? 'bottom-24 opacity-100' : 'bottom-20 pointer-events-none opacity-0'
+        }`}
+      >
+        <ChevronUp size={18} />
+      </button>
 
       {/* Filter sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>

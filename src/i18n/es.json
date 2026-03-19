@@ -30,7 +30,8 @@
     "tryAgain": "Reintentar",
     "goToDashboard": "Ir al inicio",
     "errorBoundaryDescription": "Ocurrió un error inesperado en esta sección. Puedes reintentar o volver al inicio.",
-    "saved": "Guardado"
+    "saved": "Guardado",
+    "scrollToTop": "Volver arriba"
   },
   "dashboard": {
     "income": "Ingresos",

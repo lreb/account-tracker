@@ -81,25 +81,52 @@ function getServiceTypeLabel(serviceType: string, t: (key: string) => string): s
   return key ? t(key) : serviceType
 }
 
+type OdometerEntry = {
+  date: string
+  odometer: number
+}
+
+function getOdometerNeighbors(entries: OdometerEntry[], selectedIso?: string): {
+  previousOdometer?: number
+  nextOdometer?: number
+} {
+  if (!selectedIso || entries.length === 0) return {}
+
+  let previousOdometer: number | undefined
+  let nextOdometer: number | undefined
+
+  for (const entry of entries) {
+    if (entry.date <= selectedIso) {
+      previousOdometer = entry.odometer
+      continue
+    }
+
+    nextOdometer = entry.odometer
+    break
+  }
+
+  return { previousOdometer, nextOdometer }
+}
+
 // ─── Fuel Log dialog (add + edit) ────────────────────────────────────────────
 
 function FuelLogDialog({
   open,
   vehicleId,
   vehicleName,
-  lastOdometer,
+  initialOdometer,
   editing,
   onClose,
 }: {
   open: boolean
   vehicleId: string
   vehicleName: string
-  lastOdometer: number
+  initialOdometer: number
   editing?: FuelLog
   onClose: () => void
 }) {
   const { t } = useTranslation()
-  const { addFuelLog, updateFuelLog } = useVehiclesStore()
+  const { addFuelLog, updateFuelLog, fuelLogs, vehicleServices } = useVehiclesStore()
   const { add: addTransaction } = useTransactionsStore()
   const { accounts } = useAccountsStore()
   const { categories } = useCategoriesStore()
@@ -143,10 +170,53 @@ function FuelLogDialog({
   const watchLiters = watch('liters')
   const watchCostPerLiter = watch('costPerLiter')
   const watchTotalCost = watch('totalCost')
+  const watchDate = watch('date')
+  const watchTime = watch('time')
   const availableAccounts = useMemo(
     () => getAccountSelectOptions(accounts, [watchAccountId]),
     [accounts, watchAccountId],
   )
+
+  const odometerEntries = useMemo<OdometerEntry[]>(() => {
+    const fromFuel = fuelLogs
+      .filter((log) => log.vehicleId === vehicleId && log.id !== editing?.id)
+      .map((log) => ({ date: log.date, odometer: log.odometer }))
+
+    const fromServices = vehicleServices
+      .filter((service) => service.vehicleId === vehicleId)
+      .map((service) => ({ date: service.date, odometer: service.odometer }))
+
+    return [...fromFuel, ...fromServices].sort((a, b) => a.date.localeCompare(b.date))
+  }, [fuelLogs, vehicleServices, vehicleId, editing?.id])
+
+  const selectedDateIso = useMemo(() => {
+    if (!watchDate || !watchTime) return undefined
+    const [y, m, d] = watchDate.split('-').map(Number)
+    const [hh, mm] = watchTime.split(':').map(Number)
+    if ([y, m, d, hh, mm].some(Number.isNaN)) return undefined
+    return new Date(y, m - 1, d, hh, mm).toISOString()
+  }, [watchDate, watchTime])
+
+  const { previousOdometer, nextOdometer } = useMemo(
+    () => getOdometerNeighbors(odometerEntries, selectedDateIso),
+    [odometerEntries, selectedDateIso],
+  )
+
+  const odometerPlaceholder = useMemo(() => {
+    if (odometerEntries.length === 0) {
+      return initialOdometer > 0 ? `${t('vehicles.last')}: ${initialOdometer.toLocaleString()}` : '0'
+    }
+    if (previousOdometer != null && nextOdometer != null) {
+      return `${t('vehicles.last')}: ${previousOdometer.toLocaleString()} · ${t('vehicles.nextAt')}: ${nextOdometer.toLocaleString()}`
+    }
+    if (previousOdometer != null) {
+      return `${t('vehicles.last')}: ${previousOdometer.toLocaleString()}`
+    }
+    if (nextOdometer != null) {
+      return `${t('vehicles.nextAt')}: ${nextOdometer.toLocaleString()}`
+    }
+    return '0'
+  }, [odometerEntries.length, initialOdometer, previousOdometer, nextOdometer, t])
 
   // Auto-calc total cost when liters + cost/liter change
   const [lastEdited, setLastEdited] = useState<'costPerLiter' | 'totalCost'>('costPerLiter')
@@ -306,7 +376,7 @@ function FuelLogDialog({
           {/* Odometer */}
           <div className="space-y-1">
             <FormLabel>{t('vehicles.odometer')}</FormLabel>
-            <Input type="number" inputMode="numeric" placeholder={lastOdometer > 0 ? `${t('vehicles.last')}: ${lastOdometer}` : '0'} {...register('odometer')} />
+            <Input type="number" inputMode="numeric" placeholder={odometerPlaceholder} {...register('odometer')} />
             {errors.odometer && <p className="text-xs text-red-500">{t(errors.odometer.message!)}</p>}
           </div>
 
@@ -431,17 +501,19 @@ function ServiceDialog({
   open,
   vehicleId,
   vehicleName,
+  initialOdometer,
   editing,
   onClose,
 }: {
   open: boolean
   vehicleId: string
   vehicleName: string
+  initialOdometer: number
   editing?: VehicleService
   onClose: () => void
 }) {
   const { t } = useTranslation()
-  const { addService, updateService } = useVehiclesStore()
+  const { addService, updateService, fuelLogs, vehicleServices } = useVehiclesStore()
   const { add: addTransaction } = useTransactionsStore()
   const { accounts } = useAccountsStore()
   const { categories } = useCategoriesStore()
@@ -483,10 +555,53 @@ function ServiceDialog({
   const watchStatus = watch('status')
   const watchLabels = watch('labels') ?? []
   const watchServiceType = watch('serviceType')
+  const watchDate = watch('date')
+  const watchTime = watch('time')
   const availableAccounts = useMemo(
     () => getAccountSelectOptions(accounts, [watchAccountId]),
     [accounts, watchAccountId],
   )
+
+  const odometerEntries = useMemo<OdometerEntry[]>(() => {
+    const fromFuel = fuelLogs
+      .filter((log) => log.vehicleId === vehicleId)
+      .map((log) => ({ date: log.date, odometer: log.odometer }))
+
+    const fromServices = vehicleServices
+      .filter((service) => service.vehicleId === vehicleId && service.id !== editing?.id)
+      .map((service) => ({ date: service.date, odometer: service.odometer }))
+
+    return [...fromFuel, ...fromServices].sort((a, b) => a.date.localeCompare(b.date))
+  }, [fuelLogs, vehicleServices, vehicleId, editing?.id])
+
+  const selectedDateIso = useMemo(() => {
+    if (!watchDate || !watchTime) return undefined
+    const [y, m, d] = watchDate.split('-').map(Number)
+    const [hh, mm] = watchTime.split(':').map(Number)
+    if ([y, m, d, hh, mm].some(Number.isNaN)) return undefined
+    return new Date(y, m - 1, d, hh, mm).toISOString()
+  }, [watchDate, watchTime])
+
+  const { previousOdometer, nextOdometer } = useMemo(
+    () => getOdometerNeighbors(odometerEntries, selectedDateIso),
+    [odometerEntries, selectedDateIso],
+  )
+
+  const odometerPlaceholder = useMemo(() => {
+    if (odometerEntries.length === 0) {
+      return initialOdometer > 0 ? `${t('vehicles.last')}: ${initialOdometer.toLocaleString()}` : '0'
+    }
+    if (previousOdometer != null && nextOdometer != null) {
+      return `${t('vehicles.last')}: ${previousOdometer.toLocaleString()} · ${t('vehicles.nextAt')}: ${nextOdometer.toLocaleString()}`
+    }
+    if (previousOdometer != null) {
+      return `${t('vehicles.last')}: ${previousOdometer.toLocaleString()}`
+    }
+    if (nextOdometer != null) {
+      return `${t('vehicles.nextAt')}: ${nextOdometer.toLocaleString()}`
+    }
+    return '0'
+  }, [odometerEntries.length, initialOdometer, previousOdometer, nextOdometer, t])
 
   useEffect(() => {
     if (!open) return
@@ -674,7 +789,7 @@ function ServiceDialog({
             </div>
             <div className="space-y-1">
               <FormLabel>{t('vehicles.odometer')}</FormLabel>
-              <Input type="number" inputMode="numeric" placeholder="0" {...register('odometer')} />
+              <Input type="number" inputMode="numeric" placeholder={odometerPlaceholder} {...register('odometer')} />
               {errors.odometer && <p className="text-xs text-red-500">{t(errors.odometer.message!)}</p>}
             </div>
           </div>
@@ -1160,7 +1275,7 @@ export default function VehicleDetailPage() {
             open={fuelDialog}
             vehicleId={vehicle.id}
             vehicleName={vehicle.name}
-            lastOdometer={logs[0]?.odometer ?? vehicle.initialOdometer ?? 0}
+            initialOdometer={vehicle.initialOdometer ?? 0}
             editing={editingLog ?? undefined}
             onClose={() => { setFuelDialog(false); setEditingLog(null) }}
           />
@@ -1235,6 +1350,7 @@ export default function VehicleDetailPage() {
             open={serviceDialog}
             vehicleId={vehicle.id}
             vehicleName={vehicle.name}
+            initialOdometer={vehicle.initialOdometer ?? 0}
             editing={editingSvc ?? undefined}
             onClose={() => { setServiceDialog(false); setEditingSvc(null) }}
           />
