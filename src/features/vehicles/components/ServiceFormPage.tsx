@@ -1,0 +1,480 @@
+import { useState, useEffect, useMemo } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useParams, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import { format } from 'date-fns'
+import { v4 as uuid } from 'uuid'
+import { ArrowLeft, X } from 'lucide-react'
+
+import {
+  vehicleServiceSchema,
+  SERVICE_TYPES,
+  type VehicleServiceFormValues,
+} from '../schemas/vehicle.schema'
+import {
+  getAccountSelectOptions,
+  getVisibleAccounts,
+} from '@/lib/accounts'
+import { getTranslatedCategoryName } from '@/lib/categories'
+import {
+  getOdometerNeighbors,
+  getServiceTypeLabel,
+  type OdometerEntry,
+} from '@/lib/vehicles'
+import { useVehiclesStore } from '@/stores/vehicles.store'
+import { useTransactionsStore } from '@/stores/transactions.store'
+import { useAccountsStore } from '@/stores/accounts.store'
+import { useCategoriesStore } from '@/stores/categories.store'
+import { useSettingsStore } from '@/stores/settings.store'
+import { useLabelsStore } from '@/stores/labels.store'
+import type { VehicleService, Transaction } from '@/types'
+
+import { Button } from '@/components/ui/button'
+import { AmountCalculatorButton } from '@/components/ui/amount-calculator-button'
+import { Input } from '@/components/ui/input'
+import { Label as FormLabel } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+
+export default function ServiceFormPage() {
+  const { t } = useTranslation()
+  const { vehicleId, serviceId } = useParams<{ vehicleId: string; serviceId?: string }>()
+  const navigate = useNavigate()
+
+  const { vehicles, addService, updateService, fuelLogs, vehicleServices } = useVehiclesStore()
+  const { add: addTransaction, transactions } = useTransactionsStore()
+  const { accounts } = useAccountsStore()
+  const { categories } = useCategoriesStore()
+  const { baseCurrency } = useSettingsStore()
+  const { labels, load: loadLabels } = useLabelsStore()
+
+  useEffect(() => { loadLabels() }, [loadLabels])
+
+  const vehicle = vehicles.find((v) => v.id === vehicleId)
+  const editing = serviceId ? vehicleServices.find((s) => s.id === serviceId) ?? null : null
+  const isEditing = Boolean(serviceId)
+
+  const [customServiceType, setCustomServiceType] = useState(false)
+
+  const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
+  const defaultAccount = visibleAccounts[0] ?? accounts[0]
+  const maintenanceCategory = categories.find((c) => c.id === 'vehicle-maintenance') ?? categories[0]
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<VehicleServiceFormValues>({
+    resolver: zodResolver(vehicleServiceSchema),
+    defaultValues: {
+      date: format(new Date(), 'yyyy-MM-dd'),
+      time: format(new Date(), 'HH:mm'),
+      serviceType: '',
+      cost: '',
+      odometer: '',
+      accountId: defaultAccount?.id ?? '',
+      categoryId: maintenanceCategory?.id ?? '',
+      status: 'cleared',
+      notes: '',
+      labels: [],
+    },
+  })
+
+  const watchAccountId = watch('accountId')
+  const watchCategoryId = watch('categoryId')
+  const watchStatus = watch('status')
+  const watchLabels = watch('labels') ?? []
+  const watchServiceType = watch('serviceType')
+  const watchCost = watch('cost')
+  const watchDate = watch('date')
+  const watchTime = watch('time')
+
+  const availableAccounts = useMemo(
+    () => getAccountSelectOptions(accounts, [watchAccountId]),
+    [accounts, watchAccountId],
+  )
+
+  const odometerEntries = useMemo<OdometerEntry[]>(() => {
+    const fromFuel = fuelLogs
+      .filter((log) => log.vehicleId === vehicleId)
+      .map((log) => ({ date: log.date, odometer: log.odometer }))
+
+    const fromServices = vehicleServices
+      .filter((service) => service.vehicleId === vehicleId && service.id !== editing?.id)
+      .map((service) => ({ date: service.date, odometer: service.odometer }))
+
+    return [...fromFuel, ...fromServices].sort((a, b) => a.date.localeCompare(b.date))
+  }, [fuelLogs, vehicleServices, vehicleId, editing?.id])
+
+  const selectedDateIso = useMemo(() => {
+    if (!watchDate || !watchTime) return undefined
+    const [y, m, d] = watchDate.split('-').map(Number)
+    const [hh, mm] = watchTime.split(':').map(Number)
+    if ([y, m, d, hh, mm].some(Number.isNaN)) return undefined
+    return new Date(y, m - 1, d, hh, mm).toISOString()
+  }, [watchDate, watchTime])
+
+  const { previousOdometer, nextOdometer } = useMemo(
+    () => getOdometerNeighbors(odometerEntries, selectedDateIso),
+    [odometerEntries, selectedDateIso],
+  )
+
+  const odometerPlaceholder = useMemo(() => {
+    const initialOdo = vehicle?.initialOdometer ?? 0
+    if (odometerEntries.length === 0) {
+      return initialOdo > 0 ? `${t('vehicles.last')}: ${initialOdo.toLocaleString()}` : '0'
+    }
+    if (previousOdometer != null && nextOdometer != null) {
+      return `${t('vehicles.last')}: ${previousOdometer.toLocaleString()} · ${t('vehicles.nextAt')}: ${nextOdometer.toLocaleString()}`
+    }
+    if (previousOdometer != null) {
+      return `${t('vehicles.last')}: ${previousOdometer.toLocaleString()}`
+    }
+    if (nextOdometer != null) {
+      return `${t('vehicles.nextAt')}: ${nextOdometer.toLocaleString()}`
+    }
+    return '0'
+  }, [odometerEntries.length, vehicle?.initialOdometer, previousOdometer, nextOdometer, t])
+
+  // Populate form when editing
+  useEffect(() => {
+    if (isEditing && editing) {
+      const existingTx = editing.transactionId
+        ? transactions.find((tx) => tx.id === editing.transactionId)
+        : undefined
+      const isCustom = !SERVICE_TYPES.includes(editing.serviceType as typeof SERVICE_TYPES[number])
+      setCustomServiceType(isCustom)
+      reset({
+        date: format(new Date(editing.date), 'yyyy-MM-dd'),
+        time: format(new Date(editing.date), 'HH:mm'),
+        serviceType: editing.serviceType,
+        cost: (editing.cost / 100).toFixed(2),
+        odometer: editing.odometer.toString(),
+        notes: editing.notes ?? existingTx?.notes ?? '',
+        nextServiceKm: editing.nextServiceKm?.toString() ?? '',
+        nextServiceDate: editing.nextServiceDate
+          ? format(new Date(editing.nextServiceDate), 'yyyy-MM-dd')
+          : '',
+        accountId: existingTx?.accountId ?? defaultAccount?.id ?? '',
+        categoryId: existingTx?.categoryId ?? maintenanceCategory?.id ?? '',
+        status: existingTx?.status ?? 'cleared',
+        labels: existingTx?.labels ?? [],
+      })
+    }
+  }, [isEditing, editing]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Guard: editing a service that doesn't exist
+  useEffect(() => {
+    if (isEditing && serviceId && !editing) {
+      navigate(`/vehicles/${vehicleId}`, { replace: true })
+    }
+  }, [editing, serviceId, isEditing, navigate, vehicleId])
+
+  const toggleLabel = (labelId: string) => {
+    const next = watchLabels.includes(labelId)
+      ? watchLabels.filter((l) => l !== labelId)
+      : [...watchLabels, labelId]
+    setValue('labels', next)
+  }
+
+  const onSubmit = async (values: VehicleServiceFormValues) => {
+    if (!vehicleId || !vehicle) return
+    const account = accounts.find((a) => a.id === values.accountId)
+    const costCents = Math.round(parseFloat(values.cost) * 100)
+    const [y, mo, d] = values.date.split('-').map(Number)
+    const [hh, mm] = values.time.split(':').map(Number)
+    const isoDate = new Date(y, mo - 1, d, hh, mm).toISOString()
+
+    if (editing) {
+      const updatedSvc: VehicleService = {
+        ...editing,
+        date: isoDate,
+        serviceType: values.serviceType,
+        cost: costCents,
+        odometer: parseInt(values.odometer, 10),
+        notes: values.notes || undefined,
+        nextServiceKm: values.nextServiceKm ? parseInt(values.nextServiceKm, 10) : undefined,
+        nextServiceDate: values.nextServiceDate
+          ? new Date(values.nextServiceDate).toISOString()
+          : undefined,
+      }
+      let linkedTx: Transaction | undefined
+      if (editing.transactionId) {
+        const existingTx = transactions.find((tx) => tx.id === editing.transactionId)
+        if (existingTx) {
+          linkedTx = {
+            ...existingTx,
+            amount: costCents,
+            date: isoDate,
+            categoryId: values.categoryId,
+            accountId: values.accountId,
+            description: `${values.serviceType} · ${vehicle.name}`,
+            notes: values.notes || undefined,
+            status: values.status,
+            labels: values.labels ?? [],
+            currency: account?.currency ?? baseCurrency,
+          }
+        }
+      }
+      await updateService(updatedSvc, linkedTx)
+    } else {
+      const txId = uuid()
+      const svcId = uuid()
+      await addTransaction({
+        id: txId,
+        type: 'expense',
+        amount: costCents,
+        date: isoDate,
+        categoryId: values.categoryId,
+        accountId: values.accountId,
+        description: `${values.serviceType} · ${vehicle.name}`,
+        notes: values.notes || undefined,
+        status: values.status,
+        currency: account?.currency ?? baseCurrency,
+        labels: values.labels ?? [],
+      })
+      await addService({
+        id: svcId,
+        vehicleId,
+        date: isoDate,
+        serviceType: values.serviceType,
+        cost: costCents,
+        odometer: parseInt(values.odometer, 10),
+        notes: values.notes || undefined,
+        nextServiceKm: values.nextServiceKm ? parseInt(values.nextServiceKm, 10) : undefined,
+        nextServiceDate: values.nextServiceDate
+          ? new Date(values.nextServiceDate).toISOString()
+          : undefined,
+        transactionId: txId,
+      })
+    }
+
+    navigate(`/vehicles/${vehicleId}`)
+  }
+
+  const filteredCategories = categories.filter((c) => !c.deletedAt && (c.type === 'expense' || c.type === 'any'))
+
+  return (
+    <div className="p-4 pb-24 max-w-xl mx-auto space-y-4">
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => navigate(`/vehicles/${vehicleId}`)}
+        >
+          <ArrowLeft size={16} />
+        </Button>
+        <h1 className="text-xl font-bold">
+          {isEditing ? t('vehicles.editService') : t('vehicles.addService')}
+        </h1>
+      </div>
+
+      {vehicle && (
+        <p className="text-sm text-gray-500 -mt-2 ml-10">{vehicle.name}</p>
+      )}
+
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 rounded-2xl border bg-white p-4">
+        {/* Date + Time */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <FormLabel>{t('transactions.date')}</FormLabel>
+            <Input type="date" {...register('date')} />
+            {errors.date && <p className="text-xs text-red-500">{t(errors.date.message!)}</p>}
+          </div>
+          <div className="space-y-1">
+            <FormLabel>{t('transactions.time')}</FormLabel>
+            <Input type="time" {...register('time')} />
+            {errors.time && <p className="text-xs text-red-500">{t(errors.time.message!)}</p>}
+          </div>
+        </div>
+
+        {/* Service Type */}
+        <div className="space-y-1">
+          <FormLabel>{t('vehicles.serviceType')}</FormLabel>
+          {customServiceType ? (
+            <div className="flex gap-2">
+              <Input
+                className="flex-1"
+                placeholder={t('vehicles.serviceTypePlaceholder')}
+                {...register('serviceType')}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="shrink-0"
+                onClick={() => { setCustomServiceType(false); setValue('serviceType', '') }}
+              >
+                <X size={14} />
+              </Button>
+            </div>
+          ) : (
+            <Select
+              value={watchServiceType || ''}
+              onValueChange={(v) => {
+                if (v === 'Other') { setCustomServiceType(true); setValue('serviceType', '') }
+                else setValue('serviceType', v as string)
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue>{watchServiceType ? getServiceTypeLabel(watchServiceType, t) : t('vehicles.selectServiceType')}</SelectValue>
+              </SelectTrigger>
+              <SelectContent className="max-h-60">
+                {SERVICE_TYPES.map((st) => (
+                  <SelectItem key={st} value={st}>{getServiceTypeLabel(st, t)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {errors.serviceType && <p className="text-xs text-red-500">{t(errors.serviceType.message!)}</p>}
+        </div>
+
+        {/* Cost + Odometer */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <FormLabel>{t('vehicles.cost')}</FormLabel>
+              <AmountCalculatorButton
+                currentValue={watchCost}
+                onApply={(value) => {
+                  setValue('cost', value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                    shouldTouch: true,
+                  })
+                }}
+              />
+            </div>
+            <Input type="number" step="0.01" inputMode="decimal" placeholder="0.00" {...register('cost')} />
+            {errors.cost && <p className="text-xs text-red-500">{t(errors.cost.message!)}</p>}
+          </div>
+          <div className="space-y-1">
+            <FormLabel>{t('vehicles.odometer')}</FormLabel>
+            <Input type="number" inputMode="numeric" placeholder={odometerPlaceholder} {...register('odometer')} />
+            {errors.odometer && <p className="text-xs text-red-500">{t(errors.odometer.message!)}</p>}
+          </div>
+        </div>
+
+        {/* Account */}
+        <div className="space-y-1">
+          <FormLabel>{t('transactions.account')}</FormLabel>
+          <Select value={watchAccountId || ''} onValueChange={(v) => setValue('accountId', v as string)}>
+            <SelectTrigger>
+              <SelectValue>{accounts.find((a) => a.id === watchAccountId)?.name ?? t('transactions.selectAccount')}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {availableAccounts.map((a) => (
+                <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.accountId && <p className="text-xs text-red-500">{t(errors.accountId.message!)}</p>}
+        </div>
+
+        {/* Category */}
+        <div className="space-y-1">
+          <FormLabel>{t('transactions.category')}</FormLabel>
+          <Select value={watchCategoryId || ''} onValueChange={(v) => setValue('categoryId', v as string)}>
+            <SelectTrigger>
+              <SelectValue>{getTranslatedCategoryName(filteredCategories.find((c) => c.id === watchCategoryId), t) || t('transactions.selectCategory')}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {filteredCategories.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{getTranslatedCategoryName(c, t)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.categoryId && <p className="text-xs text-red-500">{t(errors.categoryId.message!)}</p>}
+        </div>
+
+        {/* Status */}
+        <div className="space-y-1">
+          <FormLabel>{t('transactions.statusLabel')}</FormLabel>
+          <Select value={watchStatus} onValueChange={(v) => setValue('status', v as VehicleServiceFormValues['status'])}>
+            <SelectTrigger>
+              <SelectValue>{t(`transactions.status.${watchStatus}`)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {(['cleared', 'pending', 'reconciled', 'cancelled'] as const).map((s) => (
+                <SelectItem key={s} value={s}>{t(`transactions.status.${s}`)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Labels */}
+        {labels.length > 0 && (
+          <div className="space-y-1">
+            <FormLabel>{t('transactions.labels')}</FormLabel>
+            <div className="flex flex-wrap gap-1.5">
+              {labels.map((lbl) => {
+                const active = watchLabels.includes(lbl.id)
+                return (
+                  <button
+                    key={lbl.id}
+                    type="button"
+                    onClick={() => toggleLabel(lbl.id)}
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border transition-colors ${
+                      active ? 'ring-2 ring-offset-1' : 'opacity-50'
+                    }`}
+                    style={{
+                      borderColor: lbl.color ?? '#6b7280',
+                      color: lbl.color ?? '#6b7280',
+                      backgroundColor: active ? `${lbl.color ?? '#6b7280'}18` : 'transparent',
+                    }}
+                  >
+                    {lbl.name}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Notes */}
+        <div className="space-y-1">
+          <FormLabel>{t('transactions.notes')}</FormLabel>
+          <Textarea rows={2} placeholder={t('transactions.notesPlaceholder')} {...register('notes')} />
+        </div>
+
+        {/* Next service */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <FormLabel>{t('vehicles.nextServiceKm')}</FormLabel>
+            <Input
+              type="number"
+              inputMode="numeric"
+              placeholder={t('common.optional')}
+              {...register('nextServiceKm')}
+            />
+          </div>
+          <div className="space-y-1">
+            <FormLabel>{t('vehicles.nextServiceDate')}</FormLabel>
+            <Input type="date" {...register('nextServiceDate')} />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <Button type="button" variant="outline" onClick={() => navigate(`/vehicles/${vehicleId}`)}>
+            {t('common.cancel')}
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isEditing ? t('common.update') : t('common.save')}
+          </Button>
+        </div>
+      </form>
+    </div>
+  )
+}

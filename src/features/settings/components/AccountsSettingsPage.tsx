@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowUp, Eye, EyeOff, Pencil, Trash2, Plus, Wallet } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff, Pencil, Trash2, Plus, Wallet } from 'lucide-react'
 
 import {
   ACCOUNT_SUBTYPE_OPTIONS_BY_TYPE,
@@ -22,6 +22,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
 
 const OTHER_SUBTYPE_VALUE = '__other__'
 const TYPE_ORDER: AccountType[] = ['asset', 'liability']
@@ -38,8 +39,6 @@ export default function AccountsSettingsPage() {
   const { transactions, removeMany } = useTransactionsStore()
   const [actionAccount, setActionAccount] = useState<Account | null>(null)
   const [processingAccountAction, setProcessingAccountAction] = useState(false)
-  const [showScrollTop, setShowScrollTop] = useState(false)
-
   const openAdd = () => {
     navigate('/settings/accounts/new')
   }
@@ -114,23 +113,6 @@ export default function AccountsSettingsPage() {
       mounted = false
     }
   }, [accounts.length, navigate])
-
-  useEffect(() => {
-    const onScroll = () => {
-      setShowScrollTop(window.scrollY > 500)
-    }
-
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-
-    return () => {
-      window.removeEventListener('scroll', onScroll)
-    }
-  }, [])
-
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
 
   const accountBalances = useMemo(() => {
     const map = new Map<string, number>()
@@ -360,18 +342,7 @@ export default function AccountsSettingsPage() {
         </DialogContent>
       </Dialog>
 
-      <button
-        type="button"
-        onClick={scrollToTop}
-        aria-label={t('common.scrollToTop')}
-        title={t('common.scrollToTop')}
-        className={`fixed bottom-24 right-4 z-30 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-lg transition-all duration-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
-          showScrollTop ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0'
-        }`}
-      >
-        <ArrowUp size={14} />
-        <span>{t('common.scrollToTop')}</span>
-      </button>
+      <ScrollToTopButton />
     </div>
   )
 }

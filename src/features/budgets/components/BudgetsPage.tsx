@@ -35,6 +35,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
 
 const DEFAULT_CATEGORY_NAME_TO_ID: Record<string, string> = {
   Transportation: 'transportation',
@@ -415,6 +416,7 @@ export default function BudgetsPage() {
       )}
 
       <BudgetDialog open={dialogOpen} editing={editing} onClose={closeDialog} />
+      <ScrollToTopButton />
     </div>
   )
 }

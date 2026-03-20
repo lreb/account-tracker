@@ -5,6 +5,8 @@ import TransactionListPage from '@/features/transactions/components/TransactionL
 import TransactionFormPage from '@/features/transactions/components/TransactionFormPage'
 import VehicleListPage from '@/features/vehicles/components/VehicleListPage'
 import VehicleDetailPage from '@/features/vehicles/components/VehicleDetailPage'
+import FuelLogFormPage from '@/features/vehicles/components/FuelLogFormPage'
+import ServiceFormPage from '@/features/vehicles/components/ServiceFormPage'
 import ReportsPage from '@/features/reports/components/ReportsPage'
 import BalanceSheetPage from '@/features/reports/components/BalanceSheetPage'
 import BalanceSheetDetailPage from '@/features/reports/components/BalanceSheetDetailPage'
@@ -33,6 +35,10 @@ export const router = createBrowserRouter([
       { path: 'transactions/:id', element: <TransactionFormPage /> },
       { path: 'vehicles', element: <VehicleListPage /> },
       { path: 'vehicles/:id', element: <VehicleDetailPage /> },
+      { path: 'vehicles/:vehicleId/fuel/new', element: <FuelLogFormPage /> },
+      { path: 'vehicles/:vehicleId/fuel/:fuelId', element: <FuelLogFormPage /> },
+      { path: 'vehicles/:vehicleId/service/new', element: <ServiceFormPage /> },
+      { path: 'vehicles/:vehicleId/service/:serviceId', element: <ServiceFormPage /> },
       { path: 'reports', element: <ReportsPage /> },
       { path: 'budgets', element: <BudgetsPage /> },
       { path: 'insights', element: <InsightsPage /> },
