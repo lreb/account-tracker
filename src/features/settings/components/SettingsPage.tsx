@@ -35,6 +35,7 @@ import {
   startGoogleSignIn, signOutOfGoogle,
   uploadBackupToDrive, downloadBackupFromDrive,
 } from '@/lib/google-drive'
+import { COMMON_CURRENCIES } from '@/constants/currencies'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogFooter, DialogDescription,
@@ -48,18 +49,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-
-const SUPPORTED_CURRENCIES = [
-  { code: 'USD', label: 'USD - US Dollar' },
-  { code: 'EUR', label: 'EUR - Euro' },
-  { code: 'MXN', label: 'MXN - Mexican Peso' },
-  { code: 'GBP', label: 'GBP - British Pound' },
-  { code: 'CAD', label: 'CAD - Canadian Dollar' },
-  { code: 'BRL', label: 'BRL - Brazilian Real' },
-  { code: 'COP', label: 'COP - Colombian Peso' },
-  { code: 'ARS', label: 'ARS - Argentine Peso' },
-  { code: 'CLP', label: 'CLP - Chilean Peso' },
-] as const
 
 const settingsItems = [
   { to: '/settings/accounts',       icon: Wallet,    labelKey: 'settings.accounts' },
@@ -463,7 +452,7 @@ export default function SettingsPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {SUPPORTED_CURRENCIES.map(({ code, label }) => (
+              {COMMON_CURRENCIES.map(({ code, label }) => (
                 <SelectItem key={code} value={code}>{label}</SelectItem>
               ))}
             </SelectContent>
@@ -757,7 +746,7 @@ export default function SettingsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {SUPPORTED_CURRENCIES.map(({ code, label }) => (
+                  {COMMON_CURRENCIES.map(({ code, label }) => (
                     <SelectItem key={code} value={code}>{label}</SelectItem>
                   ))}
                 </SelectContent>

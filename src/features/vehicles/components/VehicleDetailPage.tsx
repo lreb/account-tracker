@@ -33,6 +33,7 @@ import { calcKmPerLiter, calcCostPerKm, calcKmSinceLastFill } from '@/lib/vehicl
 import type { FuelLog, VehicleService, Transaction } from '@/types'
 
 import { Button } from '@/components/ui/button'
+import { AmountCalculatorButton } from '@/components/ui/amount-calculator-button'
 import { Input } from '@/components/ui/input'
 import { Label as FormLabel } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -402,7 +403,20 @@ function FuelLogDialog({
 
           {/* Total cost */}
           <div className="space-y-1">
-            <FormLabel>{t('vehicles.totalCost')}</FormLabel>
+            <div className="flex items-center justify-between gap-2">
+              <FormLabel>{t('vehicles.totalCost')}</FormLabel>
+              <AmountCalculatorButton
+                currentValue={watchTotalCost}
+                onApply={(value) => {
+                  setValue('totalCost', value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                    shouldTouch: true,
+                  })
+                  setLastEdited('totalCost')
+                }}
+              />
+            </div>
             <Input
               type="number"
               step="0.01"
@@ -555,6 +569,7 @@ function ServiceDialog({
   const watchStatus = watch('status')
   const watchLabels = watch('labels') ?? []
   const watchServiceType = watch('serviceType')
+  const watchCost = watch('cost')
   const watchDate = watch('date')
   const watchTime = watch('time')
   const availableAccounts = useMemo(
@@ -783,7 +798,19 @@ function ServiceDialog({
           {/* Cost + Odometer */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <FormLabel>{t('vehicles.cost')}</FormLabel>
+              <div className="flex items-center justify-between gap-2">
+                <FormLabel>{t('vehicles.cost')}</FormLabel>
+                <AmountCalculatorButton
+                  currentValue={watchCost}
+                  onApply={(value) => {
+                    setValue('cost', value, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                      shouldTouch: true,
+                    })
+                  }}
+                />
+              </div>
               <Input type="number" step="0.01" inputMode="decimal" placeholder="0.00" {...register('cost')} />
               {errors.cost && <p className="text-xs text-red-500">{t(errors.cost.message!)}</p>}
             </div>

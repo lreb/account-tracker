@@ -7,6 +7,7 @@ export function createDefaultAccount(currency = 'USD'): Account {
     id: DEFAULT_ACCOUNT_ID,
     name: 'Main Account',
     type: 'asset',
+    subtype: '',
     openingBalance: 0,
     currency,
     hidden: false,
@@ -17,6 +18,7 @@ export function normalizeAccount(account: Account): Account {
   return {
     ...account,
     hidden: account.hidden ?? false,
+    subtype: account.subtype ?? '',
   }
 }
 

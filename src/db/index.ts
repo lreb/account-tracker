@@ -1,4 +1,4 @@
-// Current DB version: 5
+// Current DB version: 6
 import Dexie, { type Table } from 'dexie'
 import type {
   Account,
@@ -61,6 +61,14 @@ class ExpenseTrackingDB extends Dexie {
     }).upgrade((tx) => {
       return tx.table('accounts').toCollection().modify((account) => {
         if (account.hidden == null) account.hidden = false
+      })
+    })
+    // Version 6: add subtype index on accounts
+    this.version(6).stores({
+      accounts: 'id, type, subtype, currency, hidden',
+    }).upgrade((tx) => {
+      return tx.table('accounts').toCollection().modify((account) => {
+        if (account.subtype == null) account.subtype = ''
       })
     })
   }

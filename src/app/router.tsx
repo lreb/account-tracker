@@ -12,6 +12,7 @@ import BudgetsPage from '@/features/budgets/components/BudgetsPage'
 import InsightsPage from '@/features/insights/components/InsightsPage'
 import SettingsPage from '@/features/settings/components/SettingsPage'
 import AccountsSettingsPage from '@/features/settings/components/AccountsSettingsPage'
+import AccountFormPage from '@/features/settings/components/AccountFormPage'
 import CategoriesSettingsPage from '@/features/settings/components/CategoriesSettingsPage'
 import LabelsSettingsPage from '@/features/settings/components/LabelsSettingsPage'
 import ExchangeRatesSettingsPage from '@/features/settings/components/ExchangeRatesSettingsPage'
@@ -40,6 +41,8 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <SettingsPage /> },
           { path: 'accounts', element: <AccountsSettingsPage /> },
+          { path: 'accounts/new', element: <AccountFormPage /> },
+          { path: 'accounts/:id', element: <AccountFormPage /> },
           { path: 'categories', element: <CategoriesSettingsPage /> },
           { path: 'labels', element: <LabelsSettingsPage /> },
           { path: 'exchange-rates', element: <ExchangeRatesSettingsPage /> },

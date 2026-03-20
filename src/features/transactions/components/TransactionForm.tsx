@@ -18,6 +18,7 @@ import { useExchangeRatesStore } from '@/stores/exchange-rates.store'
 import { useSettingsStore } from '@/stores/settings.store'
 
 import { Button } from '@/components/ui/button'
+import { AmountCalculatorButton } from '@/components/ui/amount-calculator-button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -380,7 +381,19 @@ export default function TransactionForm() {
 
       {/* Amount */}
       <div className="space-y-1">
-        <Label htmlFor="amount">{t('common.amount', 'Amount')}</Label>
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor="amount">{t('common.amount', 'Amount')}</Label>
+          <AmountCalculatorButton
+            currentValue={watch('amount')}
+            onApply={(value) => {
+              setValue('amount', value, {
+                shouldDirty: true,
+                shouldValidate: true,
+                shouldTouch: true,
+              })
+            }}
+          />
+        </div>
         <Input
           id="amount"
           type="number"
