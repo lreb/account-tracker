@@ -1,29 +1,20 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
-import { v4 as uuid } from 'uuid'
-import { Eye, EyeOff, Pencil, Trash2, Plus, Wallet } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ArrowLeft, Eye, EyeOff, Pencil, Trash2, Plus, Wallet } from 'lucide-react'
 
-import { accountSchema, type AccountFormValues } from '../schemas/account.schema'
+import {
+  ACCOUNT_SUBTYPE_OPTIONS_BY_TYPE,
+  getOtherSubtypeLabelKey,
+} from '@/constants/account-subtypes'
 import { getVisibleAccounts } from '@/lib/accounts'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useTransactionsStore } from '@/stores/transactions.store'
-import { useSettingsStore } from '@/stores/settings.store'
 import type { Account, AccountType } from '@/types'
 import { formatCurrency } from '@/lib/currency'
 import { db } from '@/db'
 
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -31,221 +22,77 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
 
-const ACCOUNT_TYPES = ['asset', 'liability'] as const
+const OTHER_SUBTYPE_VALUE = '__other__'
+const TYPE_ORDER: AccountType[] = ['asset', 'liability']
 
-const COMMON_CURRENCIES = [
-  { code: 'USD', label: 'USD — US Dollar' },
-  { code: 'EUR', label: 'EUR — Euro' },
-  { code: 'MXN', label: 'MXN — Mexican Peso' },
-  { code: 'GBP', label: 'GBP — British Pound' },
-  { code: 'CAD', label: 'CAD — Canadian Dollar' },
-  { code: 'BRL', label: 'BRL — Brazilian Real' },
-  { code: 'COP', label: 'COP — Colombian Peso' },
-  { code: 'ARS', label: 'ARS — Argentine Peso' },
-  { code: 'CLP', label: 'CLP — Chilean Peso' },
-]
-
-interface AccountDialogProps {
-  open: boolean
-  editing: Account | null
-  showOnboarding: boolean
-  onOnboardingDone: () => void
-  onClose: () => void
-}
-
-function AccountDialog({ open, editing, showOnboarding, onOnboardingDone, onClose }: AccountDialogProps) {
-  const { t } = useTranslation()
-  const { add, update } = useAccountsStore()
-  const { baseCurrency } = useSettingsStore()
-
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors, isSubmitting },
-    reset,
-  } = useForm<AccountFormValues>({
-    resolver: zodResolver(accountSchema),
-    defaultValues: { type: 'asset', currency: baseCurrency || 'USD', hidden: false, openingBalance: '0', name: '' },
-  })
-
-  useEffect(() => {
-    if (!open) return
-    if (editing) {
-      reset({
-        name: editing.name,
-        type: editing.type,
-        currency: editing.currency,
-        hidden: editing.hidden ?? false,
-        openingBalance: (editing.openingBalance / 100).toFixed(2),
-      })
-    } else {
-      reset({ name: '', type: 'asset', currency: baseCurrency || 'USD', hidden: false, openingBalance: '0' })
-    }
-  }, [open, editing, reset, baseCurrency])
-
-  const onSubmit = async (values: AccountFormValues) => {
-    const balanceCents = Math.round(parseFloat(values.openingBalance) * 100)
-    if (editing) {
-      await update({ ...editing, ...values, openingBalance: balanceCents })
-    } else {
-      await add({ id: uuid(), ...values, openingBalance: balanceCents })
-    }
-
-    if (showOnboarding) {
-      onOnboardingDone()
-    }
-
-    reset()
-    onClose()
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset({ name: '', type: 'asset', currency: baseCurrency || 'USD', hidden: false, openingBalance: '0' }); onClose() } }}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>
-            {editing ? t('common.edit') : t('common.add')} {t('settings.accounts')}
-          </DialogTitle>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-1">
-          {showOnboarding && (
-            <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-900 space-y-1">
-              <p className="font-semibold">{t('accounts.onboardingTitle')}</p>
-              <p>{t('accounts.onboardingDesc')}</p>
-              <p>{t('accounts.requiredHint')}</p>
-            </div>
-          )}
-
-          {/* Name */}
-          <div className="space-y-1">
-            <Label htmlFor="name">{t('accounts.name')} <span className="text-red-500">*</span></Label>
-            <Input id="name" placeholder={t('accounts.namePlaceholder')} {...register('name')} />
-            {errors.name && <p className="text-xs text-red-500">{t(errors.name.message!)}</p>}
-          </div>
-
-          {/* Type */}
-          <div className="space-y-1">
-            <Label>{t('accounts.type')} <span className="text-red-500">*</span></Label>
-            <Select
-              value={watch('type')}
-              onValueChange={(v) => setValue('type', v as AccountFormValues['type'])}
-            >
-              <SelectTrigger>
-                <SelectValue>
-                  {t(`accounts.types.${watch('type')}`)}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {ACCOUNT_TYPES.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {t(`accounts.types.${type}`)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Currency */}
-          <div className="space-y-1">
-            <Label>{t('accounts.currency')} <span className="text-red-500">*</span></Label>
-            <Select
-              value={watch('currency')}
-              onValueChange={(v) => setValue('currency', v ?? '')}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {COMMON_CURRENCIES.map(({ code, label }) => (
-                  <SelectItem key={code} value={code}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.currency && <p className="text-xs text-red-500">{t(errors.currency.message!)}</p>}
-          </div>
-
-          {/* Opening Balance */}
-          <div className="space-y-1">
-            <Label htmlFor="openingBalance">{t('accounts.openingBalance')}</Label>
-            <Input
-              id="openingBalance"
-              type="number"
-              step="0.01"
-              inputMode="decimal"
-              placeholder="0.00"
-              {...register('openingBalance')}
-            />
-            {errors.openingBalance && (
-              <p className="text-xs text-red-500">{t(errors.openingBalance.message!)}</p>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-2">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={watch('hidden')}
-              onClick={() => setValue('hidden', !watch('hidden'))}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                watch('hidden') ? 'bg-gray-900' : 'bg-gray-200'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                  watch('hidden') ? 'translate-x-4' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-            <div className="min-w-0">
-              <Label className="cursor-pointer">{t('accounts.hideFromApp')}</Label>
-              <p className="text-xs text-gray-500">{t('accounts.excludedFromTotals')}</p>
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              {t('common.cancel')}
-            </Button>
-            {showOnboarding && (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  onOnboardingDone()
-                  onClose()
-                }}
-              >
-                {t('accounts.skipTour')}
-              </Button>
-            )}
-            <Button type="submit" disabled={isSubmitting}>
-              {t('common.save')}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
+function getSubtypeGroupValue(subtype?: string): string {
+  if (!subtype) return OTHER_SUBTYPE_VALUE
+  return subtype
 }
 
 export default function AccountsSettingsPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { accounts, remove, update } = useAccountsStore()
-  const { transactions } = useTransactionsStore()
-  const { saveSetting } = useSettingsStore()
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editing, setEditing] = useState<Account | null>(null)
-  const [showOnboarding, setShowOnboarding] = useState(false)
+  const { transactions, removeMany } = useTransactionsStore()
+  const [actionAccount, setActionAccount] = useState<Account | null>(null)
+  const [processingAccountAction, setProcessingAccountAction] = useState(false)
+  const openAdd = () => {
+    navigate('/settings/accounts/new')
+  }
 
-  const openAdd = () => { setEditing(null); setDialogOpen(true) }
-  const openEdit = (a: Account) => { setEditing(a); setDialogOpen(true) }
-  const closeDialog = () => { setDialogOpen(false); setEditing(null) }
+  const openEdit = (account: Account) => {
+    navigate(`/settings/accounts/${encodeURIComponent(account.id)}`)
+  }
+
+  const closeActionDialog = () => {
+    if (processingAccountAction) return
+    setActionAccount(null)
+  }
+
+  const accountCascadeDeleteCount = useMemo(() => {
+    if (!actionAccount) return 0
+    return transactions.filter(
+      (transaction) =>
+        transaction.accountId === actionAccount.id ||
+        transaction.toAccountId === actionAccount.id,
+    ).length
+  }, [actionAccount, transactions])
+
+  const archiveAccount = async (account: Account) => {
+    setProcessingAccountAction(true)
+    try {
+      await update({ ...account, hidden: true })
+      setActionAccount(null)
+    } finally {
+      setProcessingAccountAction(false)
+    }
+  }
+
+  const deleteAccountCascade = async (account: Account) => {
+    setProcessingAccountAction(true)
+    try {
+      const transactionIds = transactions
+        .filter(
+          (transaction) =>
+            transaction.accountId === account.id ||
+            transaction.toAccountId === account.id,
+        )
+        .map((transaction) => transaction.id)
+
+      if (transactionIds.length > 0) {
+        await db.transactions.bulkDelete(transactionIds)
+        removeMany(transactionIds)
+      }
+
+      await remove(account.id)
+      setActionAccount(null)
+    } finally {
+      setProcessingAccountAction(false)
+    }
+  }
 
   useEffect(() => {
     let mounted = true
@@ -253,11 +100,11 @@ export default function AccountsSettingsPage() {
     async function maybeStartOnboarding() {
       const row = await db.settings.get('accountsOnboardingSeen')
       if (!mounted || row?.value === '1') return
-      if (accounts.length === 0) return
 
-      setShowOnboarding(true)
-      setEditing(accounts[0])
-      setDialogOpen(true)
+      const accountCount = await db.accounts.count()
+      if (accountCount > 0) return
+
+      navigate('/settings/accounts/new?onboarding=1', { replace: true })
     }
 
     void maybeStartOnboarding()
@@ -265,12 +112,7 @@ export default function AccountsSettingsPage() {
     return () => {
       mounted = false
     }
-  }, [accounts])
-
-  async function markOnboardingDone() {
-    setShowOnboarding(false)
-    await saveSetting('accountsOnboardingSeen', '1')
-  }
+  }, [accounts.length, navigate])
 
   const accountBalances = useMemo(() => {
     const map = new Map<string, number>()
@@ -294,26 +136,65 @@ export default function AccountsSettingsPage() {
   const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
 
   const groupedAccounts = useMemo(() => {
-    const groups: Record<AccountType, Account[]> = { asset: [], liability: [] }
-    for (const account of accounts) {
-      if (account.type in groups) {
-        groups[account.type].push(account)
-      } else {
-        groups.asset.push(account)
+    return TYPE_ORDER.map((type) => {
+      const accountsByType = accounts.filter((account) => account.type === type)
+      const subgroupMap = new Map<string, Account[]>()
+
+      for (const account of accountsByType) {
+        const key = getSubtypeGroupValue(account.subtype)
+        subgroupMap.set(key, [...(subgroupMap.get(key) ?? []), account])
       }
-    }
-    return groups
-  }, [accounts])
+
+      const orderedKnownKeys = ACCOUNT_SUBTYPE_OPTIONS_BY_TYPE[type].map((option) => option.value)
+      const unknownKeys = Array.from(subgroupMap.keys())
+        .filter((key) => !orderedKnownKeys.includes(key) && key !== OTHER_SUBTYPE_VALUE)
+        .sort((a, b) => a.localeCompare(b))
+
+      const orderedSubgroupKeys = [
+        ...orderedKnownKeys,
+        OTHER_SUBTYPE_VALUE,
+        ...unknownKeys,
+      ].filter((key) => subgroupMap.has(key))
+
+      const subgroups = orderedSubgroupKeys.map((key) => {
+        const option = ACCOUNT_SUBTYPE_OPTIONS_BY_TYPE[type].find((item) => item.value === key)
+        const label = key === OTHER_SUBTYPE_VALUE
+          ? t(getOtherSubtypeLabelKey(type))
+          : option
+            ? t(option.labelKey)
+            : key
+
+        return {
+          key,
+          label,
+          accounts: subgroupMap.get(key) ?? [],
+        }
+      })
+
+      return { type, subgroups }
+    })
+  }, [accounts, t])
 
   const groupTotal = (type: AccountType) => {
     const group = visibleAccounts.filter((account) => account.type === type)
-    return group.reduce((sum, a) => sum + (accountBalances.get(a.id) ?? a.openingBalance), 0)
+    return group.reduce((sum, account) => sum + (accountBalances.get(account.id) ?? account.openingBalance), 0)
   }
 
   return (
     <div className="p-4">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold">{t('settings.accounts')}</h1>
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => navigate('/settings')}
+          >
+            <ArrowLeft size={16} />
+          </Button>
+          <h1 className="text-xl font-bold">{t('settings.accounts')}</h1>
+        </div>
         <Button size="sm" onClick={openAdd} className="gap-1">
           <Plus size={16} />
           {t('common.add')}
@@ -330,86 +211,138 @@ export default function AccountsSettingsPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {(Object.keys(groupedAccounts) as AccountType[]).map((type) => {
-            const group = groupedAccounts[type]
-            if (group.length === 0) return null
+          {groupedAccounts.map(({ type, subgroups }) => {
+            const totalInType = subgroups.reduce((count, subgroup) => count + subgroup.accounts.length, 0)
+            if (totalInType === 0) return null
             return (
               <section key={type}>
                 <div className="flex items-center justify-between mb-2">
                   <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
                     {t(`accounts.types.${type}`)}
                     <span className="ml-1 text-xs font-normal normal-case text-gray-400">
-                      — {t(`accounts.descriptions.${type}`)}
+                      - {t(`accounts.descriptions.${type}`)}
                     </span>
                   </h2>
                   <span className="text-sm font-semibold">
                     {formatCurrency(groupTotal(type), accounts[0]?.currency ?? 'USD')}
                   </span>
                 </div>
-                <ul className="space-y-2">
-                  {group.map((account) => {
-                    const balance = accountBalances.get(account.id) ?? account.openingBalance
-                    return (
-                      <li
-                        key={account.id}
-                        className="flex items-center gap-3 rounded-2xl border bg-white px-4 py-3"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium">{account.name}</p>
-                          <p className="text-xs text-gray-400">
-                            {account.currency}
-                            {account.hidden ? ` · ${t('accounts.hidden')}` : ''}
-                          </p>
-                          {account.hidden && (
-                            <p className="text-xs text-amber-600">{t('accounts.excludedFromTotals')}</p>
-                          )}
-                        </div>
-                        <span className="text-sm font-semibold tabular-nums whitespace-nowrap">
-                          {formatCurrency(balance, account.currency)}
-                        </span>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => update({ ...account, hidden: !(account.hidden ?? false) })}
-                          >
-                            {account.hidden ? <Eye size={15} /> : <EyeOff size={15} />}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => openEdit(account)}
-                          >
-                            <Pencil size={15} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-red-500 hover:text-red-600"
-                            onClick={() => remove(account.id)}
-                          >
-                            <Trash2 size={15} />
-                          </Button>
-                        </div>
-                      </li>
-                    )
-                  })}
-                </ul>
+                <div className="space-y-3">
+                  {subgroups.map((subgroup) => (
+                    <div key={`${type}:${subgroup.key}`} className="space-y-2">
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-400 px-1">
+                        {subgroup.label}
+                      </p>
+                      <ul className="space-y-2">
+                        {subgroup.accounts.map((account) => {
+                          const balance = accountBalances.get(account.id) ?? account.openingBalance
+                          return (
+                            <li
+                              key={account.id}
+                              className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition-colors ${
+                                account.hidden
+                                  ? 'bg-slate-50 border-slate-200'
+                                  : 'bg-white'
+                              }`}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium">{account.name}</p>
+                                <p className="text-xs text-gray-400">
+                                  {account.currency}
+                                  {account.hidden ? ` · ${t('accounts.hidden')}` : ''}
+                                </p>
+                                {account.hidden && (
+                                  <p className="text-xs text-amber-600">{t('accounts.excludedFromTotals')}</p>
+                                )}
+                              </div>
+                              <span className="text-sm font-semibold tabular-nums whitespace-nowrap">
+                                {formatCurrency(balance, account.currency)}
+                              </span>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => update({ ...account, hidden: !(account.hidden ?? false) })}
+                                >
+                                  {account.hidden ? <Eye size={15} /> : <EyeOff size={15} />}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => openEdit(account)}
+                                >
+                                  <Pencil size={15} />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-red-500 hover:text-red-600"
+                                  onClick={() => setActionAccount(account)}
+                                >
+                                  <Trash2 size={15} />
+                                </Button>
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
               </section>
             )
           })}
         </div>
       )}
 
-      <AccountDialog
-        open={dialogOpen}
-        editing={editing}
-        showOnboarding={showOnboarding}
-        onOnboardingDone={() => { void markOnboardingDone() }}
-        onClose={closeDialog}
-      />
+      <Dialog open={Boolean(actionAccount)} onOpenChange={(open) => { if (!open) closeActionDialog() }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t('accounts.deleteConfirmTitle', 'Archive or permanently delete account?')}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>
+              {t('accounts.deleteConfirmDesc', {
+                name: actionAccount?.name ?? '',
+                defaultValue: 'You are about to remove account "{{name}}" from active usage.',
+              })}
+            </p>
+            <p>
+              {t('accounts.deleteConfirmCascade', {
+                count: accountCascadeDeleteCount,
+                defaultValue: 'If you delete permanently, {{count}} linked transaction(s) will also be deleted and cannot be recovered.',
+              })}
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={closeActionDialog} disabled={processingAccountAction}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!actionAccount || processingAccountAction}
+              onClick={() => { if (actionAccount) void archiveAccount(actionAccount) }}
+            >
+              {t('accounts.archiveInstead', 'Archive account')}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={!actionAccount || processingAccountAction}
+              onClick={() => { if (actionAccount) void deleteAccountCascade(actionAccount) }}
+            >
+              {t('accounts.deletePermanently', 'Delete permanently')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ScrollToTopButton />
     </div>
   )
 }

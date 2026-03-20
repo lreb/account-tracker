@@ -4,6 +4,7 @@ import { router } from './router'
 import i18n from '@/i18n'
 import { db } from '@/db'
 import { createDefaultAccount } from '@/lib/accounts'
+import { COMMON_CURRENCIES } from '@/constants/currencies'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useCategoriesStore } from '@/stores/categories.store'
@@ -18,18 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-
-const SUPPORTED_CURRENCIES = [
-  { code: 'USD', label: 'USD - US Dollar' },
-  { code: 'EUR', label: 'EUR - Euro' },
-  { code: 'MXN', label: 'MXN - Mexican Peso' },
-  { code: 'GBP', label: 'GBP - British Pound' },
-  { code: 'CAD', label: 'CAD - Canadian Dollar' },
-  { code: 'BRL', label: 'BRL - Brazilian Real' },
-  { code: 'COP', label: 'COP - Colombian Peso' },
-  { code: 'ARS', label: 'ARS - Argentine Peso' },
-  { code: 'CLP', label: 'CLP - Chilean Peso' },
-] as const
 
 function AppLoadingScreen() {
   return (
@@ -149,7 +138,7 @@ export default function App() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {SUPPORTED_CURRENCIES.map(({ code, label }) => (
+                  {COMMON_CURRENCIES.map(({ code, label }) => (
                     <SelectItem key={code} value={code}>{label}</SelectItem>
                   ))}
                 </SelectContent>

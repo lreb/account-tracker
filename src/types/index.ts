@@ -32,6 +32,7 @@ export interface Account {
   id: string
   name: string
   type: AccountType
+  subtype?: string           // optional account subtype (e.g. checking, credit-card)
   openingBalance: number      // integer cents in account's currency
   currency: string            // ISO 4217
   hidden?: boolean            // excluded from app totals and account selectors

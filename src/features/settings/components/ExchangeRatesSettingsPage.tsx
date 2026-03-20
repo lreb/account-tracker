@@ -8,6 +8,7 @@ import { Trash2, RefreshCw, Plus } from 'lucide-react'
 
 import { useExchangeRatesStore } from '@/stores/exchange-rates.store'
 import { useSettingsStore } from '@/stores/settings.store'
+import { EXCHANGE_RATE_CURRENCIES } from '@/constants/currencies'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,14 +26,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-
-const COMMON_CURRENCIES = [
-  'USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'CNY', 'HKD', 'SGD',
-  'MXN', 'BRL', 'ARS', 'COP', 'CLP', 'PEN', 'UYU', 'BOB', 'PYG', 'VES',
-  'INR', 'KRW', 'THB', 'MYR', 'IDR', 'PHP', 'VND', 'PKR', 'BDT', 'NGN',
-  'ZAR', 'EGP', 'MAD', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF', 'RON',
-  'TRY', 'RUB', 'SAR', 'AED', 'ILS', 'NZD',
-]
 
 const manualRateSchema = z.object({
   fromCurrency: z.string().min(3),
@@ -186,7 +179,7 @@ export default function ExchangeRatesSettingsPage() {
                     <SelectValue placeholder="USD" />
                   </SelectTrigger>
                   <SelectContent>
-                    {COMMON_CURRENCIES.map((c) => (
+                    {EXCHANGE_RATE_CURRENCIES.map((c) => (
                       <SelectItem key={c} value={c}>{c}</SelectItem>
                     ))}
                   </SelectContent>
@@ -206,7 +199,7 @@ export default function ExchangeRatesSettingsPage() {
                     <SelectValue placeholder="EUR" />
                   </SelectTrigger>
                   <SelectContent>
-                    {COMMON_CURRENCIES.filter((c) => c !== watchFrom).map((c) => (
+                    {EXCHANGE_RATE_CURRENCIES.filter((c) => c !== watchFrom).map((c) => (
                       <SelectItem key={c} value={c}>{c}</SelectItem>
                     ))}
                   </SelectContent>

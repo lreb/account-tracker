@@ -1,892 +1,34 @@
-import { useState, useEffect, useMemo } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useState, useMemo } from 'react'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { format, parseISO, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths } from 'date-fns'
-import { v4 as uuid } from 'uuid'
-import { ArrowLeft, Plus, Trash2, Pencil, Gauge, TrendingDown, Fuel, X } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Pencil, Gauge, TrendingDown, Fuel } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from 'recharts'
 
 import {
-  fuelLogSchema,
-  vehicleServiceSchema,
-  SERVICE_TYPES,
-  type FuelLogFormValues,
-  type VehicleServiceFormValues,
-} from '../schemas/vehicle.schema'
-import {
-  getAccountSelectOptions,
   getVisibleAccountIds,
-  getVisibleAccounts,
   isTransactionForVisiblePrimaryAccount,
 } from '@/lib/accounts'
-import { getTranslatedCategoryName } from '@/lib/categories'
 import { useVehiclesStore } from '@/stores/vehicles.store'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useAccountsStore } from '@/stores/accounts.store'
-import { useCategoriesStore } from '@/stores/categories.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { useLabelsStore } from '@/stores/labels.store'
 import { formatCurrency } from '@/lib/currency'
-import { calcKmPerLiter, calcCostPerKm, calcKmSinceLastFill } from '@/lib/vehicles'
-import type { FuelLog, VehicleService, Transaction } from '@/types'
+import {
+  calcKmPerLiter,
+  calcCostPerKm,
+  calcKmSinceLastFill,
+  getServiceTypeLabel,
+} from '@/lib/vehicles'
+import type { FuelLog, VehicleService } from '@/types'
 
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label as FormLabel } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
+import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
 
 // Palette for charts
 const CHART_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316']
-
-const SERVICE_TYPE_KEY_MAP: Record<string, string> = {
-  'Oil change': 'vehicles.serviceTypes.oilChange',
-  'Tire rotation': 'vehicles.serviceTypes.tireRotation',
-  'Tire replacement': 'vehicles.serviceTypes.tireReplacement',
-  'Brake pads': 'vehicles.serviceTypes.brakePads',
-  'Brake discs': 'vehicles.serviceTypes.brakeDiscs',
-  'Battery replacement': 'vehicles.serviceTypes.batteryReplacement',
-  'Timing belt': 'vehicles.serviceTypes.timingBelt',
-  'Spark plugs': 'vehicles.serviceTypes.sparkPlugs',
-  'Air filter': 'vehicles.serviceTypes.airFilter',
-  'Cabin filter': 'vehicles.serviceTypes.cabinFilter',
-  'Fuel filter': 'vehicles.serviceTypes.fuelFilter',
-  'Transmission fluid': 'vehicles.serviceTypes.transmissionFluid',
-  'Coolant flush': 'vehicles.serviceTypes.coolantFlush',
-  Alignment: 'vehicles.serviceTypes.alignment',
-  Suspension: 'vehicles.serviceTypes.suspension',
-  'AC service': 'vehicles.serviceTypes.acService',
-  'General inspection': 'vehicles.serviceTypes.generalInspection',
-  Other: 'vehicles.serviceTypes.other',
-}
-
-function getServiceTypeLabel(serviceType: string, t: (key: string) => string): string {
-  const key = SERVICE_TYPE_KEY_MAP[serviceType]
-  return key ? t(key) : serviceType
-}
-
-type OdometerEntry = {
-  date: string
-  odometer: number
-}
-
-function getOdometerNeighbors(entries: OdometerEntry[], selectedIso?: string): {
-  previousOdometer?: number
-  nextOdometer?: number
-} {
-  if (!selectedIso || entries.length === 0) return {}
-
-  let previousOdometer: number | undefined
-  let nextOdometer: number | undefined
-
-  for (const entry of entries) {
-    if (entry.date <= selectedIso) {
-      previousOdometer = entry.odometer
-      continue
-    }
-
-    nextOdometer = entry.odometer
-    break
-  }
-
-  return { previousOdometer, nextOdometer }
-}
-
-// ─── Fuel Log dialog (add + edit) ────────────────────────────────────────────
-
-function FuelLogDialog({
-  open,
-  vehicleId,
-  vehicleName,
-  initialOdometer,
-  editing,
-  onClose,
-}: {
-  open: boolean
-  vehicleId: string
-  vehicleName: string
-  initialOdometer: number
-  editing?: FuelLog
-  onClose: () => void
-}) {
-  const { t } = useTranslation()
-  const { addFuelLog, updateFuelLog, fuelLogs, vehicleServices } = useVehiclesStore()
-  const { add: addTransaction } = useTransactionsStore()
-  const { accounts } = useAccountsStore()
-  const { categories } = useCategoriesStore()
-  const { baseCurrency } = useSettingsStore()
-  const { labels, load: loadLabels } = useLabelsStore()
-  const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
-
-  useEffect(() => { loadLabels() }, [loadLabels])
-
-  const defaultAccount = visibleAccounts[0] ?? accounts[0]
-  const fuelCategory = categories.find((c) => c.id === 'fuel-gas') ?? categories[0]
-
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<FuelLogFormValues>({
-    resolver: zodResolver(fuelLogSchema),
-    defaultValues: {
-      date: format(new Date(), 'yyyy-MM-dd'),
-      time: format(new Date(), 'HH:mm'),
-      liters: '',
-      costPerLiter: '',
-      totalCost: '',
-      odometer: '',
-      accountId: defaultAccount?.id ?? '',
-      categoryId: fuelCategory?.id ?? '',
-      status: 'cleared',
-      notes: '',
-      labels: [],
-    },
-  })
-
-  const watchAccountId = watch('accountId')
-  const watchCategoryId = watch('categoryId')
-  const watchStatus = watch('status')
-  const watchLabels = watch('labels') ?? []
-  const watchLiters = watch('liters')
-  const watchCostPerLiter = watch('costPerLiter')
-  const watchTotalCost = watch('totalCost')
-  const watchDate = watch('date')
-  const watchTime = watch('time')
-  const availableAccounts = useMemo(
-    () => getAccountSelectOptions(accounts, [watchAccountId]),
-    [accounts, watchAccountId],
-  )
-
-  const odometerEntries = useMemo<OdometerEntry[]>(() => {
-    const fromFuel = fuelLogs
-      .filter((log) => log.vehicleId === vehicleId && log.id !== editing?.id)
-      .map((log) => ({ date: log.date, odometer: log.odometer }))
-
-    const fromServices = vehicleServices
-      .filter((service) => service.vehicleId === vehicleId)
-      .map((service) => ({ date: service.date, odometer: service.odometer }))
-
-    return [...fromFuel, ...fromServices].sort((a, b) => a.date.localeCompare(b.date))
-  }, [fuelLogs, vehicleServices, vehicleId, editing?.id])
-
-  const selectedDateIso = useMemo(() => {
-    if (!watchDate || !watchTime) return undefined
-    const [y, m, d] = watchDate.split('-').map(Number)
-    const [hh, mm] = watchTime.split(':').map(Number)
-    if ([y, m, d, hh, mm].some(Number.isNaN)) return undefined
-    return new Date(y, m - 1, d, hh, mm).toISOString()
-  }, [watchDate, watchTime])
-
-  const { previousOdometer, nextOdometer } = useMemo(
-    () => getOdometerNeighbors(odometerEntries, selectedDateIso),
-    [odometerEntries, selectedDateIso],
-  )
-
-  const odometerPlaceholder = useMemo(() => {
-    if (odometerEntries.length === 0) {
-      return initialOdometer > 0 ? `${t('vehicles.last')}: ${initialOdometer.toLocaleString()}` : '0'
-    }
-    if (previousOdometer != null && nextOdometer != null) {
-      return `${t('vehicles.last')}: ${previousOdometer.toLocaleString()} · ${t('vehicles.nextAt')}: ${nextOdometer.toLocaleString()}`
-    }
-    if (previousOdometer != null) {
-      return `${t('vehicles.last')}: ${previousOdometer.toLocaleString()}`
-    }
-    if (nextOdometer != null) {
-      return `${t('vehicles.nextAt')}: ${nextOdometer.toLocaleString()}`
-    }
-    return '0'
-  }, [odometerEntries.length, initialOdometer, previousOdometer, nextOdometer, t])
-
-  // Auto-calc total cost when liters + cost/liter change
-  const [lastEdited, setLastEdited] = useState<'costPerLiter' | 'totalCost'>('costPerLiter')
-
-  useEffect(() => {
-    const liters = parseFloat(watchLiters)
-    if (isNaN(liters) || liters <= 0) return
-    if (lastEdited === 'costPerLiter') {
-      const cpl = parseFloat(watchCostPerLiter)
-      if (!isNaN(cpl) && cpl > 0) {
-        const total = (liters * cpl).toFixed(2)
-        if (total !== watchTotalCost) setValue('totalCost', total, { shouldValidate: true })
-      }
-    } else {
-      const total = parseFloat(watchTotalCost)
-      if (!isNaN(total) && total > 0) {
-        const cpl = (total / liters).toFixed(4)
-        if (cpl !== watchCostPerLiter) setValue('costPerLiter', cpl, { shouldValidate: true })
-      }
-    }
-  }, [watchLiters, watchCostPerLiter, watchTotalCost, lastEdited, setValue])
-
-  useEffect(() => {
-    if (!open) return
-    if (editing) {
-      const existingTx = editing.transactionId
-        ? useTransactionsStore.getState().transactions.find((tx) => tx.id === editing.transactionId)
-        : undefined
-      const cpl = editing.liters > 0 ? ((editing.totalCost / 100) / editing.liters).toFixed(4) : ''
-      reset({
-        date: format(new Date(editing.date), 'yyyy-MM-dd'),
-        time: format(new Date(editing.date), 'HH:mm'),
-        liters: editing.liters.toString(),
-        costPerLiter: cpl,
-        totalCost: (editing.totalCost / 100).toFixed(2),
-        odometer: editing.odometer.toString(),
-        accountId: existingTx?.accountId ?? defaultAccount?.id ?? '',
-        categoryId: existingTx?.categoryId ?? fuelCategory?.id ?? '',
-        status: existingTx?.status ?? 'cleared',
-        notes: editing.notes ?? existingTx?.notes ?? '',
-        labels: existingTx?.labels ?? [],
-      })
-    } else {
-      reset({
-        date: format(new Date(), 'yyyy-MM-dd'),
-        time: format(new Date(), 'HH:mm'),
-        liters: '',
-        costPerLiter: '',
-        totalCost: '',
-        odometer: '',
-        accountId: defaultAccount?.id ?? '',
-        categoryId: fuelCategory?.id ?? '',
-        status: 'cleared',
-        notes: '',
-        labels: [],
-      })
-    }
-  }, [open, editing]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const toggleLabel = (labelId: string) => {
-    const current = watchLabels
-    const next = current.includes(labelId) ? current.filter((l) => l !== labelId) : [...current, labelId]
-    setValue('labels', next)
-  }
-
-  const onSubmit = async (values: FuelLogFormValues) => {
-    const account = accounts.find((a) => a.id === values.accountId)
-    const costCents = Math.round(parseFloat(values.totalCost) * 100)
-    const [y, m, d] = values.date.split('-').map(Number)
-    const [hh, mm] = values.time.split(':').map(Number)
-    const isoDate = new Date(y, m - 1, d, hh, mm).toISOString()
-
-    if (editing) {
-      const updatedLog: FuelLog = {
-        ...editing,
-        date: isoDate,
-        liters: parseFloat(values.liters),
-        totalCost: costCents,
-        odometer: parseInt(values.odometer, 10),
-        notes: values.notes || undefined,
-      }
-      let linkedTx: Transaction | undefined
-      if (editing.transactionId) {
-        const existingTx = useTransactionsStore.getState().transactions.find(
-          (tx) => tx.id === editing.transactionId,
-        )
-        if (existingTx) {
-          linkedTx = {
-            ...existingTx,
-            amount: costCents,
-            date: isoDate,
-            categoryId: values.categoryId,
-            accountId: values.accountId,
-            description: `${t('vehicles.fuelFillUp')} – ${parseFloat(values.liters).toFixed(2)} L · ${vehicleName}`,
-            notes: values.notes || undefined,
-            status: values.status,
-            labels: values.labels ?? [],
-            currency: account?.currency ?? baseCurrency,
-          }
-        }
-      }
-      await updateFuelLog(updatedLog, linkedTx)
-    } else {
-      const txId = uuid()
-      const logId = uuid()
-      await addTransaction({
-        id: txId,
-        type: 'expense',
-        amount: costCents,
-        date: isoDate,
-        categoryId: values.categoryId,
-        accountId: values.accountId,
-        description: `${t('vehicles.fuelFillUp')} – ${parseFloat(values.liters).toFixed(2)} L · ${vehicleName}`,
-        notes: values.notes || undefined,
-        status: values.status,
-        currency: account?.currency ?? baseCurrency,
-        labels: values.labels ?? [],
-      })
-      await addFuelLog({
-        id: logId,
-        vehicleId,
-        date: isoDate,
-        liters: parseFloat(values.liters),
-        totalCost: costCents,
-        odometer: parseInt(values.odometer, 10),
-        notes: values.notes || undefined,
-        transactionId: txId,
-      })
-    }
-    reset()
-    onClose()
-  }
-
-  const filteredCategories = categories.filter((c) => !c.deletedAt && (c.type === 'expense' || c.type === 'any'))
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset(); onClose() } }}>
-      <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{editing ? t('vehicles.editFuelLog') : t('vehicles.addFuelLog')}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 pt-1">
-          {/* Date + Time */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <FormLabel>{t('transactions.date')}</FormLabel>
-              <Input type="date" {...register('date')} />
-              {errors.date && <p className="text-xs text-red-500">{t(errors.date.message!)}</p>}
-            </div>
-            <div className="space-y-1">
-              <FormLabel>{t('transactions.time')}</FormLabel>
-              <Input type="time" {...register('time')} />
-              {errors.time && <p className="text-xs text-red-500">{t(errors.time.message!)}</p>}
-            </div>
-          </div>
-
-          {/* Odometer */}
-          <div className="space-y-1">
-            <FormLabel>{t('vehicles.odometer')}</FormLabel>
-            <Input type="number" inputMode="numeric" placeholder={odometerPlaceholder} {...register('odometer')} />
-            {errors.odometer && <p className="text-xs text-red-500">{t(errors.odometer.message!)}</p>}
-          </div>
-
-          {/* Liters + Cost per liter */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <FormLabel>{t('vehicles.liters')}</FormLabel>
-              <Input type="number" step="0.001" inputMode="decimal" placeholder="40.000" {...register('liters')} />
-              {errors.liters && <p className="text-xs text-red-500">{t(errors.liters.message!)}</p>}
-            </div>
-            <div className="space-y-1">
-              <FormLabel>{t('vehicles.costPerLiter')}</FormLabel>
-              <Input
-                type="number"
-                step="0.0001"
-                inputMode="decimal"
-                placeholder="0.0000"
-                {...register('costPerLiter', { onChange: () => setLastEdited('costPerLiter') })}
-              />
-              {errors.costPerLiter && <p className="text-xs text-red-500">{t(errors.costPerLiter.message!)}</p>}
-            </div>
-          </div>
-
-          {/* Total cost */}
-          <div className="space-y-1">
-            <FormLabel>{t('vehicles.totalCost')}</FormLabel>
-            <Input
-              type="number"
-              step="0.01"
-              inputMode="decimal"
-              placeholder="0.00"
-              {...register('totalCost', { onChange: () => setLastEdited('totalCost') })}
-            />
-            {errors.totalCost && <p className="text-xs text-red-500">{t(errors.totalCost.message!)}</p>}
-          </div>
-
-          {/* Account */}
-          <div className="space-y-1">
-            <FormLabel>{t('transactions.account')}</FormLabel>
-            <Select value={watchAccountId || ''} onValueChange={(v) => setValue('accountId', v as string)}>
-              <SelectTrigger><SelectValue>{accounts.find((a) => a.id === watchAccountId)?.name ?? t('transactions.selectAccount')}</SelectValue></SelectTrigger>
-              <SelectContent>
-                {availableAccounts.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.accountId && <p className="text-xs text-red-500">{t(errors.accountId.message!)}</p>}
-          </div>
-
-          {/* Category */}
-          <div className="space-y-1">
-            <FormLabel>{t('transactions.category')}</FormLabel>
-            <Select value={watchCategoryId || ''} onValueChange={(v) => setValue('categoryId', v as string)}>
-              <SelectTrigger><SelectValue>{getTranslatedCategoryName(filteredCategories.find((c) => c.id === watchCategoryId), t) || t('transactions.selectCategory')}</SelectValue></SelectTrigger>
-              <SelectContent>
-                {filteredCategories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{getTranslatedCategoryName(c, t)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.categoryId && <p className="text-xs text-red-500">{t(errors.categoryId.message!)}</p>}
-          </div>
-
-          {/* Status */}
-          <div className="space-y-1">
-            <FormLabel>{t('transactions.statusLabel')}</FormLabel>
-            <Select value={watchStatus} onValueChange={(v) => setValue('status', v as FuelLogFormValues['status'])}>
-              <SelectTrigger><SelectValue>{t(`transactions.status.${watchStatus}`)}</SelectValue></SelectTrigger>
-              <SelectContent>
-                {(['cleared', 'pending', 'reconciled', 'cancelled'] as const).map((s) => (
-                  <SelectItem key={s} value={s}>{t(`transactions.status.${s}`)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Labels */}
-          {labels.length > 0 && (
-            <div className="space-y-1">
-              <FormLabel>{t('transactions.labels')}</FormLabel>
-              <div className="flex flex-wrap gap-1.5">
-                {labels.map((lbl) => {
-                  const active = watchLabels.includes(lbl.id)
-                  return (
-                    <button
-                      key={lbl.id}
-                      type="button"
-                      onClick={() => toggleLabel(lbl.id)}
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border transition-colors ${
-                        active ? 'ring-2 ring-offset-1' : 'opacity-50'
-                      }`}
-                      style={{ borderColor: lbl.color ?? '#6b7280', color: lbl.color ?? '#6b7280', backgroundColor: active ? `${lbl.color ?? '#6b7280'}18` : 'transparent' }}
-                    >
-                      {lbl.name}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Notes */}
-          <div className="space-y-1">
-            <FormLabel>{t('transactions.notes')}</FormLabel>
-            <Textarea rows={2} placeholder={t('transactions.notesPlaceholder')} {...register('notes')} />
-          </div>
-
-          <DialogFooter className="gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => { reset(); onClose() }}>{t('common.cancel')}</Button>
-            <Button type="submit" disabled={isSubmitting}>{editing ? t('common.update') : t('common.save')}</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// ─── Service dialog (add + edit) ──────────────────────────────────────────────
-
-function ServiceDialog({
-  open,
-  vehicleId,
-  vehicleName,
-  initialOdometer,
-  editing,
-  onClose,
-}: {
-  open: boolean
-  vehicleId: string
-  vehicleName: string
-  initialOdometer: number
-  editing?: VehicleService
-  onClose: () => void
-}) {
-  const { t } = useTranslation()
-  const { addService, updateService, fuelLogs, vehicleServices } = useVehiclesStore()
-  const { add: addTransaction } = useTransactionsStore()
-  const { accounts } = useAccountsStore()
-  const { categories } = useCategoriesStore()
-  const { baseCurrency } = useSettingsStore()
-  const { labels, load: loadLabels } = useLabelsStore()
-  const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
-
-  useEffect(() => { loadLabels() }, [loadLabels])
-
-  const [customServiceType, setCustomServiceType] = useState(false)
-  const defaultAccount = visibleAccounts[0] ?? accounts[0]
-  const maintenanceCategory = categories.find((c) => c.id === 'vehicle-maintenance') ?? categories[0]
-
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<VehicleServiceFormValues>({
-    resolver: zodResolver(vehicleServiceSchema),
-    defaultValues: {
-      date: format(new Date(), 'yyyy-MM-dd'),
-      time: format(new Date(), 'HH:mm'),
-      serviceType: '',
-      cost: '',
-      odometer: '',
-      accountId: defaultAccount?.id ?? '',
-      categoryId: maintenanceCategory?.id ?? '',
-      status: 'cleared',
-      notes: '',
-      labels: [],
-    },
-  })
-
-  const watchAccountId = watch('accountId')
-  const watchCategoryId = watch('categoryId')
-  const watchStatus = watch('status')
-  const watchLabels = watch('labels') ?? []
-  const watchServiceType = watch('serviceType')
-  const watchDate = watch('date')
-  const watchTime = watch('time')
-  const availableAccounts = useMemo(
-    () => getAccountSelectOptions(accounts, [watchAccountId]),
-    [accounts, watchAccountId],
-  )
-
-  const odometerEntries = useMemo<OdometerEntry[]>(() => {
-    const fromFuel = fuelLogs
-      .filter((log) => log.vehicleId === vehicleId)
-      .map((log) => ({ date: log.date, odometer: log.odometer }))
-
-    const fromServices = vehicleServices
-      .filter((service) => service.vehicleId === vehicleId && service.id !== editing?.id)
-      .map((service) => ({ date: service.date, odometer: service.odometer }))
-
-    return [...fromFuel, ...fromServices].sort((a, b) => a.date.localeCompare(b.date))
-  }, [fuelLogs, vehicleServices, vehicleId, editing?.id])
-
-  const selectedDateIso = useMemo(() => {
-    if (!watchDate || !watchTime) return undefined
-    const [y, m, d] = watchDate.split('-').map(Number)
-    const [hh, mm] = watchTime.split(':').map(Number)
-    if ([y, m, d, hh, mm].some(Number.isNaN)) return undefined
-    return new Date(y, m - 1, d, hh, mm).toISOString()
-  }, [watchDate, watchTime])
-
-  const { previousOdometer, nextOdometer } = useMemo(
-    () => getOdometerNeighbors(odometerEntries, selectedDateIso),
-    [odometerEntries, selectedDateIso],
-  )
-
-  const odometerPlaceholder = useMemo(() => {
-    if (odometerEntries.length === 0) {
-      return initialOdometer > 0 ? `${t('vehicles.last')}: ${initialOdometer.toLocaleString()}` : '0'
-    }
-    if (previousOdometer != null && nextOdometer != null) {
-      return `${t('vehicles.last')}: ${previousOdometer.toLocaleString()} · ${t('vehicles.nextAt')}: ${nextOdometer.toLocaleString()}`
-    }
-    if (previousOdometer != null) {
-      return `${t('vehicles.last')}: ${previousOdometer.toLocaleString()}`
-    }
-    if (nextOdometer != null) {
-      return `${t('vehicles.nextAt')}: ${nextOdometer.toLocaleString()}`
-    }
-    return '0'
-  }, [odometerEntries.length, initialOdometer, previousOdometer, nextOdometer, t])
-
-  useEffect(() => {
-    if (!open) return
-    if (editing) {
-      const existingTx = editing.transactionId
-        ? useTransactionsStore.getState().transactions.find((tx) => tx.id === editing.transactionId)
-        : undefined
-      const isCustom = !SERVICE_TYPES.includes(editing.serviceType as typeof SERVICE_TYPES[number])
-      setCustomServiceType(isCustom)
-      reset({
-        date: format(new Date(editing.date), 'yyyy-MM-dd'),
-        time: format(new Date(editing.date), 'HH:mm'),
-        serviceType: editing.serviceType,
-        cost: (editing.cost / 100).toFixed(2),
-        odometer: editing.odometer.toString(),
-        notes: editing.notes ?? existingTx?.notes ?? '',
-        nextServiceKm: editing.nextServiceKm?.toString() ?? '',
-        nextServiceDate: editing.nextServiceDate
-          ? format(new Date(editing.nextServiceDate), 'yyyy-MM-dd')
-          : '',
-        accountId: existingTx?.accountId ?? defaultAccount?.id ?? '',
-        categoryId: existingTx?.categoryId ?? maintenanceCategory?.id ?? '',
-        status: existingTx?.status ?? 'cleared',
-        labels: existingTx?.labels ?? [],
-      })
-    } else {
-      setCustomServiceType(false)
-      reset({
-        date: format(new Date(), 'yyyy-MM-dd'),
-        time: format(new Date(), 'HH:mm'),
-        serviceType: '',
-        cost: '',
-        odometer: '',
-        accountId: defaultAccount?.id ?? '',
-        categoryId: maintenanceCategory?.id ?? '',
-        status: 'cleared',
-        notes: '',
-        labels: [],
-      })
-    }
-  }, [open, editing]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const toggleLabel = (labelId: string) => {
-    const current = watchLabels
-    const next = current.includes(labelId) ? current.filter((l) => l !== labelId) : [...current, labelId]
-    setValue('labels', next)
-  }
-
-  const onSubmit = async (values: VehicleServiceFormValues) => {
-    const account = accounts.find((a) => a.id === values.accountId)
-    const costCents = Math.round(parseFloat(values.cost) * 100)
-    const [y, mo, d] = values.date.split('-').map(Number)
-    const [hh, mm] = values.time.split(':').map(Number)
-    const isoDate = new Date(y, mo - 1, d, hh, mm).toISOString()
-
-    if (editing) {
-      const updatedSvc: VehicleService = {
-        ...editing,
-        date: isoDate,
-        serviceType: values.serviceType,
-        cost: costCents,
-        odometer: parseInt(values.odometer, 10),
-        notes: values.notes || undefined,
-        nextServiceKm: values.nextServiceKm ? parseInt(values.nextServiceKm, 10) : undefined,
-        nextServiceDate: values.nextServiceDate
-          ? new Date(values.nextServiceDate).toISOString()
-          : undefined,
-      }
-      let linkedTx: Transaction | undefined
-      if (editing.transactionId) {
-        const existingTx = useTransactionsStore.getState().transactions.find(
-          (tx) => tx.id === editing.transactionId,
-        )
-        if (existingTx) {
-          linkedTx = {
-            ...existingTx,
-            amount: costCents,
-            date: isoDate,
-            categoryId: values.categoryId,
-            accountId: values.accountId,
-            description: `${values.serviceType} · ${vehicleName}`,
-            notes: values.notes || undefined,
-            status: values.status,
-            labels: values.labels ?? [],
-            currency: account?.currency ?? baseCurrency,
-          }
-        }
-      }
-      await updateService(updatedSvc, linkedTx)
-    } else {
-      const txId = uuid()
-      const svcId = uuid()
-      await addTransaction({
-        id: txId,
-        type: 'expense',
-        amount: costCents,
-        date: isoDate,
-        categoryId: values.categoryId,
-        accountId: values.accountId,
-        description: `${values.serviceType} · ${vehicleName}`,
-        notes: values.notes || undefined,
-        status: values.status,
-        currency: account?.currency ?? baseCurrency,
-        labels: values.labels ?? [],
-      })
-      await addService({
-        id: svcId,
-        vehicleId,
-        date: isoDate,
-        serviceType: values.serviceType,
-        cost: costCents,
-        odometer: parseInt(values.odometer, 10),
-        notes: values.notes || undefined,
-        nextServiceKm: values.nextServiceKm ? parseInt(values.nextServiceKm, 10) : undefined,
-        nextServiceDate: values.nextServiceDate
-          ? new Date(values.nextServiceDate).toISOString()
-          : undefined,
-        transactionId: txId,
-      })
-    }
-    reset()
-    onClose()
-  }
-
-  const filteredCategories = categories.filter((c) => !c.deletedAt && (c.type === 'expense' || c.type === 'any'))
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset(); onClose() } }}>
-      <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{editing ? t('vehicles.editService') : t('vehicles.addService')}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 pt-1">
-          {/* Date + Time */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <FormLabel>{t('transactions.date')}</FormLabel>
-              <Input type="date" {...register('date')} />
-              {errors.date && <p className="text-xs text-red-500">{t(errors.date.message!)}</p>}
-            </div>
-            <div className="space-y-1">
-              <FormLabel>{t('transactions.time')}</FormLabel>
-              <Input type="time" {...register('time')} />
-              {errors.time && <p className="text-xs text-red-500">{t(errors.time.message!)}</p>}
-            </div>
-          </div>
-
-          {/* Service Type */}
-          <div className="space-y-1">
-            <FormLabel>{t('vehicles.serviceType')}</FormLabel>
-            {customServiceType ? (
-              <div className="flex gap-2">
-                <Input className="flex-1" placeholder={t('vehicles.serviceTypePlaceholder')} {...register('serviceType')} />
-                <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => { setCustomServiceType(false); setValue('serviceType', '') }}>
-                  <X size={14} />
-                </Button>
-              </div>
-            ) : (
-              <Select
-                value={watchServiceType || ''}
-                onValueChange={(v) => {
-                  if (v === 'Other') { setCustomServiceType(true); setValue('serviceType', '') }
-                  else setValue('serviceType', v as string)
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue>{watchServiceType || t('vehicles.selectServiceType')}</SelectValue>
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {SERVICE_TYPES.map((st) => (
-                    <SelectItem key={st} value={st}>{getServiceTypeLabel(st, t)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {errors.serviceType && <p className="text-xs text-red-500">{t(errors.serviceType.message!)}</p>}
-          </div>
-
-          {/* Cost + Odometer */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <FormLabel>{t('vehicles.cost')}</FormLabel>
-              <Input type="number" step="0.01" inputMode="decimal" placeholder="0.00" {...register('cost')} />
-              {errors.cost && <p className="text-xs text-red-500">{t(errors.cost.message!)}</p>}
-            </div>
-            <div className="space-y-1">
-              <FormLabel>{t('vehicles.odometer')}</FormLabel>
-              <Input type="number" inputMode="numeric" placeholder={odometerPlaceholder} {...register('odometer')} />
-              {errors.odometer && <p className="text-xs text-red-500">{t(errors.odometer.message!)}</p>}
-            </div>
-          </div>
-
-          {/* Account */}
-          <div className="space-y-1">
-            <FormLabel>{t('transactions.account')}</FormLabel>
-            <Select value={watchAccountId || ''} onValueChange={(v) => setValue('accountId', v as string)}>
-              <SelectTrigger><SelectValue>{accounts.find((a) => a.id === watchAccountId)?.name ?? t('transactions.selectAccount')}</SelectValue></SelectTrigger>
-              <SelectContent>
-                {availableAccounts.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.accountId && <p className="text-xs text-red-500">{t(errors.accountId.message!)}</p>}
-          </div>
-
-          {/* Category */}
-          <div className="space-y-1">
-            <FormLabel>{t('transactions.category')}</FormLabel>
-            <Select value={watchCategoryId || ''} onValueChange={(v) => setValue('categoryId', v as string)}>
-              <SelectTrigger><SelectValue>{getTranslatedCategoryName(filteredCategories.find((c) => c.id === watchCategoryId), t) || t('transactions.selectCategory')}</SelectValue></SelectTrigger>
-              <SelectContent>
-                {filteredCategories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{getTranslatedCategoryName(c, t)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.categoryId && <p className="text-xs text-red-500">{t(errors.categoryId.message!)}</p>}
-          </div>
-
-          {/* Status */}
-          <div className="space-y-1">
-            <FormLabel>{t('transactions.statusLabel')}</FormLabel>
-            <Select value={watchStatus} onValueChange={(v) => setValue('status', v as VehicleServiceFormValues['status'])}>
-              <SelectTrigger><SelectValue>{t(`transactions.status.${watchStatus}`)}</SelectValue></SelectTrigger>
-              <SelectContent>
-                {(['cleared', 'pending', 'reconciled', 'cancelled'] as const).map((s) => (
-                  <SelectItem key={s} value={s}>{t(`transactions.status.${s}`)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Labels */}
-          {labels.length > 0 && (
-            <div className="space-y-1">
-              <FormLabel>{t('transactions.labels')}</FormLabel>
-              <div className="flex flex-wrap gap-1.5">
-                {labels.map((lbl) => {
-                  const active = watchLabels.includes(lbl.id)
-                  return (
-                    <button
-                      key={lbl.id}
-                      type="button"
-                      onClick={() => toggleLabel(lbl.id)}
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border transition-colors ${
-                        active ? 'ring-2 ring-offset-1' : 'opacity-50'
-                      }`}
-                      style={{ borderColor: lbl.color ?? '#6b7280', color: lbl.color ?? '#6b7280', backgroundColor: active ? `${lbl.color ?? '#6b7280'}18` : 'transparent' }}
-                    >
-                      {lbl.name}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Notes */}
-          <div className="space-y-1">
-            <FormLabel>{t('transactions.notes')}</FormLabel>
-            <Textarea rows={2} placeholder={t('transactions.notesPlaceholder')} {...register('notes')} />
-          </div>
-
-          {/* Next service */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <FormLabel>{t('vehicles.nextServiceKm')}</FormLabel>
-              <Input type="number" inputMode="numeric" placeholder={t('common.optional')} {...register('nextServiceKm')} />
-            </div>
-            <div className="space-y-1">
-              <FormLabel>{t('vehicles.nextServiceDate')}</FormLabel>
-              <Input type="date" {...register('nextServiceDate')} />
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => { reset(); onClose() }}>{t('common.cancel')}</Button>
-            <Button type="submit" disabled={isSubmitting}>{editing ? t('common.update') : t('common.save')}</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
 
 // ─── Stats tab ────────────────────────────────────────────────────────────────
 
@@ -1107,11 +249,8 @@ export default function VehicleDetailPage() {
   const { accounts } = useAccountsStore()
   const { baseCurrency } = useSettingsStore()
   const { labels } = useLabelsStore()
-  const [tab, setTab] = useState<Tab>('fuel')
-  const [fuelDialog, setFuelDialog] = useState(false)
-  const [editingLog, setEditingLog] = useState<FuelLog | null>(null)
-  const [serviceDialog, setServiceDialog] = useState(false)
-  const [editingSvc, setEditingSvc] = useState<VehicleService | null>(null)
+  const [searchParams] = useSearchParams()
+  const [tab, setTab] = useState<Tab>((searchParams.get('tab') as Tab) ?? 'fuel')
 
   const visibleAccountIds = useMemo(() => getVisibleAccountIds(accounts), [accounts])
   const visibleTransactionIds = useMemo(() => {
@@ -1210,7 +349,7 @@ export default function VehicleDetailPage() {
       {tab === 'fuel' && (
         <>
           <div className="flex justify-end mb-3">
-            <Button size="sm" onClick={() => setFuelDialog(true)} className="gap-1">
+            <Button size="sm" onClick={() => navigate(`/vehicles/${vehicle.id}/fuel/new`)} className="gap-1">
               <Plus size={14} /> {t('vehicles.addFillUp')}
             </Button>
           </div>
@@ -1257,7 +396,7 @@ export default function VehicleDetailPage() {
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-400 hover:text-gray-700"
-                          onClick={() => { setEditingLog(log); setFuelDialog(true) }}>
+                          onClick={() => navigate(`/vehicles/${vehicle.id}/fuel/${log.id}`)}>
                           <Pencil size={13} />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600"
@@ -1271,14 +410,7 @@ export default function VehicleDetailPage() {
               })}
             </ul>
           )}
-          <FuelLogDialog
-            open={fuelDialog}
-            vehicleId={vehicle.id}
-            vehicleName={vehicle.name}
-            initialOdometer={vehicle.initialOdometer ?? 0}
-            editing={editingLog ?? undefined}
-            onClose={() => { setFuelDialog(false); setEditingLog(null) }}
-          />
+
         </>
       )}
 
@@ -1286,7 +418,7 @@ export default function VehicleDetailPage() {
       {tab === 'service' && (
         <>
           <div className="flex justify-end mb-3">
-            <Button size="sm" onClick={() => setServiceDialog(true)} className="gap-1">
+            <Button size="sm" onClick={() => navigate(`/vehicles/${vehicle.id}/service/new`)} className="gap-1">
               <Plus size={14} /> {t('vehicles.addServiceBtn')}
             </Button>
           </div>
@@ -1332,7 +464,7 @@ export default function VehicleDetailPage() {
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-400 hover:text-gray-700"
-                          onClick={() => { setEditingSvc(svc); setServiceDialog(true) }}>
+                          onClick={() => navigate(`/vehicles/${vehicle.id}/service/${svc.id}`)}>
                           <Pencil size={13} />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600"
@@ -1346,14 +478,7 @@ export default function VehicleDetailPage() {
               })}
             </ul>
           )}
-          <ServiceDialog
-            open={serviceDialog}
-            vehicleId={vehicle.id}
-            vehicleName={vehicle.name}
-            initialOdometer={vehicle.initialOdometer ?? 0}
-            editing={editingSvc ?? undefined}
-            onClose={() => { setServiceDialog(false); setEditingSvc(null) }}
-          />
+
         </>
       )}
 
@@ -1366,6 +491,8 @@ export default function VehicleDetailPage() {
           initialOdometer={vehicle.initialOdometer ?? 0}
         />
       )}
+
+      <ScrollToTopButton />
     </div>
   )
 }
