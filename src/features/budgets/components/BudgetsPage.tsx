@@ -385,20 +385,25 @@ export default function BudgetsPage() {
   const { budgets, remove } = useBudgetsStore()
   const { transactions } = useTransactionsStore()
   const { labels } = useLabelsStore()
+  const { accounts } = useAccountsStore()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Budget | null>(null)
   const [filterLabelIds, setFilterLabelIds] = useState<string[]>([])
+
+  const visibleAccountIds = useMemo(() => getVisibleAccountIds(accounts), [accounts])
 
   const filteredBudgets = useMemo(() => {
     if (filterLabelIds.length === 0) return budgets
     return budgets.filter((b) =>
       transactions.some(
         (t) =>
+          t.type === 'expense' &&
+          visibleAccountIds.has(t.accountId) &&
           t.categoryId === b.categoryId &&
           filterLabelIds.some((id) => t.labels?.includes(id)),
       )
     )
-  }, [budgets, transactions, filterLabelIds])
+  }, [budgets, transactions, filterLabelIds, visibleAccountIds])
 
   const openAdd = () => { setEditing(null); setDialogOpen(true) }
   const openEdit = (b: Budget) => { setEditing(b); setDialogOpen(true) }

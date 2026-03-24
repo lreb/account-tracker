@@ -207,7 +207,7 @@ export default function ReportsPage() {
   // ── Derived data ─────────────────────────────────────────────────────────
   const summary = useMemo(
     () => computePeriodSummary(filteredTransactions, filters, visibleAccountIds),
-    [transactions, filters, visibleAccountIds],
+    [filteredTransactions, filters, visibleAccountIds],
   )
 
   const lastMonthFilters: ReportFilters = useMemo(() => {
@@ -227,7 +227,7 @@ export default function ReportsPage() {
       filterAccount === 'all' ? undefined : filterAccount,
       visibleAccountIds,
     ),
-    [transactions, monthCount, filterAccount, visibleAccountIds],
+    [filteredTransactions, monthCount, filterAccount, visibleAccountIds],
   )
 
   const expensesByCategory = useMemo(
@@ -251,7 +251,7 @@ export default function ReportsPage() {
       filterAccount === 'all' ? undefined : filterAccount,
       visibleAccountIds,
     ),
-    [transactions, monthCount, filterAccount, visibleAccountIds],
+    [filteredTransactions, monthCount, filterAccount, visibleAccountIds],
   )
 
   const labelBreakdown = useMemo(
@@ -661,4 +661,3 @@ export default function ReportsPage() {
     </div>
   )
 }
-

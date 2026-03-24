@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowUp } from 'lucide-react'
 
@@ -6,17 +6,17 @@ interface ScrollToTopButtonProps {
   /** Scroll distance (px) at which the button becomes visible. Default: 300 */
   threshold?: number
   /** Optional scroll container ref. When provided, tracks that element instead of #main-scroll. */
-  scrollRef?: React.RefObject<HTMLElement | null>
+  scrollRef?: RefObject<HTMLElement | null>
 }
 
 export function ScrollToTopButton({ threshold = 300, scrollRef }: ScrollToTopButtonProps) {
   const { t } = useTranslation()
   const [show, setShow] = useState(false)
-  const containerRef = useRef<Element | null>(null)
+  const containerRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
-    const container: Element | null =
-      scrollRef?.current ?? document.getElementById('main-scroll') ?? document.querySelector('main')
+    const container: HTMLElement | null =
+      scrollRef?.current ?? document.getElementById('main-scroll') ?? document.querySelector<HTMLElement>('main')
     if (!container) return
     containerRef.current = container
     const onScroll = () => setShow(container.scrollTop > threshold)

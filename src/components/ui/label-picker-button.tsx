@@ -107,6 +107,7 @@ export function LabelPickerButton({ labels, selectedIds, onChange }: LabelPicker
                   <button
                     key={lbl.id}
                     type="button"
+                    aria-pressed={active}
                     onClick={() => toggle(lbl.id)}
                     className="inline-flex items-center rounded-full px-3 py-1.5 text-sm font-medium border-2 transition-all"
                     style={{
