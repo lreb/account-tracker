@@ -31,7 +31,9 @@
     "goToDashboard": "Go to dashboard",
     "errorBoundaryDescription": "An unexpected error occurred in this section. You can try again or go back to the dashboard.",
     "saved": "Saved",
-    "scrollToTop": "Scroll to top"
+    "scrollToTop": "Scroll to top",
+    "search": "Search…",
+    "noResults": "No results"
   },
   "dashboard": {
     "income": "Income",
@@ -490,7 +492,11 @@
     "noAccounts": "No accounts to show",
     "noTransactionsForAccount": "No transactions for this account",
     "periodLabels": {
-      "lastMonth": "last month"
+      "lastWeek": "last week",
+      "last2Weeks": "last 2 weeks",
+      "lastMonth": "last month",
+      "lastQuarter": "last quarter",
+      "lastYear": "last year"
     },
     "periods": {
       "lastWeek": "Last week",
@@ -502,11 +508,13 @@
     "sectionNetWorth": "Net Worth",
     "shareOfNetWorth": "Share of Net Worth",
     "sameDateComparison": "Compared to {{period}} ending on {{date}}",
+    "detailTitle": "Account Detail",
     "subtitle": "Assets and liabilities",
     "title": "Balance Sheet",
     "transactionsSubtitle": "Recent activity for this account",
     "transactionKinds": {
-      "transferIn": "Transfer in"
+      "transferIn": "Transfer in",
+      "transferOut": "Transfer out"
     },
     "transactionsTitle": "Transactions",
     "unavailable": "Unavailable",

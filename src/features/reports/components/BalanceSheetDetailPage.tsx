@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ArrowLeft, ChevronRight, Plus, TrendingDown, TrendingUp } from 'lucide-react'
@@ -10,6 +10,7 @@ import { useCategoriesStore } from '@/stores/categories.store'
 import { useExchangeRatesStore } from '@/stores/exchange-rates.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { useTransactionsStore } from '@/stores/transactions.store'
+import { useLabelsStore } from '@/stores/labels.store'
 import {
   BALANCE_SHEET_PRESETS,
   convertBalanceToBase,
@@ -23,6 +24,8 @@ import { formatCurrency } from '@/lib/currency'
 import type { Account, Transaction } from '@/types'
 
 import { Button } from '@/components/ui/button'
+import { LabelPickerButton } from '@/components/ui/label-picker-button'
+import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
 
 function getTransactionPresentation(transaction: Transaction, account: Account) {
   const signedAmount = getAccountTransactionAmount(transaction, account)
@@ -55,6 +58,8 @@ export default function BalanceSheetDetailPage() {
   const { accounts } = useAccountsStore()
   const { transactions } = useTransactionsStore()
   const { categories } = useCategoriesStore()
+  const { labels } = useLabelsStore()
+  const [filterLabelIds, setFilterLabelIds] = useState<string[]>([])
   const { baseCurrency } = useSettingsStore()
   const { load: loadRates, getRateForPair } = useExchangeRatesStore()
   const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
@@ -88,6 +93,13 @@ export default function BalanceSheetDetailPage() {
       .filter((transaction) => isTransactionForAccount(transaction, account.id))
       .sort((left, right) => right.date.localeCompare(left.date))
   }, [account, transactions])
+
+  const filteredAccountTransactions = useMemo(
+    () => filterLabelIds.length === 0
+      ? accountTransactions
+      : accountTransactions.filter((t) => filterLabelIds.some((id) => t.labels?.includes(id))),
+    [accountTransactions, filterLabelIds],
+  )
 
   const currentBalance = useMemo(() => {
     if (!account) {
@@ -211,20 +223,23 @@ export default function BalanceSheetDetailPage() {
       </div>
 
       <section className="space-y-3 rounded-3xl border bg-white p-4 shadow-sm">
-        <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500">
-            {t('balanceSheet.transactionsTitle')}
-          </h2>
-          <p className="text-xs text-gray-400">{t('balanceSheet.transactionsSubtitle', { account: account.name })}</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500">
+              {t('balanceSheet.transactionsTitle')}
+            </h2>
+            <p className="text-xs text-gray-400">{t('balanceSheet.transactionsSubtitle', { account: account.name })}</p>
+          </div>
+          <LabelPickerButton labels={labels} selectedIds={filterLabelIds} onChange={setFilterLabelIds} />
         </div>
 
-        {accountTransactions.length === 0 ? (
+        {filteredAccountTransactions.length === 0 ? (
           <p className="rounded-2xl bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
             {t('balanceSheet.noTransactionsForAccount')}
           </p>
         ) : (
           <ul className="space-y-2">
-            {accountTransactions.map((transaction) => {
+            {filteredAccountTransactions.map((transaction) => {
               const category = categories.find((item) => item.id === transaction.categoryId)
               const presentation = getTransactionPresentation(transaction, account)
               return (
@@ -254,6 +269,7 @@ export default function BalanceSheetDetailPage() {
           </ul>
         )}
       </section>
+      <ScrollToTopButton />
     </div>
   )
 }

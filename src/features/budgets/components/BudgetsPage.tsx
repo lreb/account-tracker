@@ -12,6 +12,8 @@ import { useBudgetsStore } from '@/stores/budgets.store'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useCategoriesStore } from '@/stores/categories.store'
 import { useSettingsStore } from '@/stores/settings.store'
+import { useTransactionsStore } from '@/stores/transactions.store'
+import { useLabelsStore } from '@/stores/labels.store'
 import { getBudgetUsage, type BudgetUsage } from '@/lib/budgets'
 import { formatCurrency } from '@/lib/currency'
 import { CategoryIcon } from '@/lib/icon-map'
@@ -19,6 +21,7 @@ import type { Budget } from '@/types'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { LabelPickerButton } from '@/components/ui/label-picker-button'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -380,8 +383,22 @@ function BudgetDialog({
 export default function BudgetsPage() {
   const { t } = useTranslation()
   const { budgets, remove } = useBudgetsStore()
+  const { transactions } = useTransactionsStore()
+  const { labels } = useLabelsStore()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Budget | null>(null)
+  const [filterLabelIds, setFilterLabelIds] = useState<string[]>([])
+
+  const filteredBudgets = useMemo(() => {
+    if (filterLabelIds.length === 0) return budgets
+    return budgets.filter((b) =>
+      transactions.some(
+        (t) =>
+          t.categoryId === b.categoryId &&
+          filterLabelIds.some((id) => t.labels?.includes(id)),
+      )
+    )
+  }, [budgets, transactions, filterLabelIds])
 
   const openAdd = () => { setEditing(null); setDialogOpen(true) }
   const openEdit = (b: Budget) => { setEditing(b); setDialogOpen(true) }
@@ -391,10 +408,13 @@ export default function BudgetsPage() {
     <div className="p-4">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold">{t('budgets.title')}</h1>
-        <Button size="sm" onClick={openAdd} className="gap-1">
-          <Plus size={16} />
-          {t('common.add')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <LabelPickerButton labels={labels} selectedIds={filterLabelIds} onChange={setFilterLabelIds} />
+          <Button size="sm" onClick={openAdd} className="gap-1">
+            <Plus size={16} />
+            {t('common.add')}
+          </Button>
+        </div>
       </div>
 
       {budgets.length === 0 ? (
@@ -407,7 +427,7 @@ export default function BudgetsPage() {
         </div>
       ) : (
         <ul className="space-y-3">
-          {budgets.map((budget) => (
+          {filteredBudgets.map((budget) => (
             <li key={budget.id}>
               <BudgetCard budget={budget} onEdit={openEdit} onDelete={remove} />
             </li>

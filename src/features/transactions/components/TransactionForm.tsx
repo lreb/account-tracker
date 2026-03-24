@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { LabelPickerButton } from '@/components/ui/label-picker-button'
 
 const TYPE_OPTIONS = [
   { value: 'expense',  label: 'transactions.expense' },
@@ -79,11 +80,6 @@ export default function TransactionForm() {
   const [selectedLabels, setSelectedLabels] = useState<string[]>(
     () => existing?.labels ?? []
   )
-
-  const toggleLabel = (id: string) =>
-    setSelectedLabels((prev) =>
-      prev.includes(id) ? prev.filter((l) => l !== id) : [...prev, id]
-    )
 
   const {
     register,
@@ -207,6 +203,7 @@ export default function TransactionForm() {
   const applySuggestion = (tx: typeof transactions[0]) => {
     setValue('description', tx.description)
     setValue('type', tx.type)
+    setValue('amount', (tx.amount / 100).toFixed(2))
     setValue('categoryId', tx.categoryId)
     setValue('accountId', tx.accountId)
     setValue('toAccountId', tx.toAccountId ?? '')
@@ -445,13 +442,9 @@ export default function TransactionForm() {
       {/* Account */}
       <div className="space-y-1">
         <Label>{t('settings.accounts')}</Label>
-        {accountContextId && !isEdit && (
-          <p className="text-xs text-gray-500">{t('balanceSheet.accountContextLocked')}</p>
-        )}
         <Select
           value={watchAccountId || undefined}
           onValueChange={(v) => setValue('accountId', v ?? '')}
-          disabled={Boolean(accountContextId) && !isEdit}
         >
           <SelectTrigger>
             <SelectValue placeholder="Select account">
@@ -551,32 +544,11 @@ export default function TransactionForm() {
       )}
 
       {/* Labels */}
-      {labels.length > 0 && (
-        <div className="space-y-2">
-          <Label>{t('settings.labels')}</Label>
-          <div className="flex flex-wrap gap-2">
-            {labels.map((lbl) => {
-              const active = selectedLabels.includes(lbl.id)
-              return (
-                <button
-                  key={lbl.id}
-                  type="button"
-                  onClick={() => toggleLabel(lbl.id)}
-                  className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border transition-all"
-                  style={{
-                    backgroundColor: active ? `${lbl.color ?? '#6b7280'}25` : 'transparent',
-                    borderColor: lbl.color ?? '#6b7280',
-                    color: lbl.color ?? '#6b7280',
-                    opacity: active ? 1 : 0.5,
-                  }}
-                >
-                  {lbl.name}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
+      <LabelPickerButton
+        labels={labels}
+        selectedIds={selectedLabels}
+        onChange={setSelectedLabels}
+      />
 
       {/* Notes */}
       <div className="space-y-1">

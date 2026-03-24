@@ -1,4 +1,4 @@
-import { useMemo, useDeferredValue } from 'react'
+import { useMemo, useDeferredValue, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns'
@@ -21,6 +21,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { Button } from '@/components/ui/button'
+import { LabelPickerButton } from '@/components/ui/label-picker-button'
 
 export default function DashboardPage() {
   const { t } = useTranslation()
@@ -34,9 +35,16 @@ export default function DashboardPage() {
   const { baseCurrency } = useSettingsStore()
   const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
   const visibleAccountIds = useMemo(() => getVisibleAccountIds(accounts), [accounts])
+  const [filterLabelIds, setFilterLabelIds] = useState<string[]>([])
   const visibleTransactions = useMemo(
     () => transactions.filter((transaction) => isTransactionForVisiblePrimaryAccount(transaction, visibleAccountIds)),
     [transactions, visibleAccountIds],
+  )
+  const labelFilteredTransactions = useMemo(
+    () => filterLabelIds.length === 0
+      ? visibleTransactions
+      : visibleTransactions.filter((t) => filterLabelIds.some((id) => t.labels?.includes(id))),
+    [visibleTransactions, filterLabelIds],
   )
 
   const now = new Date()
@@ -84,7 +92,7 @@ export default function DashboardPage() {
   }, [visibleAccounts, transactions])
 
   // Recent transactions (last 5)
-  const recent = useMemo(() => visibleTransactions.slice(0, 5), [visibleTransactions])
+  const recent = useMemo(() => labelFilteredTransactions.slice(0, 5), [labelFilteredTransactions])
 
   // 50/30/20 — only render when user has labelled transactions this month
   const rule503020 = useMemo(
@@ -130,6 +138,7 @@ export default function DashboardPage() {
           </p>
           <h1 className="text-xl font-bold text-gray-900">{t('nav.dashboard')}</h1>
         </div>
+        <LabelPickerButton labels={labels} selectedIds={filterLabelIds} onChange={setFilterLabelIds} />
       </div>
 
       {/* ── Net worth ──────────────────────────────────────────────────── */}
