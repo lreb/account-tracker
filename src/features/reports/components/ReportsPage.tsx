@@ -44,6 +44,7 @@ import {
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { LabelPickerButton } from '@/components/ui/label-picker-button'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -171,6 +172,7 @@ export default function ReportsPage() {
   const [customFrom, setCustomFrom] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'))
   const [customTo, setCustomTo] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'))
   const [filterAccount, setFilterAccount] = useState<string>('all')
+  const [filterLabelIds, setFilterLabelIds] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<'overview' | 'category' | 'accounts' | 'cashflow' | 'labels'>('overview')
 
   useEffect(() => {
@@ -195,10 +197,17 @@ export default function ReportsPage() {
     }
   }, [preset, customFrom, customTo, filterAccount])
 
+  const filteredTransactions = useMemo(
+    () => filterLabelIds.length === 0
+      ? transactions
+      : transactions.filter((t) => filterLabelIds.some((id) => t.labels?.includes(id))),
+    [transactions, filterLabelIds],
+  )
+
   // ── Derived data ─────────────────────────────────────────────────────────
   const summary = useMemo(
-    () => computePeriodSummary(transactions, filters, visibleAccountIds),
-    [transactions, filters, visibleAccountIds],
+    () => computePeriodSummary(filteredTransactions, filters, visibleAccountIds),
+    [filteredTransactions, filters, visibleAccountIds],
   )
 
   const lastMonthFilters: ReportFilters = useMemo(() => {
@@ -206,48 +215,48 @@ export default function ReportsPage() {
     return { from: startOfMonth(lm), to: endOfMonth(lm), accountId: filters.accountId }
   }, [filters])
   const lastMonthSummary = useMemo(
-    () => computePeriodSummary(transactions, lastMonthFilters, visibleAccountIds),
-    [transactions, lastMonthFilters, visibleAccountIds],
+    () => computePeriodSummary(filteredTransactions, lastMonthFilters, visibleAccountIds),
+    [filteredTransactions, lastMonthFilters, visibleAccountIds],
   )
 
   const monthCount = preset === 'thisYear' ? 12 : preset === 'last6' ? 6 : preset === 'last3' ? 3 : 6
   const monthlyTrend = useMemo(
     () => computeMonthlyTrend(
-      transactions,
+      filteredTransactions,
       monthCount,
       filterAccount === 'all' ? undefined : filterAccount,
       visibleAccountIds,
     ),
-    [transactions, monthCount, filterAccount, visibleAccountIds],
+    [filteredTransactions, monthCount, filterAccount, visibleAccountIds],
   )
 
   const expensesByCategory = useMemo(
-    () => computeCategoryBreakdown(transactions, categories, filters, 'expense', visibleAccountIds),
-    [transactions, categories, filters, visibleAccountIds],
+    () => computeCategoryBreakdown(filteredTransactions, categories, filters, 'expense', visibleAccountIds),
+    [filteredTransactions, categories, filters, visibleAccountIds],
   )
   const incomeByCategory = useMemo(
-    () => computeCategoryBreakdown(transactions, categories, filters, 'income', visibleAccountIds),
-    [transactions, categories, filters, visibleAccountIds],
+    () => computeCategoryBreakdown(filteredTransactions, categories, filters, 'income', visibleAccountIds),
+    [filteredTransactions, categories, filters, visibleAccountIds],
   )
 
   const accountBalances = useMemo(
-    () => computeAccountBalances(transactions, accounts, categories, filters),
-    [transactions, accounts, categories, filters],
+    () => computeAccountBalances(filteredTransactions, accounts, categories, filters),
+    [filteredTransactions, accounts, categories, filters],
   )
 
   const cashFlow = useMemo(
     () => computeCashFlow(
-      transactions,
+      filteredTransactions,
       monthCount,
       filterAccount === 'all' ? undefined : filterAccount,
       visibleAccountIds,
     ),
-    [transactions, monthCount, filterAccount, visibleAccountIds],
+    [filteredTransactions, monthCount, filterAccount, visibleAccountIds],
   )
 
   const labelBreakdown = useMemo(
-    () => computeLabelBreakdown(transactions, labels, filters, visibleAccountIds),
-    [transactions, labels, filters, visibleAccountIds],
+    () => computeLabelBreakdown(filteredTransactions, labels, filters, visibleAccountIds),
+    [filteredTransactions, labels, filters, visibleAccountIds],
   )
 
   // ─── Render ─────────────────────────────────────────────────────────────
@@ -294,7 +303,7 @@ export default function ReportsPage() {
           </div>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Select value={filterAccount} onValueChange={(value) => setFilterAccount(value ?? 'all')}>
             <SelectTrigger className="h-8 text-xs w-44">
               <SelectValue placeholder={t('reports.allAccounts')} />
@@ -306,6 +315,7 @@ export default function ReportsPage() {
               ))}
             </SelectContent>
           </Select>
+          <LabelPickerButton labels={labels} selectedIds={filterLabelIds} onChange={setFilterLabelIds} />
         </div>
       </div>
 
@@ -651,4 +661,3 @@ export default function ReportsPage() {
     </div>
   )
 }
-

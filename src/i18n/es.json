@@ -31,7 +31,9 @@
     "goToDashboard": "Ir al inicio",
     "errorBoundaryDescription": "Ocurrió un error inesperado en esta sección. Puedes reintentar o volver al inicio.",
     "saved": "Guardado",
-    "scrollToTop": "Volver arriba"
+    "scrollToTop": "Volver arriba",
+    "search": "Buscar…",
+    "noResults": "Sin resultados"
   },
   "dashboard": {
     "income": "Ingresos",
@@ -490,7 +492,11 @@
     "noAccounts": "Sin cuentas para mostrar",
     "noTransactionsForAccount": "Sin transacciones",
     "periodLabels": {
-      "lastMonth": "el último mes"
+      "lastWeek": "la última semana",
+      "last2Weeks": "las últimas 2 semanas",
+      "lastMonth": "el último mes",
+      "lastQuarter": "el último trimestre",
+      "lastYear": "el último año"
     },
     "periods": {
       "lastWeek": "Última semana",
@@ -502,11 +508,13 @@
     "sectionNetWorth": "Patrimonio Neto",
     "shareOfNetWorth": "% Patrimonio Neto",
     "sameDateComparison": "Comparado contra {{period}} con cierre en {{date}}",
+    "detailTitle": "Detalle de Cuenta",
     "subtitle": "Activos y pasivos",
     "title": "Balance General",
     "transactionsSubtitle": "Actividad reciente de esta cuenta",
     "transactionKinds": {
-      "transferIn": "Transferencia entrante"
+      "transferIn": "Transferencia entrante",
+      "transferOut": "Transferencia saliente"
     },
     "transactionsTitle": "Transacciones",
     "unavailable": "No disponible",

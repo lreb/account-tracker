@@ -27,6 +27,7 @@ import { AmountCalculatorButton } from '@/components/ui/amount-calculator-button
 import { Input } from '@/components/ui/input'
 import { Label as FormLabel } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { LabelPickerButton } from '@/components/ui/label-picker-button'
 import {
   Select,
   SelectContent,
@@ -188,13 +189,6 @@ export default function FuelLogFormPage() {
       navigate(`/vehicles/${vehicleId}`, { replace: true })
     }
   }, [editing, fuelId, isEditing, navigate, vehicleId])
-
-  const toggleLabel = (labelId: string) => {
-    const next = watchLabels.includes(labelId)
-      ? watchLabels.filter((l) => l !== labelId)
-      : [...watchLabels, labelId]
-    setValue('labels', next)
-  }
 
   const onSubmit = async (values: FuelLogFormValues) => {
     if (!vehicleId || !vehicle) return
@@ -408,33 +402,11 @@ export default function FuelLogFormPage() {
         </div>
 
         {/* Labels */}
-        {labels.length > 0 && (
-          <div className="space-y-1">
-            <FormLabel>{t('transactions.labels')}</FormLabel>
-            <div className="flex flex-wrap gap-1.5">
-              {labels.map((lbl) => {
-                const active = watchLabels.includes(lbl.id)
-                return (
-                  <button
-                    key={lbl.id}
-                    type="button"
-                    onClick={() => toggleLabel(lbl.id)}
-                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border transition-colors ${
-                      active ? 'ring-2 ring-offset-1' : 'opacity-50'
-                    }`}
-                    style={{
-                      borderColor: lbl.color ?? '#6b7280',
-                      color: lbl.color ?? '#6b7280',
-                      backgroundColor: active ? `${lbl.color ?? '#6b7280'}18` : 'transparent',
-                    }}
-                  >
-                    {lbl.name}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
+        <LabelPickerButton
+          labels={labels}
+          selectedIds={watchLabels}
+          onChange={(ids) => setValue('labels', ids)}
+        />
 
         {/* Notes */}
         <div className="space-y-1">

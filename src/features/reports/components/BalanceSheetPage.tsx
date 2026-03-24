@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ChevronRight, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
@@ -9,6 +9,7 @@ import { useAccountsStore } from '@/stores/accounts.store'
 import { useExchangeRatesStore } from '@/stores/exchange-rates.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { useTransactionsStore } from '@/stores/transactions.store'
+import { useLabelsStore } from '@/stores/labels.store'
 import {
   BALANCE_SHEET_PRESETS,
   convertBalanceToBase,
@@ -21,6 +22,8 @@ import { formatCurrency } from '@/lib/currency'
 import type { Account, AccountType } from '@/types'
 
 import { Button } from '@/components/ui/button'
+import { LabelPickerButton } from '@/components/ui/label-picker-button'
+import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
 
 const ACCOUNT_TYPES: AccountType[] = ['asset', 'liability']
 const DEFAULT_PRESET: BalanceSheetPreset = 'lastMonth'
@@ -40,7 +43,9 @@ export default function BalanceSheetPage() {
   const { t } = useTranslation()
   const { accounts } = useAccountsStore()
   const { transactions } = useTransactionsStore()
+  const { labels } = useLabelsStore()
   const { baseCurrency } = useSettingsStore()
+  const [filterLabelIds, setFilterLabelIds] = useState<string[]>([])
   const { load: loadRates, getRateForPair } = useExchangeRatesStore()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -127,6 +132,20 @@ export default function BalanceSheetPage() {
     return snapshots.filter((snapshot) => snapshot.baseBalance === null).length
   }, [snapshots])
 
+  const filteredGroupedSnapshots = useMemo(() => {
+    if (filterLabelIds.length === 0) return groupedSnapshots
+    const matchesLabel = (accountId: string) =>
+      transactions.some(
+        (t) =>
+          (t.accountId === accountId || t.toAccountId === accountId) &&
+          filterLabelIds.some((id) => t.labels?.includes(id)),
+      )
+    return {
+      asset: groupedSnapshots.asset.filter((s) => matchesLabel(s.account.id)),
+      liability: groupedSnapshots.liability.filter((s) => matchesLabel(s.account.id)),
+    }
+  }, [groupedSnapshots, transactions, filterLabelIds])
+
   const updatePeriod = (preset: BalanceSheetPreset) => {
     const next = new URLSearchParams(searchParams)
     next.set('period', preset)
@@ -159,6 +178,10 @@ export default function BalanceSheetPage() {
               {t('balanceSheet.vsReference', { period: t(`balanceSheet.periodLabels.${selectedPreset}`) })}
             </p>
           </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 items-center">
+          <LabelPickerButton labels={labels} selectedIds={filterLabelIds} onChange={setFilterLabelIds} />
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -209,7 +232,7 @@ export default function BalanceSheetPage() {
       ) : (
         <div className="space-y-6">
           {ACCOUNT_TYPES.map((type) => {
-            const items = groupedSnapshots[type]
+            const items = filteredGroupedSnapshots[type]
             if (items.length === 0) {
               return null
             }
@@ -296,6 +319,7 @@ export default function BalanceSheetPage() {
           })}
         </div>
       )}
+      <ScrollToTopButton />
     </div>
   )
 }
