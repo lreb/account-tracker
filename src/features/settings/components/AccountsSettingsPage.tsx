@@ -7,7 +7,7 @@ import {
   ACCOUNT_SUBTYPE_OPTIONS_BY_TYPE,
   getOtherSubtypeLabelKey,
 } from '@/constants/account-subtypes'
-import { getVisibleAccounts, getActiveAccounts } from '@/lib/accounts'
+import { getActiveAccounts } from '@/lib/accounts'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import type { Account, AccountType } from '@/types'
@@ -132,8 +132,6 @@ export default function AccountsSettingsPage() {
     }
     return map
   }, [accounts, transactions])
-
-  const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
 
   const groupedAccounts = useMemo(() => {
     return TYPE_ORDER.map((type) => {
