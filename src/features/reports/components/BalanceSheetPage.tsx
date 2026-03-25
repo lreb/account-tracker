@@ -4,7 +4,7 @@ import { format } from 'date-fns'
 import { ChevronRight, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { getVisibleAccounts, getActiveAccounts } from '@/lib/accounts'
+import { getActiveAccounts } from '@/lib/accounts'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useExchangeRatesStore } from '@/stores/exchange-rates.store'
 import { useSettingsStore } from '@/stores/settings.store'
