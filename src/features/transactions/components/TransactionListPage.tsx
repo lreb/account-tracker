@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { Plus, SlidersHorizontal, X } from 'lucide-react'
+import { Plus, SlidersHorizontal, X, ChevronDown, Fuel, Wrench } from 'lucide-react'
 import { format, isToday, isYesterday, parseISO, subMonths, subYears } from 'date-fns'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useTransactionsStore } from '@/stores/transactions.store'
@@ -9,6 +9,7 @@ import { useCategoriesStore } from '@/stores/categories.store'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { useLabelsStore } from '@/stores/labels.store'
+import { useVehiclesStore } from '@/stores/vehicles.store'
 import {
   getVisibleAccountIds,
   getVisibleAccounts,
@@ -135,6 +136,8 @@ export default function TransactionListPage() {
   const { accounts } = useAccountsStore()
   const { baseCurrency } = useSettingsStore()
   const { labels, load: loadLabels } = useLabelsStore()
+  const { vehicles } = useVehiclesStore()
+  const activeVehicles = useMemo(() => vehicles.filter((v) => !v.archivedAt), [vehicles])
   const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
   const visibleAccountIds = useMemo(() => getVisibleAccountIds(accounts), [accounts])
   // O(1) lookup maps — avoid .find() on every virtual row render (Option B)
@@ -146,6 +149,8 @@ export default function TransactionListPage() {
   )
 
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
+  const addMenuRef = useRef<HTMLDivElement>(null)
   const [filters, setFiltersRaw] = useState<Filters>(persistedFilters)
   // draft = filters being edited inside the sheet; only committed on Apply
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS)
@@ -177,6 +182,17 @@ export default function TransactionListPage() {
     loadTx(getQuickRangeSince(persistedQuickRange))
     loadLabels()
   }, [loadTx, loadLabels])
+
+  // Close add-menu on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
+        setAddMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   const openSheet = () => { setDraft(filters); setSheetOpen(true) }
   // Sheet Apply: reload DB with the custom dateFrom if set, then apply all draft filters
@@ -377,13 +393,77 @@ export default function TransactionListPage() {
                 </span>
               )}
             </button>
-            <Link
-              to="/transactions/new"
-              className="flex items-center gap-1 rounded-full bg-indigo-600 text-white px-4 py-1.5 text-sm font-medium"
-            >
-              <Plus size={16} />
-              {t('common.add')}
-            </Link>
+            <div ref={addMenuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setAddMenuOpen((prev) => !prev)}
+                className="flex items-center gap-1 rounded-full bg-indigo-600 text-white px-4 py-1.5 text-sm font-medium"
+              >
+                <Plus size={16} />
+                {t('common.add')}
+                <ChevronDown size={14} className={`transition-transform ${addMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {addMenuOpen && (
+                <div className="absolute right-0 mt-1 w-48 rounded-lg border bg-white shadow-lg z-50 py-1">
+                  <Link
+                    to="/transactions/new"
+                    onClick={() => setAddMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
+                  >
+                    <Plus size={14} className="text-gray-500" />
+                    {t('transactions.addTransaction')}
+                  </Link>
+                  {activeVehicles.length > 0 && (
+                    <>
+                      {activeVehicles.length === 1 ? (
+                        <>
+                          <Link
+                            to={`/vehicles/${activeVehicles[0].id}/fuel/new`}
+                            onClick={() => setAddMenuOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
+                          >
+                            <Fuel size={14} className="text-gray-500" />
+                            {t('vehicles.addFuelLog')}
+                          </Link>
+                          <Link
+                            to={`/vehicles/${activeVehicles[0].id}/service/new`}
+                            onClick={() => setAddMenuOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
+                          >
+                            <Wrench size={14} className="text-gray-500" />
+                            {t('vehicles.addService')}
+                          </Link>
+                        </>
+                      ) : (
+                        activeVehicles.map((v) => (
+                          <div key={v.id}>
+                            <div className="px-3 pt-2 pb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                              {v.name}
+                            </div>
+                            <Link
+                              to={`/vehicles/${v.id}/fuel/new`}
+                              onClick={() => setAddMenuOpen(false)}
+                              className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50"
+                            >
+                              <Fuel size={14} className="text-gray-500" />
+                              {t('vehicles.addFuelLog')}
+                            </Link>
+                            <Link
+                              to={`/vehicles/${v.id}/service/new`}
+                              onClick={() => setAddMenuOpen(false)}
+                              className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50"
+                            >
+                              <Wrench size={14} className="text-gray-500" />
+                              {t('vehicles.addService')}
+                            </Link>
+                          </div>
+                        ))
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -467,10 +547,14 @@ export default function TransactionListPage() {
                       <div className="pb-2">
                         <Link
                           to={`/transactions/${tx.id}`}
-                          className="flex items-center gap-3 rounded-2xl border bg-white px-4 py-3 hover:bg-gray-50 transition-colors"
+                          className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition-colors ${
+                            tx.status === 'cancelled'
+                              ? 'bg-gray-50 border-gray-200 opacity-60'
+                              : 'bg-white hover:bg-gray-50'
+                          }`}
                         >
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{tx.description}</p>
+                            <p className={`text-sm font-medium truncate ${tx.status === 'cancelled' ? 'line-through text-gray-400' : ''}`}>{tx.description}</p>
                             <p className="text-xs text-gray-400 truncate">
                               {getTranslatedCategoryName(cat, t) || '—'} · {acc?.name ?? '—'} · {timeStr}
                             </p>
@@ -494,6 +578,7 @@ export default function TransactionListPage() {
                           </div>
                           <div className="text-right shrink-0">
                             <p className={`text-sm font-semibold ${
+                              tx.status === 'cancelled' ? 'text-gray-400 line-through' :
                               tx.type === 'income' ? 'text-green-600' :
                               tx.type === 'expense' ? 'text-red-500' : 'text-gray-700'
                             }`}>
@@ -621,7 +706,11 @@ export default function TransactionListPage() {
                 <SelectContent>
                   <SelectItem value="__all__">{t('transactions.filters.allAccounts')}</SelectItem>
                   {visibleAccounts.map((acc) => (
-                    <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                    <SelectItem key={acc.id} value={acc.id}>
+                      <span className={acc.cancelled ? 'text-gray-400' : undefined}>
+                        {acc.name}{acc.cancelled ? ` (${t('accounts.cancelled')})` : ''}
+                      </span>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>

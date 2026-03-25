@@ -7,7 +7,7 @@ import { v4 as uuid } from 'uuid'
 import { Plus, Pencil, Trash2, PiggyBank } from 'lucide-react'
 
 import { budgetSchema, type BudgetFormValues } from '../schemas/budget.schema'
-import { getVisibleAccountIds } from '@/lib/accounts'
+import { getActiveAccountIds } from '@/lib/accounts'
 import { useBudgetsStore } from '@/stores/budgets.store'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useCategoriesStore } from '@/stores/categories.store'
@@ -118,11 +118,11 @@ function BudgetCard({
   const { baseCurrency } = useSettingsStore()
   const { accounts } = useAccountsStore()
   const [usage, setUsage] = useState<BudgetUsage | null>(null)
-  const visibleAccountIds = useMemo(() => getVisibleAccountIds(accounts), [accounts])
+  const activeAccountIds = useMemo(() => getActiveAccountIds(accounts), [accounts])
 
   useEffect(() => {
-    getBudgetUsage(budget, visibleAccountIds).then(setUsage).catch(console.error)
-  }, [budget, visibleAccountIds])
+    getBudgetUsage(budget, activeAccountIds).then(setUsage).catch(console.error)
+  }, [budget, activeAccountIds])
 
   const category = categories.find((c) => c.id === budget.categoryId)
   const categoryLabel = category
@@ -390,7 +390,7 @@ export default function BudgetsPage() {
   const [editing, setEditing] = useState<Budget | null>(null)
   const [filterLabelIds, setFilterLabelIds] = useState<string[]>([])
 
-  const visibleAccountIds = useMemo(() => getVisibleAccountIds(accounts), [accounts])
+  const activeAccountIds = useMemo(() => getActiveAccountIds(accounts), [accounts])
 
   const filteredBudgets = useMemo(() => {
     if (filterLabelIds.length === 0) return budgets
@@ -398,12 +398,12 @@ export default function BudgetsPage() {
       transactions.some(
         (t) =>
           t.type === 'expense' &&
-          visibleAccountIds.has(t.accountId) &&
+          activeAccountIds.has(t.accountId) &&
           t.categoryId === b.categoryId &&
           filterLabelIds.some((id) => t.labels?.includes(id)),
       )
     )
-  }, [budgets, transactions, filterLabelIds, visibleAccountIds])
+  }, [budgets, transactions, filterLabelIds, activeAccountIds])
 
   const openAdd = () => { setEditing(null); setDialogOpen(true) }
   const openEdit = (b: Budget) => { setEditing(b); setDialogOpen(true) }

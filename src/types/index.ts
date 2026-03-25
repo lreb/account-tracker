@@ -36,6 +36,7 @@ export interface Account {
   openingBalance: number      // integer cents in account's currency
   currency: string            // ISO 4217
   hidden?: boolean            // excluded from app totals and account selectors
+  cancelled?: boolean         // closed/cancelled account — excluded from all calculations
 }
 
 export interface Category {

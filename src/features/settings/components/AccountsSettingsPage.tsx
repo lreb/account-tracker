@@ -7,7 +7,7 @@ import {
   ACCOUNT_SUBTYPE_OPTIONS_BY_TYPE,
   getOtherSubtypeLabelKey,
 } from '@/constants/account-subtypes'
-import { getVisibleAccounts } from '@/lib/accounts'
+import { getVisibleAccounts, getActiveAccounts } from '@/lib/accounts'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import type { Account, AccountType } from '@/types'
@@ -175,8 +175,10 @@ export default function AccountsSettingsPage() {
     })
   }, [accounts, t])
 
+  const activeAccounts = useMemo(() => getActiveAccounts(accounts), [accounts])
+
   const groupTotal = (type: AccountType) => {
-    const group = visibleAccounts.filter((account) => account.type === type)
+    const group = activeAccounts.filter((account) => account.type === type)
     return group.reduce((sum, account) => sum + (accountBalances.get(account.id) ?? account.openingBalance), 0)
   }
 
@@ -240,18 +242,23 @@ export default function AccountsSettingsPage() {
                             <li
                               key={account.id}
                               className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition-colors ${
-                                account.hidden
-                                  ? 'bg-slate-50 border-slate-200'
-                                  : 'bg-white'
+                                account.cancelled
+                                  ? 'bg-red-50 border-red-200'
+                                  : account.hidden
+                                    ? 'bg-slate-50 border-slate-200'
+                                    : 'bg-white'
                               }`}
                             >
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium">{account.name}</p>
+                                <p className={`text-sm font-medium ${account.cancelled ? 'text-gray-400' : ''}`}>{account.name}</p>
                                 <p className="text-xs text-gray-400">
                                   {account.currency}
-                                  {account.hidden ? ` · ${t('accounts.hidden')}` : ''}
+                                  {account.cancelled ? ` · ${t('accounts.cancelled')}` : account.hidden ? ` · ${t('accounts.hidden')}` : ''}
                                 </p>
-                                {account.hidden && (
+                                {account.cancelled && (
+                                  <p className="text-xs text-red-600">{t('accounts.cancelledExcluded')}</p>
+                                )}
+                                {!account.cancelled && account.hidden && (
                                   <p className="text-xs text-amber-600">{t('accounts.excludedFromTotals')}</p>
                                 )}
                               </div>

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { ArrowLeft, ChevronRight, Plus, TrendingDown, TrendingUp } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, Fuel, Plus, TrendingDown, TrendingUp, Wrench } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { getVisibleAccounts } from '@/lib/accounts'
@@ -11,6 +11,7 @@ import { useExchangeRatesStore } from '@/stores/exchange-rates.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useLabelsStore } from '@/stores/labels.store'
+import { useVehiclesStore } from '@/stores/vehicles.store'
 import {
   BALANCE_SHEET_PRESETS,
   convertBalanceToBase,
@@ -23,7 +24,6 @@ import {
 import { formatCurrency } from '@/lib/currency'
 import type { Account, Transaction } from '@/types'
 
-import { Button } from '@/components/ui/button'
 import { LabelPickerButton } from '@/components/ui/label-picker-button'
 import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
 
@@ -59,7 +59,10 @@ export default function BalanceSheetDetailPage() {
   const { transactions } = useTransactionsStore()
   const { categories } = useCategoriesStore()
   const { labels } = useLabelsStore()
+  const { vehicles } = useVehiclesStore()
   const [filterLabelIds, setFilterLabelIds] = useState<string[]>([])
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
+  const addMenuRef = useRef<HTMLDivElement>(null)
   const { baseCurrency } = useSettingsStore()
   const { load: loadRates, getRateForPair } = useExchangeRatesStore()
   const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
@@ -132,6 +135,18 @@ export default function BalanceSheetDetailPage() {
     return account.type === 'liability' ? -baseValue : baseValue
   }, [account, currentBalance, baseCurrency, getRateForPair])
 
+  const activeVehicles = useMemo(() => vehicles.filter((v) => !v.archivedAt), [vehicles])
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
+        setAddMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
   const overviewUrl = `/balance-sheet?period=${selectedPreset}`
   const returnTo = `/balance-sheet/${accountId}?period=${selectedPreset}`
 
@@ -171,12 +186,77 @@ export default function BalanceSheetDetailPage() {
                 })}
               </p>
             </div>
-            <Link to={`/transactions/new?accountId=${encodeURIComponent(account.id)}&returnTo=${encodeURIComponent(returnTo)}`}>
-              <Button size="sm" className="gap-1">
+            <div ref={addMenuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setAddMenuOpen((prev) => !prev)}
+                className="flex items-center gap-1 rounded-full bg-indigo-600 text-white px-3 py-1.5 text-sm font-medium"
+              >
                 <Plus size={14} />
-                {t('balanceSheet.addTransaction')}
-              </Button>
-            </Link>
+                {t('common.add')}
+                <ChevronDown size={12} className={`transition-transform ${addMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {addMenuOpen && (
+                <div className="absolute right-0 mt-1 w-48 rounded-lg border bg-white shadow-lg z-50 py-1">
+                  <Link
+                    to={`/transactions/new?accountId=${encodeURIComponent(account.id)}&returnTo=${encodeURIComponent(returnTo)}`}
+                    onClick={() => setAddMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
+                  >
+                    <Plus size={14} className="text-gray-500" />
+                    {t('transactions.addTransaction')}
+                  </Link>
+                  {activeVehicles.length > 0 && (
+                    <>
+                      {activeVehicles.length === 1 ? (
+                        <>
+                          <Link
+                            to={`/vehicles/${activeVehicles[0].id}/fuel/new?returnTo=${encodeURIComponent(returnTo)}`}
+                            onClick={() => setAddMenuOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
+                          >
+                            <Fuel size={14} className="text-gray-500" />
+                            {t('vehicles.addFuelLog')}
+                          </Link>
+                          <Link
+                            to={`/vehicles/${activeVehicles[0].id}/service/new?returnTo=${encodeURIComponent(returnTo)}`}
+                            onClick={() => setAddMenuOpen(false)}
+                            className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
+                          >
+                            <Wrench size={14} className="text-gray-500" />
+                            {t('vehicles.addService')}
+                          </Link>
+                        </>
+                      ) : (
+                        activeVehicles.map((v) => (
+                          <div key={v.id}>
+                            <div className="px-3 pt-2 pb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                              {v.name}
+                            </div>
+                            <Link
+                              to={`/vehicles/${v.id}/fuel/new?returnTo=${encodeURIComponent(returnTo)}`}
+                              onClick={() => setAddMenuOpen(false)}
+                              className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50"
+                            >
+                              <Fuel size={14} className="text-gray-500" />
+                              {t('vehicles.addFuelLog')}
+                            </Link>
+                            <Link
+                              to={`/vehicles/${v.id}/service/new?returnTo=${encodeURIComponent(returnTo)}`}
+                              onClick={() => setAddMenuOpen(false)}
+                              className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50"
+                            >
+                              <Wrench size={14} className="text-gray-500" />
+                              {t('vehicles.addService')}
+                            </Link>
+                          </div>
+                        ))
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -246,16 +326,20 @@ export default function BalanceSheetDetailPage() {
                 <li key={transaction.id}>
                   <Link
                     to={`/transactions/${transaction.id}?accountId=${encodeURIComponent(account.id)}&returnTo=${encodeURIComponent(returnTo)}`}
-                    className="flex items-center gap-3 rounded-2xl border border-gray-200 px-4 py-3 transition-colors hover:bg-gray-50"
+                    className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition-colors ${
+                      transaction.status === 'cancelled'
+                        ? 'bg-gray-50 border-gray-200 opacity-60'
+                        : 'border-gray-200 hover:bg-gray-50'
+                    }`}
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-gray-900">{transaction.description}</p>
+                      <p className={`truncate text-sm font-medium ${transaction.status === 'cancelled' ? 'line-through text-gray-400' : 'text-gray-900'}`}>{transaction.description}</p>
                       <p className="text-xs text-gray-400">
                         {category?.name ?? '—'} · {t(presentation.labelKey)} · {format(new Date(transaction.date), 'MMM d, yyyy')}
                       </p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className={`text-sm font-semibold ${presentation.tone}`}>
+                      <p className={`text-sm font-semibold ${transaction.status === 'cancelled' ? 'line-through text-gray-400' : presentation.tone}`}>
                         {presentation.prefix}
                         {formatCurrency(presentation.amount, presentation.currency)}
                       </p>

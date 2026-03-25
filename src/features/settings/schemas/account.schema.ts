@@ -7,6 +7,7 @@ export const accountSchema = z.object({
   subtype: z.string().optional().default(''),
   currency: z.string().min(3, vm.currencyRequired).max(3),
   hidden: z.boolean().default(false),
+  cancelled: z.boolean().default(false),
   openingBalance: z
     .string()
     .refine((v) => !isNaN(parseFloat(v)), vm.mustBeNumber)
