@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
 import { v4 as uuid } from 'uuid'
@@ -48,6 +48,8 @@ export default function ServiceFormPage() {
   const { t } = useTranslation()
   const { vehicleId, serviceId } = useParams<{ vehicleId: string; serviceId?: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const returnToPath = searchParams.get('returnTo') ?? `/vehicles/${vehicleId}`
 
   const { vehicles, addService, updateService, fuelLogs, vehicleServices } = useVehiclesStore()
   const { add: addTransaction, transactions } = useTransactionsStore()
@@ -80,6 +82,7 @@ export default function ServiceFormPage() {
     defaultValues: {
       date: format(new Date(), 'yyyy-MM-dd'),
       time: format(new Date(), 'HH:mm'),
+      description: '',
       serviceType: '',
       cost: '',
       odometer: '',
@@ -147,6 +150,47 @@ export default function ServiceFormPage() {
     return '0'
   }, [odometerEntries.length, vehicle?.initialOdometer, previousOdometer, nextOdometer, t])
 
+  // Description auto-suggest from past service transactions
+  const watchDescription = watch('description')
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const suggestionsRef = useRef<HTMLUListElement>(null)
+  const descriptionRef = useRef<HTMLInputElement | null>(null)
+
+  const suggestionMap = useMemo(() => {
+    const map = new Map<string, typeof transactions[0]>()
+    for (const tx of transactions) {
+      if (tx.categoryId !== maintenanceCategory?.id) continue
+      const key = tx.description.toLowerCase()
+      const prev = map.get(key)
+      if (!prev || tx.date > prev.date) map.set(key, tx)
+    }
+    return map
+  }, [transactions, maintenanceCategory?.id])
+
+  const suggestions = useMemo(() => {
+    const q = (watchDescription ?? '').trim().toLowerCase()
+    if (q.length < 2 || isEditing) return []
+    const results: { description: string; tx: typeof transactions[0] }[] = []
+    for (const [key, tx] of suggestionMap) {
+      if (key.includes(q)) results.push({ description: tx.description, tx })
+      if (results.length >= 5) break
+    }
+    return results
+  }, [watchDescription, suggestionMap, isEditing])
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node) &&
+        descriptionRef.current && !descriptionRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
   // Populate form when editing
   useEffect(() => {
     if (isEditing && editing) {
@@ -158,6 +202,7 @@ export default function ServiceFormPage() {
       reset({
         date: format(new Date(editing.date), 'yyyy-MM-dd'),
         time: format(new Date(editing.date), 'HH:mm'),
+        description: existingTx?.description ?? '',
         serviceType: editing.serviceType,
         cost: (editing.cost / 100).toFixed(2),
         odometer: editing.odometer.toString(),
@@ -177,9 +222,9 @@ export default function ServiceFormPage() {
   // Guard: editing a service that doesn't exist
   useEffect(() => {
     if (isEditing && serviceId && !editing) {
-      navigate(`/vehicles/${vehicleId}`, { replace: true })
+      navigate(returnToPath, { replace: true })
     }
-  }, [editing, serviceId, isEditing, navigate, vehicleId])
+  }, [editing, serviceId, isEditing, navigate, returnToPath])
 
   const onSubmit = async (values: VehicleServiceFormValues) => {
     if (!vehicleId || !vehicle) return
@@ -188,6 +233,8 @@ export default function ServiceFormPage() {
     const [y, mo, d] = values.date.split('-').map(Number)
     const [hh, mm] = values.time.split(':').map(Number)
     const isoDate = new Date(y, mo - 1, d, hh, mm).toISOString()
+    const autoDescription = `${values.serviceType} · ${vehicle.name}`
+    const description = values.description?.trim() || autoDescription
 
     if (editing) {
       const updatedSvc: VehicleService = {
@@ -212,7 +259,7 @@ export default function ServiceFormPage() {
             date: isoDate,
             categoryId: values.categoryId,
             accountId: values.accountId,
-            description: `${values.serviceType} · ${vehicle.name}`,
+            description: description,
             notes: values.notes || undefined,
             status: values.status,
             labels: values.labels ?? [],
@@ -231,7 +278,7 @@ export default function ServiceFormPage() {
         date: isoDate,
         categoryId: values.categoryId,
         accountId: values.accountId,
-        description: `${values.serviceType} · ${vehicle.name}`,
+        description: description,
         notes: values.notes || undefined,
         status: values.status,
         currency: account?.currency ?? baseCurrency,
@@ -253,7 +300,7 @@ export default function ServiceFormPage() {
       })
     }
 
-    navigate(`/vehicles/${vehicleId}`)
+    navigate(returnToPath)
   }
 
   const filteredCategories = categories.filter((c) => !c.deletedAt && (c.type === 'expense' || c.type === 'any'))
@@ -266,7 +313,7 @@ export default function ServiceFormPage() {
           variant="ghost"
           size="icon"
           className="h-8 w-8"
-          onClick={() => navigate(`/vehicles/${vehicleId}`)}
+          onClick={() => navigate(returnToPath)}
         >
           <ArrowLeft size={16} />
         </Button>
@@ -292,6 +339,47 @@ export default function ServiceFormPage() {
             <Input type="time" {...register('time')} />
             {errors.time && <p className="text-xs text-red-500">{t(errors.time.message!)}</p>}
           </div>
+        </div>
+
+        {/* Description */}
+        <div className="space-y-1">
+          <FormLabel>{t('common.description', 'Description')}</FormLabel>
+          <div className="relative">
+            <Input
+              placeholder={t('vehicles.serviceDescriptionPlaceholder', 'e.g. AutoZone oil change')}
+              autoComplete="off"
+              {...register('description')}
+              ref={(el) => {
+                register('description').ref(el)
+                descriptionRef.current = el
+              }}
+              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+              onChange={(e) => {
+                register('description').onChange(e)
+                setShowSuggestions(true)
+              }}
+            />
+            {showSuggestions && suggestions.length > 0 && (
+              <ul
+                ref={suggestionsRef}
+                className="absolute z-50 mt-1 w-full rounded-md border bg-popover text-popover-foreground shadow-md max-h-48 overflow-y-auto"
+              >
+                {suggestions.map(({ description, tx }) => (
+                  <li
+                    key={tx.id}
+                    className="flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-accent"
+                    onMouseDown={() => {
+                      setValue('description', description)
+                      setShowSuggestions(false)
+                    }}
+                  >
+                    <span className="truncate font-medium">{description}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {errors.description && <p className="text-xs text-red-500">{t(errors.description.message!)}</p>}
         </div>
 
         {/* Service Type */}
@@ -439,7 +527,7 @@ export default function ServiceFormPage() {
         </div>
 
         <div className="flex items-center justify-end gap-2 pt-2">
-          <Button type="button" variant="outline" onClick={() => navigate(`/vehicles/${vehicleId}`)}>
+          <Button type="button" variant="outline" onClick={() => navigate(returnToPath)}>
             {t('common.cancel')}
           </Button>
           <Button type="submit" disabled={isSubmitting}>

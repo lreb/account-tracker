@@ -34,6 +34,18 @@ export function getVisibleAccountIds(accounts: Array<Pick<Account, 'id' | 'hidde
   return new Set(getVisibleAccounts(accounts).map((account) => account.id))
 }
 
+export function isAccountCancelled(account?: Pick<Account, 'cancelled'> | null): boolean {
+  return account?.cancelled === true
+}
+
+export function getActiveAccounts<T extends Pick<Account, 'hidden' | 'cancelled'>>(accounts: T[]): T[] {
+  return accounts.filter((account) => !isAccountHidden(account) && !isAccountCancelled(account))
+}
+
+export function getActiveAccountIds(accounts: Array<Pick<Account, 'id' | 'hidden' | 'cancelled'>>): Set<string> {
+  return new Set(getActiveAccounts(accounts).map((account) => account.id))
+}
+
 export function getAccountSelectOptions<T extends Pick<Account, 'id' | 'hidden'>>(
   accounts: T[],
   includeIds: string[] = [],

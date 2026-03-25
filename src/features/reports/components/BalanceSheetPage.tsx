@@ -4,7 +4,7 @@ import { format } from 'date-fns'
 import { ChevronRight, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { getVisibleAccounts } from '@/lib/accounts'
+import { getVisibleAccounts, getActiveAccounts } from '@/lib/accounts'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useExchangeRatesStore } from '@/stores/exchange-rates.store'
 import { useSettingsStore } from '@/stores/settings.store'
@@ -67,7 +67,7 @@ export default function BalanceSheetPage() {
   }, [searchParams, selectedPreset, setSearchParams])
 
   const comparisonDate = useMemo(() => getComparisonDate(selectedPreset), [selectedPreset])
-  const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
+  const visibleAccounts = useMemo(() => getActiveAccounts(accounts), [accounts])
 
   const snapshots = useMemo(() => {
     const rawSnapshots = visibleAccounts.map((account) => {

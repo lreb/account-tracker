@@ -58,6 +58,7 @@ export default function AccountFormPage() {
       subtype: '',
       currency: baseCurrency || 'USD',
       hidden: false,
+      cancelled: false,
       openingBalance: '0',
       name: '',
     },
@@ -75,6 +76,7 @@ export default function AccountFormPage() {
         subtype: editing.subtype ?? '',
         currency: editing.currency,
         hidden: editing.hidden ?? false,
+        cancelled: editing.cancelled ?? false,
         openingBalance: (editing.openingBalance / 100).toFixed(2),
       })
       return
@@ -86,6 +88,7 @@ export default function AccountFormPage() {
       subtype: '',
       currency: baseCurrency || 'USD',
       hidden: false,
+      cancelled: false,
       openingBalance: '0',
     })
   }, [editing, reset, baseCurrency])
@@ -257,6 +260,28 @@ export default function AccountFormPage() {
           <div className="min-w-0">
             <Label className="cursor-pointer">{t('accounts.hideFromApp')}</Label>
             <p className="text-xs text-gray-500">{t('accounts.excludedFromTotals')}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-2">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={watch('cancelled')}
+            onClick={() => setValue('cancelled', !watch('cancelled'))}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              watch('cancelled') ? 'bg-red-500' : 'bg-gray-200'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                watch('cancelled') ? 'translate-x-4' : 'translate-x-0.5'
+              }`}
+            />
+          </button>
+          <div className="min-w-0">
+            <Label className="cursor-pointer">{t('accounts.cancelledAccount')}</Label>
+            <p className="text-xs text-gray-500">{t('accounts.cancelledExcluded')}</p>
           </div>
         </div>
 

@@ -13,6 +13,8 @@ import { useSettingsStore } from '@/stores/settings.store'
 import {
   getVisibleAccountIds,
   getVisibleAccounts,
+  getActiveAccounts,
+  getActiveAccountIds,
   isTransactionForVisiblePrimaryAccount,
 } from '@/lib/accounts'
 import { formatCurrency } from '@/lib/currency'
@@ -35,6 +37,8 @@ export default function DashboardPage() {
   const { baseCurrency } = useSettingsStore()
   const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
   const visibleAccountIds = useMemo(() => getVisibleAccountIds(accounts), [accounts])
+  const activeAccounts = useMemo(() => getActiveAccounts(accounts), [accounts])
+  const activeAccountIds = useMemo(() => getActiveAccountIds(accounts), [accounts])
   const [filterLabelIds, setFilterLabelIds] = useState<string[]>([])
   const visibleTransactions = useMemo(
     () => transactions.filter((transaction) => isTransactionForVisiblePrimaryAccount(transaction, visibleAccountIds)),
@@ -62,21 +66,21 @@ export default function DashboardPage() {
   }, [])
 
   const summary = useMemo(
-    () => computePeriodSummary(transactions, thisMonthFilters, visibleAccountIds),
-    [transactions, thisMonthFilters, visibleAccountIds],
+    () => computePeriodSummary(transactions, thisMonthFilters, activeAccountIds),
+    [transactions, thisMonthFilters, activeAccountIds],
   )
   const lastMonth = useMemo(
-    () => computePeriodSummary(transactions, lastMonthFilters, visibleAccountIds),
-    [transactions, lastMonthFilters, visibleAccountIds],
+    () => computePeriodSummary(transactions, lastMonthFilters, activeAccountIds),
+    [transactions, lastMonthFilters, activeAccountIds],
   )
   const trend = useMemo(
-    () => computeMonthlyTrend(transactions, 6, undefined, visibleAccountIds),
-    [transactions, visibleAccountIds],
+    () => computeMonthlyTrend(transactions, 6, undefined, activeAccountIds),
+    [transactions, activeAccountIds],
   )
 
   // Net worth: sum of all account closing balances
   const netWorth = useMemo(() => {
-    return visibleAccounts.reduce((sum, acc) => {
+    return activeAccounts.reduce((sum, acc) => {
       const accTx = transactions.filter((t) => t.accountId === acc.id || t.toAccountId === acc.id)
       const net = accTx.reduce((s, t) => {
         if (t.type === 'income') return s + t.amount
@@ -89,15 +93,15 @@ export default function DashboardPage() {
       }, 0)
       return sum + acc.openingBalance + net
     }, 0)
-  }, [visibleAccounts, transactions])
+  }, [activeAccounts, transactions])
 
   // Recent transactions (last 5)
   const recent = useMemo(() => labelFilteredTransactions.slice(0, 5), [labelFilteredTransactions])
 
   // 50/30/20 — only render when user has labelled transactions this month
   const rule503020 = useMemo(
-    () => compute503020(transactions, labels, thisMonthFilters, visibleAccountIds),
-    [transactions, labels, thisMonthFilters, visibleAccountIds],
+    () => compute503020(transactions, labels, thisMonthFilters, activeAccountIds),
+    [transactions, labels, thisMonthFilters, activeAccountIds],
   )
 
   // Budget health: top 3 budgets by percent used
@@ -108,7 +112,7 @@ export default function DashboardPage() {
       const spent = transactions
         .filter((t) => (
           t.type === 'expense'
-          && visibleAccountIds.has(t.accountId)
+          && activeAccountIds.has(t.accountId)
           && t.categoryId === b.categoryId
           && t.date >= startStr
           && t.date <= endStr

@@ -43,6 +43,7 @@ export const SERVICE_TYPES = [
 export const fuelLogSchema = z.object({
   date: z.string().min(1, vm.dateRequired),
   time: z.string().min(1, 'validation.timeRequired'),
+  description: z.string().max(100).optional(),
   liters: z
     .string()
     .regex(/^\d+(\.\d{1,3})?$/, vm.invalidLiters)
@@ -73,6 +74,7 @@ export type FuelLogFormValues = z.infer<typeof fuelLogSchema>
 export const vehicleServiceSchema = z.object({
   date: z.string().min(1, vm.dateRequired),
   time: z.string().min(1, 'validation.timeRequired'),
+  description: z.string().max(100).optional(),
   serviceType: z.string().min(1, vm.serviceTypeRequired).max(60),
   cost: z
     .string()
