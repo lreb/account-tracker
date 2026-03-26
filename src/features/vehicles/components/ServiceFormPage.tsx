@@ -36,6 +36,8 @@ import { Input } from '@/components/ui/input'
 import { Label as FormLabel } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { LabelPickerButton } from '@/components/ui/label-picker-button'
+import { StatusSelect } from '@/components/ui/status-select'
+import { AccountSelect } from '@/components/ui/account-select'
 import {
   Select,
   SelectContent,
@@ -450,20 +452,13 @@ export default function ServiceFormPage() {
         </div>
 
         {/* Account */}
-        <div className="space-y-1">
-          <FormLabel>{t('transactions.account')}</FormLabel>
-          <Select value={watchAccountId || ''} onValueChange={(v) => setValue('accountId', v as string)}>
-            <SelectTrigger>
-              <SelectValue>{accounts.find((a) => a.id === watchAccountId)?.name ?? t('transactions.selectAccount')}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {availableAccounts.map((a) => (
-                <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.accountId && <p className="text-xs text-red-500">{t(errors.accountId.message!)}</p>}
-        </div>
+        <AccountSelect
+          value={watchAccountId || ''}
+          onChange={(v) => setValue('accountId', v)}
+          options={availableAccounts}
+          label={t('transactions.account')}
+          error={errors.accountId ? t(errors.accountId.message!) : undefined}
+        />
 
         {/* Category */}
         <div className="space-y-1">
@@ -482,19 +477,7 @@ export default function ServiceFormPage() {
         </div>
 
         {/* Status */}
-        <div className="space-y-1">
-          <FormLabel>{t('transactions.statusLabel')}</FormLabel>
-          <Select value={watchStatus} onValueChange={(v) => setValue('status', v as VehicleServiceFormValues['status'])}>
-            <SelectTrigger>
-              <SelectValue>{t(`transactions.status.${watchStatus}`)}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {(['cleared', 'pending', 'reconciled', 'cancelled'] as const).map((s) => (
-                <SelectItem key={s} value={s}>{t(`transactions.status.${s}`)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <StatusSelect value={watchStatus} onChange={(v) => setValue('status', v)} />
 
         {/* Labels */}
         <LabelPickerButton

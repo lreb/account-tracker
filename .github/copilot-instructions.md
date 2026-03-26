@@ -94,8 +94,8 @@ src/
 │   ├── App.tsx              # Root component, providers
 │   └── router.tsx           # createBrowserRouter route definitions
 ├── components/
-│   ├── ui/                  # shadcn/ui primitives (auto-generated, do not edit)
-│   └── layout/              # Shell, bottom nav, header, page wrapper
+│   ├── ui/                  # shadcn/ui primitives + custom reusable UI components (AccountSelect, StatusSelect, ScrollToTopButton, AmountCalculatorButton, LabelPickerButton, etc.)
+│   └── layout/              # Shell, sidebar, header, page wrapper
 ├── features/
 │   ├── transactions/
 │   │   ├── components/      # TransactionForm, TransactionList, TransactionCard

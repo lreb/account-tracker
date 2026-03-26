@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { Plus, SlidersHorizontal, X, ChevronDown, Fuel, Wrench } from 'lucide-react'
+import { Plus, SlidersHorizontal, X, Fuel, Wrench } from 'lucide-react'
 import { format, isToday, isYesterday, parseISO, subMonths, subYears } from 'date-fns'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useTransactionsStore } from '@/stores/transactions.store'
@@ -150,7 +150,6 @@ export default function TransactionListPage() {
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const [addMenuOpen, setAddMenuOpen] = useState(false)
-  const addMenuRef = useRef<HTMLDivElement>(null)
   const [filters, setFiltersRaw] = useState<Filters>(persistedFilters)
   // draft = filters being edited inside the sheet; only committed on Apply
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS)
@@ -182,17 +181,6 @@ export default function TransactionListPage() {
     loadTx(getQuickRangeSince(persistedQuickRange))
     loadLabels()
   }, [loadTx, loadLabels])
-
-  // Close add-menu on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
-        setAddMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
 
   const openSheet = () => { setDraft(filters); setSheetOpen(true) }
   // Sheet Apply: reload DB with the custom dateFrom if set, then apply all draft filters
@@ -379,92 +367,19 @@ export default function TransactionListPage() {
 
         <div className="flex items-center justify-between mb-3">
           <h1 className="text-xl font-bold">{t('transactions.title')}</h1>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={openSheet}
-              className="relative flex items-center gap-1 rounded-full border bg-white px-3 py-1.5 text-sm text-gray-600 shadow-sm"
-            >
-              <SlidersHorizontal size={14} />
-              {t('transactions.filters.button')}
-              {activeCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
-                  {activeCount}
-                </span>
-              )}
-            </button>
-            <div ref={addMenuRef} className="relative">
-              <button
-                type="button"
-                onClick={() => setAddMenuOpen((prev) => !prev)}
-                className="flex items-center gap-1 rounded-full bg-indigo-600 text-white px-4 py-1.5 text-sm font-medium"
-              >
-                <Plus size={16} />
-                {t('common.add')}
-                <ChevronDown size={14} className={`transition-transform ${addMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {addMenuOpen && (
-                <div className="absolute right-0 mt-1 w-48 rounded-lg border bg-white shadow-lg z-50 py-1">
-                  <Link
-                    to="/transactions/new"
-                    onClick={() => setAddMenuOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
-                  >
-                    <Plus size={14} className="text-gray-500" />
-                    {t('transactions.addTransaction')}
-                  </Link>
-                  {activeVehicles.length > 0 && (
-                    <>
-                      {activeVehicles.length === 1 ? (
-                        <>
-                          <Link
-                            to={`/vehicles/${activeVehicles[0].id}/fuel/new`}
-                            onClick={() => setAddMenuOpen(false)}
-                            className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
-                          >
-                            <Fuel size={14} className="text-gray-500" />
-                            {t('vehicles.addFuelLog')}
-                          </Link>
-                          <Link
-                            to={`/vehicles/${activeVehicles[0].id}/service/new`}
-                            onClick={() => setAddMenuOpen(false)}
-                            className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
-                          >
-                            <Wrench size={14} className="text-gray-500" />
-                            {t('vehicles.addService')}
-                          </Link>
-                        </>
-                      ) : (
-                        activeVehicles.map((v) => (
-                          <div key={v.id}>
-                            <div className="px-3 pt-2 pb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
-                              {v.name}
-                            </div>
-                            <Link
-                              to={`/vehicles/${v.id}/fuel/new`}
-                              onClick={() => setAddMenuOpen(false)}
-                              className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50"
-                            >
-                              <Fuel size={14} className="text-gray-500" />
-                              {t('vehicles.addFuelLog')}
-                            </Link>
-                            <Link
-                              to={`/vehicles/${v.id}/service/new`}
-                              onClick={() => setAddMenuOpen(false)}
-                              className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50"
-                            >
-                              <Wrench size={14} className="text-gray-500" />
-                              {t('vehicles.addService')}
-                            </Link>
-                          </div>
-                        ))
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={openSheet}
+            className="relative flex items-center gap-1 rounded-full border bg-white px-3 py-1.5 text-sm text-gray-600 shadow-sm"
+          >
+            <SlidersHorizontal size={14} />
+            {t('transactions.filters.button')}
+            {activeCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
+                {activeCount}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Active filter chips */}
@@ -610,6 +525,78 @@ export default function TransactionListPage() {
       </div>
 
       <ScrollToTopButton scrollRef={scrollContainerRef} threshold={320} />
+
+      {/* ── FAB: Add menu (right side) ────────────────────────────────────── */}
+      {addMenuOpen && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setAddMenuOpen(false)}
+        />
+      )}
+      <div className="fixed bottom-6 right-4 z-50 flex flex-col-reverse items-end gap-2">
+        {addMenuOpen && (
+          <>
+            <Link
+              to="/transactions/new"
+              onClick={() => setAddMenuOpen(false)}
+              className="flex items-center gap-2 rounded-full bg-white pl-3 pr-4 py-2 shadow-lg border text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all animate-in fade-in slide-in-from-bottom-2 duration-150"
+            >
+              <Plus size={16} className="text-indigo-500 shrink-0" />
+              <span>{t('transactions.addTransaction')}</span>
+            </Link>
+            {activeVehicles.length === 1 ? (
+              <>
+                <Link
+                  to={`/vehicles/${activeVehicles[0].id}/fuel/new`}
+                  onClick={() => setAddMenuOpen(false)}
+                  className="flex items-center gap-2 rounded-full bg-white pl-3 pr-4 py-2 shadow-lg border text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all animate-in fade-in slide-in-from-bottom-2 duration-150"
+                >
+                  <Fuel size={16} className="text-blue-500 shrink-0" />
+                  <span>{t('vehicles.addFuelLog')}</span>
+                </Link>
+                <Link
+                  to={`/vehicles/${activeVehicles[0].id}/service/new`}
+                  onClick={() => setAddMenuOpen(false)}
+                  className="flex items-center gap-2 rounded-full bg-white pl-3 pr-4 py-2 shadow-lg border text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all animate-in fade-in slide-in-from-bottom-2 duration-150"
+                >
+                  <Wrench size={16} className="text-orange-500 shrink-0" />
+                  <span>{t('vehicles.addService')}</span>
+                </Link>
+              </>
+            ) : activeVehicles.length > 1 ? (
+              activeVehicles.map((v) => (
+                <div key={v.id} className="flex flex-col items-end gap-2">
+                  <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide pr-1">{v.name}</span>
+                  <Link
+                    to={`/vehicles/${v.id}/fuel/new`}
+                    onClick={() => setAddMenuOpen(false)}
+                    className="flex items-center gap-2 rounded-full bg-white pl-3 pr-4 py-2 shadow-lg border text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all animate-in fade-in slide-in-from-bottom-2 duration-150"
+                  >
+                    <Fuel size={16} className="text-blue-500 shrink-0" />
+                    <span>{t('vehicles.addFuelLog')}</span>
+                  </Link>
+                  <Link
+                    to={`/vehicles/${v.id}/service/new`}
+                    onClick={() => setAddMenuOpen(false)}
+                    className="flex items-center gap-2 rounded-full bg-white pl-3 pr-4 py-2 shadow-lg border text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all animate-in fade-in slide-in-from-bottom-2 duration-150"
+                  >
+                    <Wrench size={16} className="text-orange-500 shrink-0" />
+                    <span>{t('vehicles.addService')}</span>
+                  </Link>
+                </div>
+              ))
+            ) : null}
+          </>
+        )}
+        <button
+          type="button"
+          onClick={() => setAddMenuOpen((v) => !v)}
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white shadow-xl hover:bg-indigo-700 active:scale-95 transition-all"
+          aria-label={addMenuOpen ? t('common.cancel') : t('common.add')}
+        >
+          <Plus size={26} className={`transition-transform duration-200 ${addMenuOpen ? 'rotate-45' : ''}`} />
+        </button>
+      </div>
 
       {/* Filter sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>

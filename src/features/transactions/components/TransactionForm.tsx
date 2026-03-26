@@ -30,6 +30,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { LabelPickerButton } from '@/components/ui/label-picker-button'
+import { StatusSelect } from '@/components/ui/status-select'
+import { AccountSelect } from '@/components/ui/account-select'
 
 const TYPE_OPTIONS = [
   { value: 'expense',  label: 'transactions.expense' },
@@ -37,12 +39,6 @@ const TYPE_OPTIONS = [
   { value: 'transfer', label: 'transactions.transfer' },
 ] as const
 
-const STATUS_OPTIONS = [
-  { value: 'cleared',     label: 'transactions.status.cleared' },
-  { value: 'pending',     label: 'transactions.status.pending' },
-  { value: 'reconciled',  label: 'transactions.status.reconciled' },
-  { value: 'cancelled',   label: 'transactions.status.cancelled' },
-] as const
 
 export default function TransactionForm() {
   const { t } = useTranslation()
@@ -440,80 +436,29 @@ export default function TransactionForm() {
       </div>
 
       {/* Account */}
-      <div className="space-y-1">
-        <Label>{t('settings.accounts')}</Label>
-        <Select
-          value={watchAccountId || undefined}
-          onValueChange={(v) => setValue('accountId', v ?? '')}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select account">
-              {(() => {
-                const acct = accounts.find((a) => a.id === watchAccountId)
-                if (!acct) return undefined
-                return `${acct.name} · ${formatCurrency(accountBalances.get(acct.id) ?? acct.openingBalance, acct.currency)}`
-              })()}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {sourceAccountOptions.map((acct) => (
-              <SelectItem key={acct.id} value={acct.id}>
-                {acct.name} · {formatCurrency(accountBalances.get(acct.id) ?? acct.openingBalance, acct.currency)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {errors.accountId && <p className="text-xs text-red-500">{t(errors.accountId.message!)}</p>}
-      </div>
+      <AccountSelect
+        value={watchAccountId || ''}
+        onChange={(v) => setValue('accountId', v)}
+        options={sourceAccountOptions}
+        balances={accountBalances}
+        label={t('settings.accounts')}
+        error={errors.accountId ? t(errors.accountId.message!) : undefined}
+      />
 
       {/* Destination account — transfers only */}
       {watchType === 'transfer' && (
-        <div className="space-y-1">
-          <Label>{t('common.toAccount', 'To Account')}</Label>
-          <Select
-            value={watchToAccountId || undefined}
-            onValueChange={(v) => setValue('toAccountId', v ?? undefined)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select destination account">
-                {(() => {
-                  const acct = accounts.find((a) => a.id === watchToAccountId)
-                  if (!acct) return undefined
-                  return `${acct.name} · ${formatCurrency(accountBalances.get(acct.id) ?? acct.openingBalance, acct.currency)}`
-                })()}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {destinationAccountOptions.map((acct) => (
-                  <SelectItem key={acct.id} value={acct.id}>
-                    {acct.name} · {formatCurrency(accountBalances.get(acct.id) ?? acct.openingBalance, acct.currency)}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-          {errors.toAccountId && <p className="text-xs text-red-500">{t(errors.toAccountId.message!)}</p>}
-        </div>
+        <AccountSelect
+          value={watchToAccountId || ''}
+          onChange={(v) => setValue('toAccountId', v || undefined)}
+          options={destinationAccountOptions}
+          balances={accountBalances}
+          label={t('common.toAccount', 'To Account')}
+          error={errors.toAccountId ? t(errors.toAccountId.message!) : undefined}
+        />
       )}
 
       {/* Status */}
-      <div className="space-y-1">
-        <Label>{t('common.status', 'Status')}</Label>
-        <Select
-          value={watchStatus || undefined}
-          onValueChange={(v) => setValue('status', v as TransactionFormValues['status'])}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_OPTIONS.map(({ value, label }) => (
-              <SelectItem key={value} value={value}>
-                {t(label)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <StatusSelect value={watchStatus || 'cleared'} onChange={(v) => setValue('status', v)} />
 
       {/* Exchange rate — only when account currency differs from base currency */}
       {watchCurrency && watchCurrency !== baseCurrency && (
