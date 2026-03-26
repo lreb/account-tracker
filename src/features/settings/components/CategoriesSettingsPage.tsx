@@ -65,14 +65,18 @@ function CategoryDialog({
 
   const watchType = watch('type')
 
-  // Re-populate form when switching between create/edit
+  // Re-populate form every time the dialog opens (or when editing changes while open).
+  // Including `open` in deps is critical: if the user cancels without saving then
+  // reopens the same category, `editing` reference is unchanged so the effect would
+  // not fire without `open` — leaving the form with whatever the user had typed.
   useEffect(() => {
+    if (!open) return
     if (editing) {
       reset({ name: editing.name, icon: editing.icon, type: editing.type })
     } else {
       reset({ name: '', icon: 'MoreHorizontal', type: 'expense' })
     }
-  }, [editing, reset])
+  }, [open, editing, reset])
 
   const onSubmit = async (values: CategoryFormValues) => {
     if (isEdit && editing) {
@@ -183,8 +187,11 @@ function CategorySection({
   onRestore: (id: string) => void
   t: (k: string) => string
 }) {
-  const active   = items.filter((c) => !c.deletedAt)
-  const archived = items.filter((c) => !!c.deletedAt)
+  const sortByName = (a: Category, b: Category) =>
+    getTranslatedCategoryName(a, t).localeCompare(getTranslatedCategoryName(b, t))
+
+  const active   = items.filter((c) => !c.deletedAt).sort(sortByName)
+  const archived = items.filter((c) =>  !!c.deletedAt).sort(sortByName)
 
   if (active.length === 0 && archived.length === 0) return null
 

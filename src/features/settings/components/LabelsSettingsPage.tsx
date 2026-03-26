@@ -12,6 +12,7 @@ import type { Label } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label as FormLabel } from '@/components/ui/label'
+import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
 import {
   Dialog,
   DialogContent,
@@ -158,7 +159,7 @@ export default function LabelsSettingsPage() {
         </div>
       ) : (
         <ul className="space-y-2">
-          {labels.map((label) => (
+          {[...labels].sort((a, b) => a.name.localeCompare(b.name)).map((label) => (
             <li
               key={label.id}
               className="flex items-center gap-3 rounded-2xl border bg-white px-4 py-3"
@@ -201,6 +202,7 @@ export default function LabelsSettingsPage() {
       )}
 
       <LabelDialog open={dialogOpen} editing={editing} onClose={closeDialog} />
+      <ScrollToTopButton />
     </div>
   )
 }
