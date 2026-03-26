@@ -37,10 +37,9 @@ export function ScrollToTopButton({ threshold = 300, scrollRef }: ScrollToTopBut
       onClick={handleClick}
       aria-label={t('common.scrollToTop')}
       title={t('common.scrollToTop')}
-      className="fixed bottom-24 right-4 z-50 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-lg transition-opacity hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg hover:bg-emerald-600 active:scale-95 transition-all"
     >
-      <ArrowUp size={14} />
-      <span>{t('common.scrollToTop')}</span>
+      <ArrowUp size={20} strokeWidth={2.5} />
     </button>
   )
 }

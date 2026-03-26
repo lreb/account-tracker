@@ -9,6 +9,11 @@
     "vehicles": "Vehicles",
     "insights": "Insights"
   },
+  "sidebar": {
+    "main": "Main",
+    "quickCreate": "Quick Create",
+    "settings": "Settings"
+  },
   "common": {
     "add": "Add",
     "edit": "Edit",
@@ -315,6 +320,10 @@
   "settings": {
     "title": "Settings",
     "accounts": "Accounts",
+    "importExportTitle": "Import & Export",
+    "googleDriveTitle": "Google Drive Sync",
+    "dataRetentionTitle": "Data Retention",
+    "preferencesTitle": "Preferences",
     "categories": "Categories",
     "labels": "Labels",
     "exchangeRates": "Exchange Rates",

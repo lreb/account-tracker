@@ -18,6 +18,10 @@ import AccountFormPage from '@/features/settings/components/AccountFormPage'
 import CategoriesSettingsPage from '@/features/settings/components/CategoriesSettingsPage'
 import LabelsSettingsPage from '@/features/settings/components/LabelsSettingsPage'
 import ExchangeRatesSettingsPage from '@/features/settings/components/ExchangeRatesSettingsPage'
+import ImportExportPage from '@/features/settings/components/ImportExportPage'
+import GoogleDriveSyncPage from '@/features/settings/components/GoogleDriveSyncPage'
+import DataRetentionPage from '@/features/settings/components/DataRetentionPage'
+import PreferencesPage from '@/features/settings/components/PreferencesPage'
 import OAuthCallbackPage from '@/features/settings/components/OAuthCallbackPage'
 
 export const router = createBrowserRouter([
@@ -52,6 +56,10 @@ export const router = createBrowserRouter([
           { path: 'categories', element: <CategoriesSettingsPage /> },
           { path: 'labels', element: <LabelsSettingsPage /> },
           { path: 'exchange-rates', element: <ExchangeRatesSettingsPage /> },
+          { path: 'import-export', element: <ImportExportPage /> },
+          { path: 'google-drive', element: <GoogleDriveSyncPage /> },
+          { path: 'data-retention', element: <DataRetentionPage /> },
+          { path: 'preferences', element: <PreferencesPage /> },
         ],
       },
     ],
