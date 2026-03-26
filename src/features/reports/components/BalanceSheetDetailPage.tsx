@@ -73,6 +73,10 @@ export default function BalanceSheetDetailPage() {
     : 'lastMonth'
 
   useEffect(() => {
+    document.getElementById('main-scroll')?.scrollTo({ top: 0, behavior: 'instant' })
+  }, [])
+
+  useEffect(() => {
     void loadRates()
   }, [loadRates])
 
