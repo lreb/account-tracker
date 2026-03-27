@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { Plus, SlidersHorizontal, X, Fuel, Wrench } from 'lucide-react'
+import { SlidersHorizontal, X } from 'lucide-react'
 import { format, isToday, isYesterday, parseISO, subMonths, subYears } from 'date-fns'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useTransactionsStore } from '@/stores/transactions.store'
@@ -9,7 +9,7 @@ import { useCategoriesStore } from '@/stores/categories.store'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { useLabelsStore } from '@/stores/labels.store'
-import { useVehiclesStore } from '@/stores/vehicles.store'
+import { AddFabMenu } from '@/components/ui/add-fab-menu'
 import {
   getVisibleAccountIds,
   getVisibleAccounts,
@@ -136,8 +136,6 @@ export default function TransactionListPage() {
   const { accounts } = useAccountsStore()
   const { baseCurrency } = useSettingsStore()
   const { labels, load: loadLabels } = useLabelsStore()
-  const { vehicles } = useVehiclesStore()
-  const activeVehicles = useMemo(() => vehicles.filter((v) => !v.archivedAt), [vehicles])
   const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
   const visibleAccountIds = useMemo(() => getVisibleAccountIds(accounts), [accounts])
   // O(1) lookup maps — avoid .find() on every virtual row render (Option B)
@@ -149,7 +147,6 @@ export default function TransactionListPage() {
   )
 
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [addMenuOpen, setAddMenuOpen] = useState(false)
   const [filters, setFiltersRaw] = useState<Filters>(persistedFilters)
   // draft = filters being edited inside the sheet; only committed on Apply
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS)
@@ -527,76 +524,7 @@ export default function TransactionListPage() {
       <ScrollToTopButton scrollRef={scrollContainerRef} threshold={320} />
 
       {/* ── FAB: Add menu (right side) ────────────────────────────────────── */}
-      {addMenuOpen && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setAddMenuOpen(false)}
-        />
-      )}
-      <div className="fixed bottom-6 right-4 z-50 flex flex-col-reverse items-end gap-2">
-        {addMenuOpen && (
-          <>
-            <Link
-              to="/transactions/new"
-              onClick={() => setAddMenuOpen(false)}
-              className="flex items-center gap-2 rounded-full bg-white pl-3 pr-4 py-2 shadow-lg border text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all animate-in fade-in slide-in-from-bottom-2 duration-150"
-            >
-              <Plus size={16} className="text-indigo-500 shrink-0" />
-              <span>{t('transactions.addTransaction')}</span>
-            </Link>
-            {activeVehicles.length === 1 ? (
-              <>
-                <Link
-                  to={`/vehicles/${activeVehicles[0].id}/fuel/new`}
-                  onClick={() => setAddMenuOpen(false)}
-                  className="flex items-center gap-2 rounded-full bg-white pl-3 pr-4 py-2 shadow-lg border text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all animate-in fade-in slide-in-from-bottom-2 duration-150"
-                >
-                  <Fuel size={16} className="text-blue-500 shrink-0" />
-                  <span>{t('vehicles.addFuelLog')}</span>
-                </Link>
-                <Link
-                  to={`/vehicles/${activeVehicles[0].id}/service/new`}
-                  onClick={() => setAddMenuOpen(false)}
-                  className="flex items-center gap-2 rounded-full bg-white pl-3 pr-4 py-2 shadow-lg border text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all animate-in fade-in slide-in-from-bottom-2 duration-150"
-                >
-                  <Wrench size={16} className="text-orange-500 shrink-0" />
-                  <span>{t('vehicles.addService')}</span>
-                </Link>
-              </>
-            ) : activeVehicles.length > 1 ? (
-              activeVehicles.map((v) => (
-                <div key={v.id} className="flex flex-col items-end gap-2">
-                  <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide pr-1">{v.name}</span>
-                  <Link
-                    to={`/vehicles/${v.id}/fuel/new`}
-                    onClick={() => setAddMenuOpen(false)}
-                    className="flex items-center gap-2 rounded-full bg-white pl-3 pr-4 py-2 shadow-lg border text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all animate-in fade-in slide-in-from-bottom-2 duration-150"
-                  >
-                    <Fuel size={16} className="text-blue-500 shrink-0" />
-                    <span>{t('vehicles.addFuelLog')}</span>
-                  </Link>
-                  <Link
-                    to={`/vehicles/${v.id}/service/new`}
-                    onClick={() => setAddMenuOpen(false)}
-                    className="flex items-center gap-2 rounded-full bg-white pl-3 pr-4 py-2 shadow-lg border text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all animate-in fade-in slide-in-from-bottom-2 duration-150"
-                  >
-                    <Wrench size={16} className="text-orange-500 shrink-0" />
-                    <span>{t('vehicles.addService')}</span>
-                  </Link>
-                </div>
-              ))
-            ) : null}
-          </>
-        )}
-        <button
-          type="button"
-          onClick={() => setAddMenuOpen((v) => !v)}
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white shadow-xl hover:bg-indigo-700 active:scale-95 transition-all"
-          aria-label={addMenuOpen ? t('common.cancel') : t('common.add')}
-        >
-          <Plus size={26} className={`transition-transform duration-200 ${addMenuOpen ? 'rotate-45' : ''}`} />
-        </button>
-      </div>
+      <AddFabMenu />
 
       {/* Filter sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>

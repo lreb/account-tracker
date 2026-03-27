@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate } from 'react-router-dom'
@@ -9,8 +9,10 @@ import { Plus, Car, ChevronRight, Pencil, Archive, ArchiveRestore, ChevronDown, 
 
 import { vehicleSchema, type VehicleFormValues } from '../schemas/vehicle.schema'
 import { useVehiclesStore } from '@/stores/vehicles.store'
+import { useSettingsStore } from '@/stores/settings.store'
 import type { Vehicle } from '@/types'
 import { MAKES, MODEL_MAP } from '@/lib/vehicle-data'
+import { VehicleStats } from './VehicleStats'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -353,7 +355,8 @@ function VehicleRow({
 
 export default function VehicleListPage() {
   const { t } = useTranslation()
-  const { vehicles, load } = useVehiclesStore()
+  const { vehicles, fuelLogs, vehicleServices, load } = useVehiclesStore()
+  const { baseCurrency } = useSettingsStore()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Vehicle | null>(null)
   const [showArchived, setShowArchived] = useState(false)
@@ -362,6 +365,54 @@ export default function VehicleListPage() {
 
   const active   = vehicles.filter((v) => !v.archivedAt)
   const archived = vehicles.filter((v) => Boolean(v.archivedAt))
+
+  // ── Fleet stats data (active vehicles only) ────────────────────────────────
+  const fleetLogs = useMemo(
+    () => fuelLogs.filter((l) => active.some((v) => v.id === l.vehicleId)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [fuelLogs, vehicles],
+  )
+  const fleetServices = useMemo(
+    () => vehicleServices.filter((s) => active.some((v) => v.id === s.vehicleId)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [vehicleServices, vehicles],
+  )
+
+  /** Sum of per-vehicle distances (max_odo - initial/first_odo) for all active vehicles. */
+  const fleetTotalDistanceKm = useMemo(() => {
+    let total = 0
+    for (const v of active) {
+      const vLogs = fuelLogs
+        .filter((l) => l.vehicleId === v.id)
+        .sort((a, b) => a.date.localeCompare(b.date))
+      if (vLogs.length === 0) continue
+      const maxOdo = vLogs[vLogs.length - 1].odometer
+      const minOdo = v.initialOdometer || vLogs[0].odometer
+      total += Math.max(0, maxOdo - minOdo)
+    }
+    return total
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fuelLogs, vehicles])
+
+  /** Cross-vehicle weighted-average km/L (consecutive fills per vehicle). */
+  const fleetAvgKmPerL = useMemo(() => {
+    let totalKm = 0
+    let totalLiters = 0
+    for (const v of active) {
+      const vLogs = fuelLogs
+        .filter((l) => l.vehicleId === v.id)
+        .sort((a, b) => a.date.localeCompare(b.date))
+      for (let i = 1; i < vLogs.length; i++) {
+        const km = vLogs[i].odometer - vLogs[i - 1].odometer
+        if (km > 0) {
+          totalKm += km
+          totalLiters += vLogs[i].liters
+        }
+      }
+    }
+    return totalLiters > 0 ? totalKm / totalLiters : 0
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fuelLogs, vehicles])
 
   const openAdd = () => { setEditing(null); setDialogOpen(true) }
   const openEdit = (v: Vehicle) => { setEditing(v); setDialogOpen(true) }
@@ -420,6 +471,23 @@ export default function VehicleListPage() {
       )}
 
       <VehicleDialog open={dialogOpen} editing={editing} onClose={closeDialog} />
+
+      {/* Fleet overview — shown only when there's at least one fuel log or service across active vehicles */}
+      {(fleetLogs.length > 0 || fleetServices.length > 0) && (
+        <div className="mt-8">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            {t('vehicles.stats.fleetOverview')}
+          </h2>
+          <VehicleStats
+            logs={fleetLogs}
+            services={fleetServices}
+            baseCurrency={baseCurrency}
+            initialOdometer={0}
+            overrideTotalDistance={fleetTotalDistanceKm}
+            overrideAvgKmPerL={fleetAvgKmPerL}
+          />
+        </div>
+      )}
     </div>
   )
 }
