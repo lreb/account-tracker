@@ -17,22 +17,15 @@ import {
   getOtherSubtypeLabelKey,
   getOtherSubtypeValue,
 } from '@/constants/account-subtypes'
+import { sortAccounts } from '@/lib/accounts'
 import { cn } from '@/lib/utils'
 import type { Account, AccountType } from '@/types'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
-const TYPE_ORDER: AccountType[] = ['asset', 'liability']
-
 function getSubtypeLabelKey(type: AccountType, subtypeValue: string): string {
   const opts = ACCOUNT_SUBTYPE_OPTIONS_BY_TYPE[type] ?? []
   return opts.find((o) => o.value === subtypeValue)?.labelKey ?? getOtherSubtypeLabelKey(type)
-}
-
-function getSubtypeOrder(type: AccountType, subtypeValue: string): number {
-  const opts = ACCOUNT_SUBTYPE_OPTIONS_BY_TYPE[type] ?? []
-  const idx = opts.findIndex((o) => o.value === subtypeValue)
-  return idx === -1 ? opts.length : idx
 }
 
 interface AccountGroup {
@@ -48,19 +41,7 @@ function buildGroups(accounts: Account[], query: string): AccountGroup[] {
     .filter((a) => !a.cancelled)
     .filter((a) => !q || a.name.toLowerCase().includes(q))
 
-  const sorted = [...filtered].sort((a, b) => {
-    const tA = TYPE_ORDER.indexOf(a.type)
-    const tB = TYPE_ORDER.indexOf(b.type)
-    if (tA !== tB) return tA - tB
-
-    const effSubA = a.subtype || getOtherSubtypeValue(a.type)
-    const effSubB = b.subtype || getOtherSubtypeValue(b.type)
-    const oA = getSubtypeOrder(a.type, effSubA)
-    const oB = getSubtypeOrder(b.type, effSubB)
-    if (oA !== oB) return oA - oB
-
-    return a.name.localeCompare(b.name)
-  })
+  const sorted = sortAccounts(filtered)
 
   const groups: AccountGroup[] = []
   for (const account of sorted) {
@@ -130,6 +111,8 @@ export function AccountSelect({ value, onChange, options, label, balances, error
             <span className="flex min-w-0 flex-1 flex-col leading-tight">
               <span className="truncate font-medium">{selectedAccount.name}</span>
               <span className="truncate text-xs text-muted-foreground">
+                {t(getSubtypeLabelKey(selectedAccount.type, selectedAccount.subtype || getOtherSubtypeValue(selectedAccount.type)))}
+                {' · '}
                 {formatCurrency(
                   balances?.get(selectedAccount.id) ?? selectedAccount.openingBalance,
                   selectedAccount.currency,
@@ -204,7 +187,12 @@ export function AccountSelect({ value, onChange, options, label, balances, error
                                 : 'hover:bg-muted',
                             )}
                           >
-                            <span className="truncate font-medium">{account.name}</span>
+                            <span className="flex min-w-0 flex-col leading-tight">
+                              <span className="truncate font-medium">{account.name}</span>
+                              <span className="truncate text-xs text-muted-foreground">
+                                {t(group.subtypeLabelKey)}
+                              </span>
+                            </span>
                             <span className="shrink-0 tabular-nums text-muted-foreground">
                               {formatCurrency(balance, account.currency)}
                             </span>

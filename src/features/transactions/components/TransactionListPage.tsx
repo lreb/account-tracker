@@ -528,12 +528,12 @@ export default function TransactionListPage() {
 
       {/* Filter sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-2xl">
+        <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-2xl px-5 pt-2 pb-8">
           <SheetHeader className="mb-4">
             <SheetTitle>{t('transactions.filters.title')}</SheetTitle>
           </SheetHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-5">
             {/* Search */}
             <div className="space-y-1">
               <Label>{t('transactions.filters.keyword')}</Label>

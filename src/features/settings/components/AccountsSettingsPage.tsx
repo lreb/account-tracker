@@ -7,7 +7,7 @@ import {
   ACCOUNT_SUBTYPE_OPTIONS_BY_TYPE,
   getOtherSubtypeLabelKey,
 } from '@/constants/account-subtypes'
-import { getActiveAccounts } from '@/lib/accounts'
+import { getActiveAccounts, sortAccounts } from '@/lib/accounts'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import type { Account, AccountType } from '@/types'
@@ -134,8 +134,9 @@ export default function AccountsSettingsPage() {
   }, [accounts, transactions])
 
   const groupedAccounts = useMemo(() => {
+    const sorted = sortAccounts(accounts)
     return TYPE_ORDER.map((type) => {
-      const accountsByType = accounts.filter((account) => account.type === type)
+      const accountsByType = sorted.filter((account) => account.type === type)
       const subgroupMap = new Map<string, Account[]>()
 
       for (const account of accountsByType) {

@@ -122,6 +122,7 @@
       "keyword": "Keyword",
       "keywordPlaceholder": "Search...",
       "reset": "Reset",
+      "all": "All",
       "status": "Status",
       "title": "Filters",
       "type": "Type"
