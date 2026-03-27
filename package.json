@@ -1,13 +1,16 @@
 {
   "name": "expense-tracking",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.11.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "publish:intranet": "powershell -ExecutionPolicy Bypass -File ./scripts/publish-pwa-intranet.ps1"
+    "lint": "eslint src --max-warnings 0",
+    "lint:fix": "eslint src --fix",
+    "publish:intranet": "powershell -ExecutionPolicy Bypass -File ./scripts/publish-pwa-intranet.ps1",
+    "prepare": "husky"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",
@@ -24,6 +27,7 @@
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.54.0",
     "react-i18next": "^15.4.0",
+    "react-is": "^19.2.4",
     "react-router-dom": "^7.2.0",
     "recharts": "^3.8.0",
     "shadcn": "^4.0.3",
@@ -41,10 +45,23 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/uuid": "^10.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.57.2",
+    "@typescript-eslint/parser": "^8.57.2",
     "@vitejs/plugin-react": "^4.3.0",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.4.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "tailwindcss": "^4.0.0",
     "typescript": "~5.7.2",
     "vite": "^6.1.0",
     "vite-plugin-pwa": "^1.2.0"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx}": [
+      "eslint --max-warnings 0"
+    ]
   }
 }

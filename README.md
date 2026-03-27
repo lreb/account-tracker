@@ -41,6 +41,8 @@ The app will be available at **http://localhost:5173** (Vite may pick 5174+ if 5
 | `npm run dev` | Start Vite dev server with hot-reload |
 | `npm run build` | Type-check + production build → `dist/` |
 | `npm run preview` | Serve the production build locally |
+| `npm run lint` | Run ESLint across all of `src/` (zero warnings allowed) |
+| `npm run lint:fix` | Run ESLint and auto-fix what it can |
 | `npm run publish:intranet` | Build and expose PWA on local network (PowerShell helper) |
 
 ---
@@ -190,6 +192,22 @@ It will:
 - print intranet URLs (`http://<your-ip>:4173/`)
 
 Full manual and advanced options are documented in [docs/PWA-INTRANET-MANUAL.md](docs/PWA-INTRANET-MANUAL.md).
+
+---
+
+## Linting & Pre-commit Hook
+
+ESLint is configured in [`eslint.config.js`](eslint.config.js) with TypeScript-aware rules and React hooks checks. The key enforced rule is `@typescript-eslint/no-unused-vars: error`, which catches unused imports like the one that prompted this setup.
+
+```bash
+# Check all source files
+npm run lint
+
+# Auto-fix what ESLint can (formatting, simple issues)
+npm run lint:fix
+```
+
+**Pre-commit gate:** [Husky](https://typicode.github.io/husky/) runs [`lint-staged`](https://github.com/lint-staged/lint-staged) automatically before every `git commit`. Only staged `src/**/*.{ts,tsx}` files are checked. If any file has a lint error (including unused imports), the commit is **blocked** until the issue is fixed.
 
 ---
 

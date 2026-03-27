@@ -123,14 +123,21 @@ export function AmountCalculatorButton({ currentValue, onApply }: AmountCalculat
   }
 
   const handleApply = () => {
-    const parsed = parseFloat(display)
-    if (isNaN(parsed) || !isFinite(parsed) || parsed <= 0) {
+    // Resolve any pending operator (OK acts like = before applying)
+    let result = parseFloat(display)
+    if (operator && storedValue !== null && !waitingNext) {
+      result = calculate(storedValue, result, operator)
+    } else if (operator && storedValue !== null && waitingNext) {
+      result = storedValue
+    }
+
+    if (isNaN(result) || !isFinite(result) || result <= 0) {
       onApply('')
       setIsOpen(false)
       return
     }
 
-    onApply(parsed.toFixed(2))
+    onApply(result.toFixed(2))
     setIsOpen(false)
   }
 
@@ -159,50 +166,40 @@ export function AmountCalculatorButton({ currentValue, onApply }: AmountCalculat
             </div>
 
             <div className="grid grid-cols-4 gap-2">
-              <Button type="button" variant="secondary" onClick={reset}>
+              <Button type="button" variant="secondary" className="h-12 text-base" onClick={reset}>
                 {t('transactions.calculator.clear', 'C')}
               </Button>
-              <Button type="button" variant="secondary" onClick={backspace} aria-label={t('transactions.calculator.backspace', 'Backspace')}>
-                <Delete />
+              <Button type="button" variant="secondary" className="h-12 text-base" onClick={backspace} aria-label={t('transactions.calculator.backspace', 'Backspace')}>
+                <Delete className="size-5" />
               </Button>
-              <Button type="button" variant="secondary" onClick={() => applyOperator('/')}>
-                /
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => applyOperator('*')}>
-                *
-              </Button>
+              <Button type="button" variant="secondary" className="h-12 text-base" onClick={() => applyOperator('/')}>/</Button>
+              <Button type="button" variant="secondary" className="h-12 text-base" onClick={() => applyOperator('*')}>×</Button>
 
-              <Button type="button" variant="outline" onClick={() => inputDigit('7')}>7</Button>
-              <Button type="button" variant="outline" onClick={() => inputDigit('8')}>8</Button>
-              <Button type="button" variant="outline" onClick={() => inputDigit('9')}>9</Button>
-              <Button type="button" variant="secondary" onClick={() => applyOperator('-')}>
-                -
-              </Button>
+              <Button type="button" variant="outline" className="h-12 text-base" onClick={() => inputDigit('7')}>7</Button>
+              <Button type="button" variant="outline" className="h-12 text-base" onClick={() => inputDigit('8')}>8</Button>
+              <Button type="button" variant="outline" className="h-12 text-base" onClick={() => inputDigit('9')}>9</Button>
+              <Button type="button" variant="secondary" className="h-12 text-base" onClick={() => applyOperator('-')}>−</Button>
 
-              <Button type="button" variant="outline" onClick={() => inputDigit('4')}>4</Button>
-              <Button type="button" variant="outline" onClick={() => inputDigit('5')}>5</Button>
-              <Button type="button" variant="outline" onClick={() => inputDigit('6')}>6</Button>
-              <Button type="button" variant="secondary" onClick={() => applyOperator('+')}>
-                +
-              </Button>
+              <Button type="button" variant="outline" className="h-12 text-base" onClick={() => inputDigit('4')}>4</Button>
+              <Button type="button" variant="outline" className="h-12 text-base" onClick={() => inputDigit('5')}>5</Button>
+              <Button type="button" variant="outline" className="h-12 text-base" onClick={() => inputDigit('6')}>6</Button>
+              <Button type="button" variant="secondary" className="h-12 text-base" onClick={() => applyOperator('+')}>+</Button>
 
-              <Button type="button" variant="outline" onClick={() => inputDigit('1')}>1</Button>
-              <Button type="button" variant="outline" onClick={() => inputDigit('2')}>2</Button>
-              <Button type="button" variant="outline" onClick={() => inputDigit('3')}>3</Button>
-              <Button type="button" variant="secondary" onClick={applyEquals}>
-                =
-              </Button>
+              <Button type="button" variant="outline" className="h-12 text-base" onClick={() => inputDigit('1')}>1</Button>
+              <Button type="button" variant="outline" className="h-12 text-base" onClick={() => inputDigit('2')}>2</Button>
+              <Button type="button" variant="outline" className="h-12 text-base" onClick={() => inputDigit('3')}>3</Button>
+              <Button type="button" variant="secondary" className="h-12 text-base" onClick={applyEquals}>=</Button>
 
-              <Button type="button" variant="outline" className="col-span-2" onClick={() => inputDigit('0')}>0</Button>
-              <Button type="button" variant="outline" onClick={inputDecimal}>.</Button>
-              <Button type="button" variant="outline" onClick={() => inputDigit('00')}>00</Button>
+              <Button type="button" variant="outline" className="col-span-2 h-12 text-base" onClick={() => inputDigit('0')}>0</Button>
+              <Button type="button" variant="outline" className="h-12 text-base" onClick={inputDecimal}>.</Button>
+              <Button type="button" variant="outline" className="h-12 text-base" onClick={() => inputDigit('00')}>00</Button>
             </div>
 
             <div className="flex gap-2 pt-1">
-              <Button type="button" variant="outline" className="flex-1" onClick={() => setIsOpen(false)}>
+              <Button type="button" variant="outline" className="flex-1 h-12 text-base" onClick={() => setIsOpen(false)}>
                 {t('common.cancel')}
               </Button>
-              <Button type="button" className="flex-1" onClick={handleApply}>
+              <Button type="button" className="flex-1 h-12 text-base" onClick={handleApply}>
                 {t('transactions.calculator.ok', 'OK')}
               </Button>
             </div>

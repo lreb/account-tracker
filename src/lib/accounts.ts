@@ -1,4 +1,37 @@
-import type { Account, Transaction } from '@/types'
+import {
+  ACCOUNT_SUBTYPE_OPTIONS_BY_TYPE,
+  getOtherSubtypeValue,
+} from '@/constants/account-subtypes'
+import type { Account, AccountType, Transaction } from '@/types'
+
+// Canonical type display order
+const TYPE_ORDER: AccountType[] = ['asset', 'liability']
+
+function subtypeOrder(type: AccountType, subtype: string): number {
+  const opts = ACCOUNT_SUBTYPE_OPTIONS_BY_TYPE[type] ?? []
+  const idx = opts.findIndex((o) => o.value === subtype)
+  return idx === -1 ? opts.length : idx
+}
+
+/**
+ * Sort accounts by: type → subtype position → name (ascending).
+ * Returns a new array; does not mutate the input.
+ */
+export function sortAccounts<T extends Pick<Account, 'type' | 'subtype' | 'name'>>(accounts: T[]): T[] {
+  return [...accounts].sort((a, b) => {
+    const tA = TYPE_ORDER.indexOf(a.type)
+    const tB = TYPE_ORDER.indexOf(b.type)
+    if (tA !== tB) return tA - tB
+
+    const effSubA = a.subtype || getOtherSubtypeValue(a.type)
+    const effSubB = b.subtype || getOtherSubtypeValue(b.type)
+    const oA = subtypeOrder(a.type, effSubA)
+    const oB = subtypeOrder(b.type, effSubB)
+    if (oA !== oB) return oA - oB
+
+    return a.name.localeCompare(b.name)
+  })
+}
 
 export const DEFAULT_ACCOUNT_ID = 'default-account'
 

@@ -115,7 +115,9 @@ function CategoryDialog({
             <Label>{t('categories.type')}</Label>
             <Select value={watchType} onValueChange={(v) => setValue('type', v as CategoryType)}>
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue>
+                  {t(`categories.types.${watchType}`)}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {CATEGORY_TYPES.map((ct) => (

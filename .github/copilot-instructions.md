@@ -351,6 +351,13 @@ Data is persisted in **Dexie.js (IndexedDB)**. Zustand holds in-memory state and
 - Labels are stored as `string[]` on the transaction; the `labels` table is used only for managing available label definitions
 - All user-facing strings must go through `react-i18next` — no hardcoded English strings in JSX
 
+### Linting
+- ESLint is configured in `eslint.config.js` (flat config, ESLint 9+) with `@typescript-eslint`, `eslint-plugin-react-hooks`, and `eslint-plugin-react-refresh`
+- `@typescript-eslint/no-unused-vars: error` — **unused imports are a lint error and will block commits**
+- `npm run lint` — checks all of `src/` with zero warnings allowed
+- `npm run lint:fix` — auto-fixes what ESLint can
+- A **Husky pre-commit hook** runs `lint-staged` before every `git commit`; only staged `src/**/*.{ts,tsx}` files are linted, so commits are blocked if any staged file has a lint error
+
 ### Form Handling
 - All forms use `react-hook-form` with a `zod` schema via `zodResolver`
 - Each feature's zod schemas live in `src/features/<module>/schemas/`

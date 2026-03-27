@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
 import { v4 as uuid } from 'uuid'
 
+import { db } from '@/db'
 import { getAccountSelectOptions, getVisibleAccounts } from '@/lib/accounts'
 import { getTranslatedCategoryName } from '@/lib/categories'
 import { transactionSchema, type TransactionFormValues } from '../schemas/transaction.schema'
@@ -21,16 +22,10 @@ import { AmountCalculatorButton } from '@/components/ui/amount-calculator-button
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { LabelPickerButton } from '@/components/ui/label-picker-button'
 import { StatusSelect } from '@/components/ui/status-select'
 import { AccountSelect } from '@/components/ui/account-select'
+import { CategorySelect } from '@/components/ui/category-select'
 
 const TYPE_OPTIONS = [
   { value: 'expense',  label: 'transactions.expense' },
@@ -148,25 +143,38 @@ export default function TransactionForm() {
   }, [storeReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Current balance per account: openingBalance + income − expense ± transfers
-  const accountBalances = useMemo(() => {
+  // Queried directly from Dexie (all-time) so the result is always correct,
+  // regardless of the date-filtered slice the list page keeps in the store.
+  const [accountBalances, setAccountBalances] = useState<Map<string, number>>(() => {
     const map = new Map<string, number>()
-    for (const acct of accounts) {
-      map.set(acct.id, acct.openingBalance)
-    }
-    for (const tx of transactions) {
-      if (tx.type === 'income') {
-        map.set(tx.accountId, (map.get(tx.accountId) ?? 0) + tx.amount)
-      } else if (tx.type === 'expense') {
-        map.set(tx.accountId, (map.get(tx.accountId) ?? 0) - tx.amount)
-      } else if (tx.type === 'transfer') {
-        map.set(tx.accountId, (map.get(tx.accountId) ?? 0) - tx.amount)
-        if (tx.toAccountId) {
-          map.set(tx.toAccountId, (map.get(tx.toAccountId) ?? 0) + tx.amount)
+    for (const acct of accounts) map.set(acct.id, acct.openingBalance)
+    return map
+  })
+
+  useEffect(() => {
+    let cancelled = false
+    async function computeBalances() {
+      const allTx = await db.transactions.toArray()
+      if (cancelled) return
+      const map = new Map<string, number>()
+      for (const acct of accounts) map.set(acct.id, acct.openingBalance)
+      for (const tx of allTx) {
+        if (tx.type === 'income') {
+          map.set(tx.accountId, (map.get(tx.accountId) ?? 0) + tx.amount)
+        } else if (tx.type === 'expense') {
+          map.set(tx.accountId, (map.get(tx.accountId) ?? 0) - tx.amount)
+        } else if (tx.type === 'transfer') {
+          map.set(tx.accountId, (map.get(tx.accountId) ?? 0) - tx.amount)
+          if (tx.toAccountId) {
+            map.set(tx.toAccountId, (map.get(tx.toAccountId) ?? 0) + tx.amount)
+          }
         }
       }
+      setAccountBalances(map)
     }
-    return map
-  }, [accounts, transactions])
+    computeBalances()
+    return () => { cancelled = true }
+  }, [accounts])
 
   // Description auto-suggest: deduplicated map of description → most recent tx
   const suggestionMap = useMemo(() => {
@@ -203,6 +211,7 @@ export default function TransactionForm() {
     setValue('accountId', tx.accountId)
     setValue('toAccountId', tx.toAccountId ?? '')
     setValue('status', tx.status)
+    setValue('notes', tx.notes ?? '')
     setSelectedLabels(tx.labels ?? [])
     setShowSuggestions(false)
   }
@@ -412,27 +421,12 @@ export default function TransactionForm() {
       </div>
 
       {/* Category */}
-      <div className="space-y-1">
-        <Label>{t('settings.categories')}</Label>
-        <Select
-          value={watchCategoryId || undefined}
-          onValueChange={(v) => setValue('categoryId', v ?? '')}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select category">
-              {getTranslatedCategoryName(categories.find((c) => c.id === watchCategoryId), t)}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {filteredCategories.map((cat) => (
-              <SelectItem key={cat.id} value={cat.id}>
-                {getTranslatedCategoryName(cat, t)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {errors.categoryId && <p className="text-xs text-red-500">{t(errors.categoryId.message!)}</p>}
-      </div>
+      <CategorySelect
+        value={watchCategoryId || ''}
+        onChange={(v) => setValue('categoryId', v)}
+        options={filteredCategories}
+        error={errors.categoryId ? t(errors.categoryId.message!) : undefined}
+      />
 
       {/* Account */}
       <AccountSelect
