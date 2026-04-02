@@ -539,6 +539,8 @@
       "transferOut": "Transfer out"
     },
     "transactionsTitle": "Transactions",
+    "today": "Today",
+    "totalNetWorth": "Total Net Worth",
     "unavailable": "Unavailable",
     "vsReference": "vs {{period}}"
   },

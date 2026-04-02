@@ -539,6 +539,8 @@
       "transferOut": "Transferencia saliente"
     },
     "transactionsTitle": "Transacciones",
+    "today": "Hoy",
+    "totalNetWorth": "Patrimonio Neto Total",
     "unavailable": "No disponible",
     "vsReference": "vs {{period}}"
   },

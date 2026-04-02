@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { ChevronRight, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
+import { ChevronDown, ChevronRight, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { getActiveAccounts } from '@/lib/accounts'
+import { getActiveAccounts, sortAccounts } from '@/lib/accounts'
+import {
+  ACCOUNT_SUBTYPE_OPTIONS_BY_TYPE,
+  getOtherSubtypeLabelKey,
+  getOtherSubtypeValue,
+} from '@/constants/account-subtypes'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useExchangeRatesStore } from '@/stores/exchange-rates.store'
 import { useSettingsStore } from '@/stores/settings.store'
@@ -28,6 +33,9 @@ import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
 const ACCOUNT_TYPES: AccountType[] = ['asset', 'liability']
 const DEFAULT_PRESET: BalanceSheetPreset = 'lastMonth'
 
+// Persists selected preset across navigation within the session
+let persistedBalancePreset: BalanceSheetPreset = DEFAULT_PRESET
+
 interface AccountSnapshot {
   account: Account
   currentBalance: number
@@ -39,6 +47,50 @@ interface AccountSnapshot {
   shareOfNetWorth: number | null
 }
 
+interface SubtypeGroup {
+  key: string
+  type: AccountType
+  labelKey: string
+  snapshots: AccountSnapshot[]
+  currentNW: number
+  previousNW: number
+  shareOfNW: number | null
+}
+
+interface TypeSection {
+  type: AccountType
+  groups: SubtypeGroup[]
+  currentNW: number
+  previousNW: number
+}
+
+// ── Standalone delta badge (no hooks — safe outside component) ──────────────
+function DeltaBadge({
+  currentNW,
+  previousNW,
+  currency,
+  size = 'sm',
+}: {
+  currentNW: number
+  previousNW: number
+  currency: string
+  size?: 'sm' | 'xs'
+}) {
+  const delta = currentNW - previousNW
+  if (delta === 0) return null
+  const isUp = delta > 0
+  const TrendIcon = isUp ? TrendingUp : TrendingDown
+  const cls = size === 'xs'
+    ? 'inline-flex items-center gap-0.5 text-[11px] font-medium'
+    : 'inline-flex items-center gap-0.5 text-xs font-medium'
+  return (
+    <span className={`${cls} ${isUp ? 'text-green-600' : 'text-red-500'}`}>
+      <TrendIcon size={size === 'xs' ? 10 : 12} />
+      {delta > 0 ? '+' : ''}{formatCurrency(delta, currency)}
+    </span>
+  )
+}
+
 export default function BalanceSheetPage() {
   const { t } = useTranslation()
   const { accounts } = useAccountsStore()
@@ -48,11 +100,12 @@ export default function BalanceSheetPage() {
   const [filterLabelIds, setFilterLabelIds] = useState<string[]>([])
   const { load: loadRates, getRateForPair } = useExchangeRatesStore()
   const [searchParams, setSearchParams] = useSearchParams()
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
 
   const presetParam = searchParams.get('period')
   const selectedPreset = BALANCE_SHEET_PRESETS.includes(presetParam as BalanceSheetPreset)
     ? (presetParam as BalanceSheetPreset)
-    : DEFAULT_PRESET
+    : persistedBalancePreset
 
   useEffect(() => {
     void loadRates()
@@ -71,7 +124,7 @@ export default function BalanceSheetPage() {
 
   const snapshots = useMemo(() => {
     const rawSnapshots = visibleAccounts.map((account) => {
-      const accountTransactions = transactions.filter((transaction) => isTransactionForAccount(transaction, account.id))
+      const accountTransactions = transactions.filter((tx) => isTransactionForAccount(tx, account.id))
       const currentBalance = getAccountBalanceAtDate(account, accountTransactions, new Date())
       const previousBalance = getAccountBalanceAtDate(account, accountTransactions, comparisonDate)
       const delta = currentBalance - previousBalance
@@ -79,148 +132,158 @@ export default function BalanceSheetPage() {
       const previousBaseBalance = convertBalanceToBase(previousBalance, account.currency, baseCurrency, getRateForPair)
       const signedContribution = baseBalance === null
         ? null
-        : account.type === 'liability'
-          ? -baseBalance
-          : baseBalance
+        : account.type === 'liability' ? -baseBalance : baseBalance
       const previousSignedContribution = previousBaseBalance === null
         ? null
-        : account.type === 'liability'
-          ? -previousBaseBalance
-          : previousBaseBalance
-
+        : account.type === 'liability' ? -previousBaseBalance : previousBaseBalance
       return {
-        account,
-        currentBalance,
-        previousBalance,
-        delta,
-        baseBalance,
+        account, currentBalance, previousBalance, delta, baseBalance,
         netWorthContribution: signedContribution,
         previousNetWorthContribution: previousSignedContribution,
         shareOfNetWorth: null,
       } satisfies AccountSnapshot
     })
-
-    const totalNetWorth = rawSnapshots.reduce((sum, snapshot) => sum + (snapshot.netWorthContribution ?? 0), 0)
-
-    return rawSnapshots.map((snapshot) => ({
-      ...snapshot,
-      shareOfNetWorth:
-        snapshot.netWorthContribution === null || totalNetWorth === 0
-          ? null
-          : (snapshot.netWorthContribution / totalNetWorth) * 100,
+    const totalNW = rawSnapshots.reduce((sum, s) => sum + (s.netWorthContribution ?? 0), 0)
+    return rawSnapshots.map((s) => ({
+      ...s,
+      shareOfNetWorth: s.netWorthContribution === null || totalNW === 0
+        ? null
+        : (s.netWorthContribution / totalNW) * 100,
     }))
   }, [visibleAccounts, transactions, comparisonDate, baseCurrency, getRateForPair])
 
-  const groupedSnapshots = useMemo(() => {
-    return ACCOUNT_TYPES.reduce<Record<AccountType, AccountSnapshot[]>>((groups, type) => {
-      groups[type] = snapshots.filter((snapshot) => snapshot.account.type === type)
-      return groups
-    }, { asset: [], liability: [] })
-  }, [snapshots])
+  const totalNetWorth = useMemo(
+    () => snapshots.reduce((sum, s) => sum + (s.netWorthContribution ?? 0), 0),
+    [snapshots],
+  )
+  const previousNetWorth = useMemo(
+    () => snapshots.reduce((sum, s) => sum + (s.previousNetWorthContribution ?? 0), 0),
+    [snapshots],
+  )
+  const missingConversionCount = useMemo(
+    () => snapshots.filter((s) => s.baseBalance === null).length,
+    [snapshots],
+  )
 
-  const totalNetWorth = useMemo(() => {
-    return snapshots.reduce((sum, snapshot) => sum + (snapshot.netWorthContribution ?? 0), 0)
-  }, [snapshots])
+  // Build type → subtype → account tree, sorted and with totals
+  const typeSections = useMemo((): TypeSection[] => {
+    return ACCOUNT_TYPES.flatMap((type) => {
+      let typeSnapshots = snapshots.filter((s) => s.account.type === type)
+      if (filterLabelIds.length > 0) {
+        typeSnapshots = typeSnapshots.filter((s) =>
+          transactions.some(
+            (tx) =>
+              (tx.accountId === s.account.id || tx.toAccountId === s.account.id) &&
+              filterLabelIds.some((id) => tx.labels?.includes(id)),
+          ),
+        )
+      }
+      if (typeSnapshots.length === 0) return []
 
-  const previousNetWorth = useMemo(() => {
-    return snapshots.reduce((sum, snapshot) => sum + (snapshot.previousNetWorthContribution ?? 0), 0)
-  }, [snapshots])
+      const sortedAccounts = sortAccounts(typeSnapshots.map((s) => s.account))
+      const sorted = sortedAccounts.map((a) => typeSnapshots.find((s) => s.account.id === a.id)!)
 
-  const netWorthDelta = totalNetWorth - previousNetWorth
+      const groups: SubtypeGroup[] = []
+      for (const snapshot of sorted) {
+        const effSub = snapshot.account.subtype || getOtherSubtypeValue(snapshot.account.type)
+        const opts = ACCOUNT_SUBTYPE_OPTIONS_BY_TYPE[snapshot.account.type] ?? []
+        const labelKey = opts.find((o) => o.value === effSub)?.labelKey ?? getOtherSubtypeLabelKey(snapshot.account.type)
+        const groupKey = `${type}::${labelKey}`
+        const last = groups[groups.length - 1]
+        if (last && last.key === groupKey) {
+          last.snapshots.push(snapshot)
+        } else {
+          groups.push({ key: groupKey, type, labelKey, snapshots: [snapshot], currentNW: 0, previousNW: 0, shareOfNW: null })
+        }
+      }
+      for (const group of groups) {
+        group.currentNW = group.snapshots.reduce((sum, s) => sum + (s.netWorthContribution ?? 0), 0)
+        group.previousNW = group.snapshots.reduce((sum, s) => sum + (s.previousNetWorthContribution ?? 0), 0)
+        group.shareOfNW = totalNetWorth === 0 ? null : (group.currentNW / totalNetWorth) * 100
+      }
+      return [{
+        type,
+        groups,
+        currentNW: groups.reduce((sum, g) => sum + g.currentNW, 0),
+        previousNW: groups.reduce((sum, g) => sum + g.previousNW, 0),
+      }]
+    })
+  }, [snapshots, filterLabelIds, transactions, totalNetWorth])
 
-  const missingConversionCount = useMemo(() => {
-    return snapshots.filter((snapshot) => snapshot.baseBalance === null).length
-  }, [snapshots])
-
-  const filteredGroupedSnapshots = useMemo(() => {
-    if (filterLabelIds.length === 0) return groupedSnapshots
-    const matchesLabel = (accountId: string) =>
-      transactions.some(
-        (t) =>
-          (t.accountId === accountId || t.toAccountId === accountId) &&
-          filterLabelIds.some((id) => t.labels?.includes(id)),
-      )
-    return {
-      asset: groupedSnapshots.asset.filter((s) => matchesLabel(s.account.id)),
-      liability: groupedSnapshots.liability.filter((s) => matchesLabel(s.account.id)),
-    }
-  }, [groupedSnapshots, transactions, filterLabelIds])
-
-  const updatePeriod = (preset: BalanceSheetPreset) => {
+  function updatePeriod(preset: BalanceSheetPreset) {
     const next = new URLSearchParams(searchParams)
     next.set('period', preset)
     setSearchParams(next)
   }
 
+  function toggleGroup(key: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
   return (
     <div className="p-4 pb-24 space-y-5">
-      <div className="space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">{t('balanceSheet.title')}</h1>
-            <p className="text-sm text-gray-500">{t('balanceSheet.subtitle')}</p>
-          </div>
-          <div className="rounded-2xl border bg-white px-4 py-3 text-right shadow-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">
-              {t('balanceSheet.netWorth')}
+
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">{t('balanceSheet.title')}</h1>
+          <p className="text-sm text-gray-500">{t('balanceSheet.subtitle')}</p>
+        </div>
+        <LabelPickerButton labels={labels} selectedIds={filterLabelIds} onChange={setFilterLabelIds} />
+      </div>
+
+      {/* ── Period pills ── */}
+      <div className="flex flex-wrap gap-2">
+        {BALANCE_SHEET_PRESETS.map((preset) => (
+          <button
+            key={preset}
+            type="button"
+            onClick={() => updatePeriod(preset)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+              selectedPreset === preset
+                ? 'border-blue-600 bg-blue-600 text-white'
+                : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300 hover:text-blue-700'
+            }`}
+          >
+            {t(`balanceSheet.periods.${preset}`)}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Net Worth comparison card ── */}
+      <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
+        <p className="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+          {t('balanceSheet.netWorth')}
+        </p>
+        <div className="grid grid-cols-2 divide-x border-t">
+          <div className="px-4 py-3">
+            <p className="text-[11px] text-gray-400 mb-1">{t(`balanceSheet.periods.${selectedPreset}`)}</p>
+            <p className={`text-lg font-bold ${previousNetWorth >= 0 ? 'text-gray-900' : 'text-red-500'}`}>
+              {formatCurrency(previousNetWorth, baseCurrency)}
             </p>
+            <p className="text-[11px] text-gray-400 mt-0.5">{format(comparisonDate, 'MMM d, yyyy')}</p>
+          </div>
+          <div className="px-4 py-3">
+            <p className="text-[11px] text-gray-400 mb-1">{t('balanceSheet.today')}</p>
             <p className={`text-lg font-bold ${totalNetWorth >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
               {formatCurrency(totalNetWorth, baseCurrency)}
             </p>
-            <div className={`mt-1 inline-flex items-center gap-1 text-xs font-medium ${netWorthDelta >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-              {netWorthDelta >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-              <span>
-                {netWorthDelta >= 0 ? '+' : '-'}
-                {formatCurrency(Math.abs(netWorthDelta), baseCurrency)}
-              </span>
-            </div>
-            <p className="mt-1 text-[11px] text-gray-400">
-              {t('balanceSheet.vsReference', { period: t(`balanceSheet.periodLabels.${selectedPreset}`) })}
-            </p>
+            <DeltaBadge currentNW={totalNetWorth} previousNW={previousNetWorth} currency={baseCurrency} />
           </div>
         </div>
-
-        <div className="flex flex-wrap gap-2 items-center">
-          <LabelPickerButton labels={labels} selectedIds={filterLabelIds} onChange={setFilterLabelIds} />
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {BALANCE_SHEET_PRESETS.map((preset) => (
-            <button
-              key={preset}
-              type="button"
-              onClick={() => updatePeriod(preset)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                selectedPreset === preset
-                  ? 'border-blue-600 bg-blue-600 text-white'
-                  : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300 hover:text-blue-700'
-              }`}
-            >
-              {t(`balanceSheet.periods.${preset}`)}
-            </button>
-          ))}
-        </div>
-
-        <div className="rounded-2xl border bg-white px-4 py-3 shadow-sm">
-          <div className="flex items-center justify-between gap-3 text-sm">
-            <div>
-              <p className="font-medium text-gray-900">{t('balanceSheet.comparisonWindow')}</p>
-              <p className="text-xs text-gray-500">
-                {t('balanceSheet.sameDateComparison', {
-                  date: format(comparisonDate, 'MMM d, yyyy'),
-                  period: t(`balanceSheet.periodLabels.${selectedPreset}`),
-                })}
-              </p>
-            </div>
-            {missingConversionCount > 0 && (
-              <p className="max-w-48 text-right text-xs text-amber-600">
-                {t('balanceSheet.missingRates', { count: missingConversionCount, currency: baseCurrency })}
-              </p>
-            )}
-          </div>
-        </div>
+        {missingConversionCount > 0 && (
+          <p className="border-t px-4 py-2 text-xs text-amber-600">
+            {t('balanceSheet.missingRates', { count: missingConversionCount, currency: baseCurrency })}
+          </p>
+        )}
       </div>
 
+      {/* ── Empty state ── */}
       {visibleAccounts.length === 0 ? (
         <div className="rounded-3xl border border-dashed bg-white px-6 py-12 text-center shadow-sm">
           <Wallet size={36} className="mx-auto text-gray-300" />
@@ -231,92 +294,152 @@ export default function BalanceSheetPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {ACCOUNT_TYPES.map((type) => {
-            const items = filteredGroupedSnapshots[type]
-            if (items.length === 0) {
-              return null
-            }
+          {typeSections.map((section) => (
+            <section key={section.type} className="space-y-2">
 
-            const typeNetWorth = items.reduce((sum, snapshot) => sum + (snapshot.netWorthContribution ?? 0), 0)
-
-            return (
-              <section key={type} className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
+              {/* Type header: name | prev NW | current NW + delta */}
+              <div className="flex items-center justify-between gap-3 px-1">
+                <div>
+                  <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                    {t(`accounts.types.${section.type}`)}
+                  </h2>
+                  <p className="text-[11px] text-gray-400">{t(`accounts.descriptions.${section.type}`)}</p>
+                </div>
+                <div className="flex items-center gap-4 text-right">
                   <div>
-                    <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500">
-                      {t(`accounts.types.${type}`)}
-                    </h2>
-                    <p className="text-xs text-gray-400">{t(`accounts.descriptions.${type}`)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-400">{t('balanceSheet.sectionNetWorth')}</p>
-                    <p className={`text-sm font-semibold ${typeNetWorth >= 0 ? 'text-gray-900' : 'text-red-500'}`}>
-                      {formatCurrency(typeNetWorth, baseCurrency)}
+                    <p className="text-[11px] text-gray-400">{t(`balanceSheet.periods.${selectedPreset}`)}</p>
+                    <p className={`text-sm font-semibold ${section.previousNW >= 0 ? 'text-gray-500' : 'text-red-500'}`}>
+                      {formatCurrency(section.previousNW, baseCurrency)}
                     </p>
                   </div>
+                  <div>
+                    <p className="text-[11px] text-gray-400">{t('balanceSheet.today')}</p>
+                    <p className={`text-sm font-semibold ${section.currentNW >= 0 ? 'text-gray-900' : 'text-red-500'}`}>
+                      {formatCurrency(section.currentNW, baseCurrency)}
+                    </p>
+                    <DeltaBadge currentNW={section.currentNW} previousNW={section.previousNW} currency={baseCurrency} size="xs" />
+                  </div>
                 </div>
+              </div>
 
-                <ul className="space-y-2">
-                  {items.map((snapshot) => {
-                    const isUp = snapshot.delta >= 0
-                    return (
-                      <li key={snapshot.account.id}>
-                        <Link
-                          to={`/balance-sheet/${snapshot.account.id}?period=${selectedPreset}`}
-                          className="block rounded-3xl border border-gray-200 bg-white px-4 py-4 text-left shadow-sm transition-colors hover:border-blue-100 hover:bg-gray-50"
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <p className="truncate text-sm font-semibold text-gray-900">{snapshot.account.name}</p>
-                                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500">
-                                  {snapshot.account.currency}
-                                </span>
-                              </div>
-                              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                                <span>
-                                  {t('balanceSheet.shareOfNetWorth')}:{' '}
-                                  <strong className="text-gray-700">
-                                    {snapshot.shareOfNetWorth === null ? t('balanceSheet.unavailable') : `${snapshot.shareOfNetWorth.toFixed(1)}%`}
-                                  </strong>
-                                </span>
-                                <span>
-                                  {t('balanceSheet.netWorthImpact')}:{' '}
-                                  <strong className="text-gray-700">
-                                    {snapshot.netWorthContribution === null
-                                      ? t('balanceSheet.unavailable')
-                                      : formatCurrency(snapshot.netWorthContribution, baseCurrency)}
-                                  </strong>
-                                </span>
-                              </div>
-                            </div>
+              {/* Subtype groups */}
+              <div className="space-y-2">
+                {section.groups.map((group) => {
+                  const isCollapsed = collapsedGroups.has(group.key)
+                  return (
+                    <div key={group.key} className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
 
-                            <div className="text-right shrink-0">
-                              <p className={`text-base font-bold ${isUp ? 'text-green-600' : 'text-red-500'}`}>
-                                {formatCurrency(snapshot.currentBalance, snapshot.account.currency)}
-                              </p>
-                              <div className={`mt-1 inline-flex items-center gap-1 text-xs ${isUp ? 'text-green-600' : 'text-red-500'}`}>
-                                {isUp ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                                <span>
-                                  {snapshot.delta >= 0 ? '+' : '-'}
-                                  {formatCurrency(Math.abs(snapshot.delta), snapshot.account.currency)}
-                                </span>
-                              </div>
-                              <p className="mt-1 text-[11px] text-gray-400">
-                                {t('balanceSheet.vsReference', { period: t(`balanceSheet.periodLabels.${selectedPreset}`) })}
-                              </p>
-                            </div>
-
-                            <ChevronRight size={16} className="mt-1 shrink-0 text-gray-300" />
+                      {/* Collapsible group header: chevron | label + % | prev | current + delta */}
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(group.key)}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                      >
+                        {isCollapsed
+                          ? <ChevronRight size={14} className="shrink-0 text-gray-400" />
+                          : <ChevronDown size={14} className="shrink-0 text-gray-400" />
+                        }
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-700">{t(group.labelKey)}</p>
+                          {group.shareOfNW !== null && (
+                            <p className="text-[11px] text-gray-400">{group.shareOfNW.toFixed(1)}%</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4 text-right shrink-0">
+                          <p className={`text-xs ${group.previousNW >= 0 ? 'text-gray-400' : 'text-red-400'}`}>
+                            {formatCurrency(group.previousNW, baseCurrency)}
+                          </p>
+                          <div>
+                            <p className={`text-sm font-semibold ${group.currentNW >= 0 ? 'text-gray-800' : 'text-red-500'}`}>
+                              {formatCurrency(group.currentNW, baseCurrency)}
+                            </p>
+                            <DeltaBadge currentNW={group.currentNW} previousNW={group.previousNW} currency={baseCurrency} size="xs" />
                           </div>
-                        </Link>
-                      </li>
-                    )
-                  })}
-                </ul>
-              </section>
-            )
-          })}
+                        </div>
+                      </button>
+
+                      {/* Account rows (expanded) */}
+                      {!isCollapsed && (
+                        <div className="border-t divide-y divide-gray-50">
+                          {group.snapshots.map((snapshot) => {
+                            // Arrow direction follows NW contribution (liabilities: balance up = NW down)
+                            const nwDelta = (snapshot.netWorthContribution ?? 0) - (snapshot.previousNetWorthContribution ?? 0)
+                            const balDelta = snapshot.currentBalance - snapshot.previousBalance
+                            return (
+                              <Link
+                                key={snapshot.account.id}
+                                to={`/balance-sheet/${snapshot.account.id}?period=${selectedPreset}`}
+                                className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+                              >
+                                {/* Left: name + prev balance */}
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-sm font-medium text-gray-900 truncate">{snapshot.account.name}</p>
+                                    <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                                      {snapshot.account.currency}
+                                    </span>
+                                  </div>
+                                  <p className="text-[11px] text-gray-400 mt-0.5">
+                                    {t(`balanceSheet.periods.${selectedPreset}`)}: {formatCurrency(snapshot.previousBalance, snapshot.account.currency)}
+                                  </p>
+                                </div>
+                                {/* Right: current balance + NW-direction arrow + delta */}
+                                <div className="text-right shrink-0">
+                                  <p className={`text-sm font-semibold ${snapshot.currentBalance < 0 ? 'text-red-500' : 'text-gray-900'}`}>
+                                    {formatCurrency(snapshot.currentBalance, snapshot.account.currency)}
+                                  </p>
+                                  {balDelta !== 0 && (
+                                    <span className={`inline-flex items-center gap-0.5 text-[11px] font-medium ${nwDelta > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                      {nwDelta > 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                                      {balDelta > 0 ? '+' : ''}{formatCurrency(balDelta, snapshot.account.currency)}
+                                    </span>
+                                  )}
+                                </div>
+                                <ChevronRight size={14} className="shrink-0 text-gray-300" />
+                              </Link>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          ))}
+
+          {/* ── Total Net Worth footer ── */}
+          <div className="rounded-2xl bg-gray-900 px-4 py-4">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-2">
+              {t('balanceSheet.totalNetWorth')}
+            </p>
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <p className="text-[11px] text-gray-400">{t(`balanceSheet.periods.${selectedPreset}`)}</p>
+                <p className={`text-base font-bold ${previousNetWorth >= 0 ? 'text-gray-200' : 'text-red-400'}`}>
+                  {formatCurrency(previousNetWorth, baseCurrency)}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[11px] text-gray-400">{t('balanceSheet.today')}</p>
+                <p className={`text-xl font-bold ${totalNetWorth >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {formatCurrency(totalNetWorth, baseCurrency)}
+                </p>
+                {(() => {
+                  const delta = totalNetWorth - previousNetWorth
+                  if (delta === 0) return null
+                  const isUp = delta > 0
+                  const TrendIcon = isUp ? TrendingUp : TrendingDown
+                  return (
+                    <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${isUp ? 'text-emerald-400' : 'text-red-400'}`}>
+                      <TrendIcon size={12} />
+                      {delta > 0 ? '+' : ''}{formatCurrency(delta, baseCurrency)}
+                    </span>
+                  )
+                })()}
+              </div>
+            </div>
+          </div>
         </div>
       )}
       <ScrollToTopButton />

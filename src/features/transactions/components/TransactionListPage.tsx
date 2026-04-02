@@ -221,18 +221,16 @@ export default function TransactionListPage() {
     })
   }, [visibleTransactions, filters])
 
-  // Option D: no array copy+sort — visibleTransactions is already date-DESC from Dexie,
-  //            so iterating in reverse gives ASC order. O(1) Map lookups replace .find().
-  //            Only entries for the currently visible (filtered) set are stored.
+  // Compute running account balance at the time of every transaction.
+  // This is intentionally independent of `filtered` so that applied filters (type,
+  // category, account, label, status, date range) never alter the displayed balance —
+  // the value always reflects the true account balance at the moment each transaction
+  // was recorded, regardless of what is currently shown in the list.
   const balanceAfterTx = useMemo(() => {
-    const filteredMap: Record<string, boolean> = {}
-    for (let i = 0; i < filtered.length; i++) filteredMap[filtered[i].id] = true
-
     const accBalances = new Map<string, number>()
     for (let i = 0; i < visibleAccounts.length; i++) accBalances.set(visibleAccounts[i].id, visibleAccounts[i].openingBalance)
 
     const result = new Map<string, BalanceEntry>()
-    let remaining = filtered.length
 
     for (let i = visibleTransactions.length - 1; i >= 0; i--) {
       const tx = visibleTransactions[i]
@@ -250,23 +248,20 @@ export default function TransactionListPage() {
         }
       }
 
-      if (filteredMap[tx.id]) {
-        const acc = accountMap.get(tx.accountId)
-        const entry: BalanceEntry = {
-          accountBalance: accBalances.get(tx.accountId) ?? 0,
-          accountCurrency: acc?.currency ?? tx.currency ?? baseCurrency,
-        }
-        if (tx.type === 'transfer' && tx.toAccountId) {
-          const toAcc = accountMap.get(tx.toAccountId)
-          entry.toAccountBalance = accBalances.get(tx.toAccountId)
-          entry.toAccountCurrency = toAcc?.currency ?? baseCurrency
-        }
-        result.set(tx.id, entry)
-        if (--remaining === 0) break
+      const acc = accountMap.get(tx.accountId)
+      const entry: BalanceEntry = {
+        accountBalance: accBalances.get(tx.accountId) ?? 0,
+        accountCurrency: acc?.currency ?? tx.currency ?? baseCurrency,
       }
+      if (tx.type === 'transfer' && tx.toAccountId) {
+        const toAcc = accountMap.get(tx.toAccountId)
+        entry.toAccountBalance = accBalances.get(tx.toAccountId)
+        entry.toAccountCurrency = toAcc?.currency ?? baseCurrency
+      }
+      result.set(tx.id, entry)
     }
     return result
-  }, [visibleTransactions, visibleAccounts, accountMap, baseCurrency, filtered])
+  }, [visibleTransactions, visibleAccounts, accountMap, baseCurrency])
 
   const grouped = useMemo(() => {
     const map = new Map<string, typeof filtered>()
@@ -467,9 +462,11 @@ export default function TransactionListPage() {
                         >
                           <div className="flex-1 min-w-0">
                             <p className={`text-sm font-medium truncate ${tx.status === 'cancelled' ? 'line-through text-gray-400' : ''}`}>{tx.description}</p>
-                            <p className="text-xs text-gray-400 truncate">
-                              {getTranslatedCategoryName(cat, t) || '—'} · {acc?.name ?? '—'} · {timeStr}
-                            </p>
+                            <div className="flex flex-col gap-0.5 mt-0.5">
+                              <p className="text-xs text-gray-400 truncate">{getTranslatedCategoryName(cat, t) || '—'}</p>
+                              <p className="text-xs text-gray-400 truncate">{acc?.name ?? '—'}</p>
+                              <p className="text-xs text-gray-400">{timeStr}</p>
+                            </div>
                             {(tx.labels ?? []).length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {(tx.labels ?? []).map((lid) => {
