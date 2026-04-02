@@ -170,7 +170,16 @@
     "noFuelLogs": "No fuel logs",
     "noServices": "No services",
     "notFound": "Vehicle not found",
+    "km": "km",
+    "mi": "mi",
     "odometer": "Odometer",
+    "odometerConverter": {
+      "open": "Convert km / mi",
+      "title": "Odometer Converter",
+      "from": "Value in {{unit}}",
+      "result": "Converted to {{unit}}",
+      "apply": "Use {{value}} {{unit}}"
+    },
     "other": "Other...",
     "selectMake": "Select make",
     "selectMakeFirst": "Select a make first",

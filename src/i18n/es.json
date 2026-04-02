@@ -170,7 +170,16 @@
     "noFuelLogs": "Sin registros",
     "noServices": "Sin servicios",
     "notFound": "Vehículo no encontrado",
+    "km": "km",
+    "mi": "mi",
     "odometer": "Odómetro",
+    "odometerConverter": {
+      "open": "Convertir km / mi",
+      "title": "Conversor de odómetro",
+      "from": "Valor en {{unit}}",
+      "result": "Convertido a {{unit}}",
+      "apply": "Usar {{value}} {{unit}}"
+    },
     "other": "Otro...",
     "selectMake": "Selecciona marca",
     "selectMakeFirst": "Selecciona una marca primero",
