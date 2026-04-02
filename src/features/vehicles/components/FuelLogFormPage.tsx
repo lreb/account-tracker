@@ -24,6 +24,7 @@ import type { FuelLog, Transaction } from '@/types'
 
 import { Button } from '@/components/ui/button'
 import { AmountCalculatorButton } from '@/components/ui/amount-calculator-button'
+import { OdometerConverterButton } from '@/components/ui/odometer-converter-button'
 import { Input } from '@/components/ui/input'
 import { Label as FormLabel } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -387,7 +388,13 @@ export default function FuelLogFormPage() {
 
         {/* Odometer */}
         <div className="space-y-1">
-          <FormLabel>{t('vehicles.odometer')}</FormLabel>
+          <div className="flex items-center justify-between gap-2">
+            <FormLabel>{t('vehicles.odometer')}</FormLabel>
+            <OdometerConverterButton
+              currentValue={watch('odometer')}
+              onApply={(v) => setValue('odometer', v, { shouldValidate: true })}
+            />
+          </div>
           <Input type="number" inputMode="numeric" placeholder={odometerPlaceholder} {...register('odometer')} />
           {errors.odometer && <p className="text-xs text-red-500">{t(errors.odometer.message!)}</p>}
         </div>
