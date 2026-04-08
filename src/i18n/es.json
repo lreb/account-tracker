@@ -50,14 +50,29 @@
     "account": "cuenta",
     "accounts": "cuentas",
     "netThisMonth": "Neto este mes",
+    "netPeriod": "Neto",
     "sixMonthTrend": "Tendencia de 6 Meses",
+    "trendTitle": "Tendencia",
     "overview503020": "Resumen 50/30/20",
     "details": "Detalles",
     "budgetHealth": "Salud del Presupuesto",
     "viewAll": "Ver todos",
     "recent": "Reciente",
     "noTransactions": "Sin transacciones aún.",
-    "addFirstTransaction": "Agrega tu primera transacción"
+    "addFirstTransaction": "Agrega tu primera transacción",
+    "period": {
+      "thisMonth": "Este mes",
+      "lastMonth": "Mes anterior",
+      "lastQuarter": "Último trimestre",
+      "last6m": "Últimos 6 meses",
+      "lastYear": "Último año",
+      "all": "Todo el tiempo"
+    },
+    "trendPeriod": {
+      "3m": "3M",
+      "6m": "6M",
+      "1y": "1A"
+    }
   },
   "transactions": {
     "title": "Transacciones",
