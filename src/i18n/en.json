@@ -23,6 +23,7 @@
     "cancel": "Cancel",
     "confirm": "Confirm",
     "loading": "Loading…",
+    "calculating": "Calculating…",
     "error": "Something went wrong",
     "comingSoon": "Coming soon",
     "optional": "Optional",
@@ -124,6 +125,7 @@
       "cancelled": "Cancelled"
     },
     "filters": {
+      "period": "Period",
       "account": "Account",
       "allAccounts": "All Accounts",
       "allCategories": "All Categories",

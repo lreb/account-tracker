@@ -19,6 +19,7 @@ import { getTranslatedCategoryName } from '@/lib/categories'
 import { formatCurrency } from '@/lib/currency'
 import type { Transaction } from '@/types'
 import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
+import { ComputingOverlay } from '@/components/ui/computing-overlay'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -151,6 +152,7 @@ export default function TransactionListPage() {
   // draft = filters being edited inside the sheet; only committed on Apply
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS)
   const [quickRange, setQuickRangeRaw] = useState<QuickRange>(persistedQuickRange)
+  const [draftQuickRange, setDraftQuickRange] = useState<QuickRange>(persistedQuickRange)
 
   // Keep module-level caches in sync so state survives navigation
   const setFilters = (next: Filters | ((prev: Filters) => Filters)) => {
@@ -165,13 +167,6 @@ export default function TransactionListPage() {
     persistedQuickRange = range
   }
 
-  const applyQuickRange = (range: QuickRange) => {
-    setQuickRange(range)
-    const dateFrom = getQuickRangeDateFrom(range)
-    loadTx(getQuickRangeSince(range))  // push date filter into IndexedDB — only load what's needed
-    setFilters((prev) => ({ ...prev, dateFrom, dateTo: '' }))
-  }
-
   // On mount: restore the persisted quick range — push its cutoff into Dexie so only
   // the needed rows are loaded from IndexedDB (Option E).
   useEffect(() => {
@@ -179,17 +174,18 @@ export default function TransactionListPage() {
     loadLabels()
   }, [loadTx, loadLabels])
 
-  const openSheet = () => { setDraft(filters); setSheetOpen(true) }
+  const openSheet = () => { setDraft(filters); setDraftQuickRange(quickRange); setSheetOpen(true) }
   // Sheet Apply: reload DB with the custom dateFrom if set, then apply all draft filters
   const applyFilters = () => {
     setFilters(draft)
-    setQuickRange('all')
+    setQuickRange(draftQuickRange)
     loadTx(draft.dateFrom ? getUtcStartIso(draft.dateFrom) : undefined)
     setSheetOpen(false)
   }
   const resetFilters = () => {
     setDraft(DEFAULT_FILTERS)
     setFilters(DEFAULT_FILTERS)
+    setDraftQuickRange(DEFAULT_QUICK_RANGE)
     setQuickRange(DEFAULT_QUICK_RANGE)
     loadTx(getQuickRangeSince(DEFAULT_QUICK_RANGE))
     setSheetOpen(false)
@@ -330,33 +326,9 @@ export default function TransactionListPage() {
     // h-full + overflow-hidden gives this page a bounded height equal to <main>.
     // The scroll happens inside the list container below, not on <main> itself.
     <div className="flex flex-col h-full overflow-hidden">
+      <ComputingOverlay visible={loading && visibleTransactions.length > 0} />
       {/* ── Non-scrolling header ──────────────────────────────────────────── */}
       <div className="shrink-0 px-4 pt-4">
-        {/* Quick date range pills */}
-        <div className="flex gap-1.5 mb-3 overflow-x-auto scrollbar-none">
-          {([
-            { value: 'all', label: t('transactions.quickRange.all') },
-            { value: '1m',  label: t('transactions.quickRange.lastMonth') },
-            { value: '3m',  label: t('transactions.quickRange.lastQuarter') },
-            { value: '6m',  label: t('transactions.quickRange.last6Months') },
-            { value: '1y',  label: t('transactions.quickRange.lastYear') },
-            { value: '2y',  label: t('transactions.quickRange.last2Years') },
-          ] as { value: QuickRange; label: string }[]).map(({ value, label }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => applyQuickRange(value)}
-              className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                quickRange === value
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
         <div className="flex items-center justify-between mb-3">
           <h1 className="text-xl font-bold">{t('transactions.title')}</h1>
           <button
@@ -461,10 +433,9 @@ export default function TransactionListPage() {
                           }`}
                         >
                           <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-medium truncate ${tx.status === 'cancelled' ? 'line-through text-gray-400' : ''}`}>{tx.description}</p>
+                            <p className={`text-sm font-medium ${tx.status === 'cancelled' ? 'line-through text-gray-400' : ''}`}>{tx.description}</p>
                             <div className="flex flex-col gap-0.5 mt-0.5">
-                              <p className="text-xs text-gray-400 truncate">{getTranslatedCategoryName(cat, t) || '—'}</p>
-                              <p className="text-xs text-gray-400 truncate">{acc?.name ?? '—'}</p>
+                              <p className="text-xs text-gray-400">{getTranslatedCategoryName(cat, t) || '—'}</p>
                               <p className="text-xs text-gray-400">{timeStr}</p>
                             </div>
                             {(tx.labels ?? []).length > 0 && (
@@ -531,6 +502,37 @@ export default function TransactionListPage() {
           </SheetHeader>
 
           <div className="space-y-5">
+            {/* Quick date range */}
+            <div className="space-y-1">
+              <Label>{t('transactions.filters.period')}</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {([
+                  { value: 'all', label: t('transactions.quickRange.all') },
+                  { value: '1m',  label: t('transactions.quickRange.lastMonth') },
+                  { value: '3m',  label: t('transactions.quickRange.lastQuarter') },
+                  { value: '6m',  label: t('transactions.quickRange.last6Months') },
+                  { value: '1y',  label: t('transactions.quickRange.lastYear') },
+                  { value: '2y',  label: t('transactions.quickRange.last2Years') },
+                ] as { value: QuickRange; label: string }[]).map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      setDraftQuickRange(value)
+                      setDraft((p) => ({ ...p, dateFrom: getQuickRangeDateFrom(value), dateTo: '' }))
+                    }}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                      draftQuickRange === value
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Search */}
             <div className="space-y-1">
               <Label>{t('transactions.filters.keyword')}</Label>
@@ -548,7 +550,7 @@ export default function TransactionListPage() {
                 <Input
                   type="date"
                   value={draft.dateFrom}
-                  onChange={(e) => setDraft((p) => ({ ...p, dateFrom: e.target.value }))}
+                  onChange={(e) => { setDraft((p) => ({ ...p, dateFrom: e.target.value })); setDraftQuickRange('all') }}
                 />
               </div>
               <div className="space-y-1">

@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ComputingOverlay } from '@/components/ui/computing-overlay'
 
 export default function DashboardPage() {
   const { t } = useTranslation()
@@ -194,12 +195,7 @@ export default function DashboardPage() {
 
   return (
     <div className="p-4 pb-24 space-y-5">
-      {isComputing && (
-        <div className="fixed top-14 right-4 z-50 flex items-center gap-1.5 rounded-full bg-white/90 border shadow-sm px-2.5 py-1 text-xs text-gray-500">
-          <div className="h-3 w-3 animate-spin rounded-full border-2 border-indigo-400 border-t-transparent" />
-          Calculating…
-        </div>
-      )}
+      <ComputingOverlay visible={isComputing} />
       <div>
         <p className="text-xs text-gray-500 uppercase tracking-widest font-medium">
           {format(now, 'MMMM yyyy')}
