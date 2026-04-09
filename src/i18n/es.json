@@ -23,6 +23,7 @@
     "cancel": "Cancelar",
     "confirm": "Confirmar",
     "loading": "Cargando…",
+    "calculating": "Calculando…",
     "error": "Algo salió mal",
     "comingSoon": "Próximamente",
     "optional": "Opcional",
@@ -50,14 +51,29 @@
     "account": "cuenta",
     "accounts": "cuentas",
     "netThisMonth": "Neto este mes",
+    "netPeriod": "Neto",
     "sixMonthTrend": "Tendencia de 6 Meses",
+    "trendTitle": "Tendencia",
     "overview503020": "Resumen 50/30/20",
     "details": "Detalles",
     "budgetHealth": "Salud del Presupuesto",
     "viewAll": "Ver todos",
     "recent": "Reciente",
     "noTransactions": "Sin transacciones aún.",
-    "addFirstTransaction": "Agrega tu primera transacción"
+    "addFirstTransaction": "Agrega tu primera transacción",
+    "period": {
+      "thisMonth": "Este mes",
+      "lastMonth": "Mes anterior",
+      "lastQuarter": "Último trimestre",
+      "last6m": "Últimos 6 meses",
+      "lastYear": "Último año",
+      "all": "Todo el tiempo"
+    },
+    "trendPeriod": {
+      "3m": "3M",
+      "6m": "6M",
+      "1y": "1A"
+    }
   },
   "transactions": {
     "title": "Transacciones",
@@ -109,6 +125,7 @@
       "cancelled": "Cancelado"
     },
     "filters": {
+      "period": "Período",
       "account": "Cuenta",
       "allAccounts": "Todas",
       "allCategories": "Todas",
@@ -523,18 +540,31 @@
     "noAccounts": "Sin cuentas para mostrar",
     "noTransactionsForAccount": "Sin transacciones",
     "periodLabels": {
-      "lastWeek": "la última semana",
-      "last2Weeks": "las últimas 2 semanas",
-      "lastMonth": "el último mes",
-      "lastQuarter": "el último trimestre",
-      "lastYear": "el último año"
+      "endLastWeek": "fin de la semana pasada",
+      "endLast2Weeks": "fin de hace 2 semanas",
+      "endLastMonth": "fin del mes pasado",
+      "sameTimeLastMonth": "mismo tiempo mes pasado",
+      "endLastQuarter": "fin del trimestre pasado",
+      "endLastYear": "fin del año pasado",
+      "sameTimeLastYear": "mismo tiempo año pasado",
+      "endOfThisMonth": "fin de este mes"
     },
     "periods": {
-      "lastWeek": "Última semana",
-      "last2Weeks": "Últimas 2 semanas",
-      "lastMonth": "Último mes",
-      "lastQuarter": "Último trimestre",
-      "lastYear": "Último año"
+      "endLastWeek": "Fin de la semana pasada",
+      "endLast2Weeks": "Fin de hace 2 semanas",
+      "endLastMonth": "Fin del mes pasado",
+      "sameTimeLastMonth": "Mismo tiempo mes pasado",
+      "endLastQuarter": "Fin del trimestre pasado",
+      "endLastYear": "Fin del año pasado",
+      "sameTimeLastYear": "Mismo tiempo año pasado",
+      "endOfThisMonth": "Fin de este mes"
+    },
+    "filters": {
+      "apply": "Aplicar",
+      "button": "Período",
+      "compareTo": "Comparar saldos actuales con",
+      "reset": "Restablecer",
+      "title": "Período de comparación"
     },
     "sectionNetWorth": "Patrimonio Neto",
     "shareOfNetWorth": "% Patrimonio Neto",
