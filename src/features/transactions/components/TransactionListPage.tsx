@@ -1,6 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
 import { SlidersHorizontal, X } from 'lucide-react'
 import { format, isToday, isYesterday, parseISO, subMonths, subYears } from 'date-fns'
 import { useVirtualizer } from '@tanstack/react-virtual'
@@ -10,13 +9,14 @@ import { useAccountsStore } from '@/stores/accounts.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { useLabelsStore } from '@/stores/labels.store'
 import { AddFabMenu } from '@/components/ui/add-fab-menu'
+import { TransactionListItem } from '@/components/ui/transaction-list-item'
+import { TransactionDateGroupHeader } from '@/components/ui/transaction-date-group-header'
 import {
   getVisibleAccountIds,
   getVisibleAccounts,
   isTransactionForVisiblePrimaryAccount,
 } from '@/lib/accounts'
 import { getTranslatedCategoryName } from '@/lib/categories'
-import { formatCurrency } from '@/lib/currency'
 import type { Transaction } from '@/types'
 import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
 import { ComputingOverlay } from '@/components/ui/computing-overlay'
@@ -142,6 +142,7 @@ export default function TransactionListPage() {
   // O(1) lookup maps — avoid .find() on every virtual row render (Option B)
   const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
   const accountMap  = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
+  const labelMap    = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels])
   const visibleTransactions = useMemo(
     () => transactions.filter((transaction) => isTransactionForVisiblePrimaryAccount(transaction, visibleAccountIds)),
     [transactions, visibleAccountIds],
@@ -408,78 +409,42 @@ export default function TransactionListPage() {
                   }}
                 >
                   {item.kind === 'header' ? (
-                    <div className="flex items-center justify-between pt-3 pb-2 px-1">
-                      <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                        {item.headerLabel}
-                      </h2>
-                      <span className="text-xs text-gray-400">
-                        {item.count} {item.count === 1 ? t('transactions.record') : t('transactions.records')}
-                      </span>
-                    </div>
+                    <TransactionDateGroupHeader
+                      headerLabel={item.headerLabel}
+                      count={item.count}
+                    />
                   ) : (() => {
                     const { tx, timeStr } = item
-                    const cat   = categoryMap.get(tx.categoryId)
-                    const acc   = accountMap.get(tx.accountId)
-                    const toAcc = tx.toAccountId ? accountMap.get(tx.toAccountId) : undefined
-                    const bal   = balanceAfterTx.get(tx.id)
+                    const cat      = categoryMap.get(tx.categoryId)
+                    const acc      = accountMap.get(tx.accountId)
+                    const toAcc    = tx.toAccountId ? accountMap.get(tx.toAccountId) : undefined
+                    const bal      = balanceAfterTx.get(tx.id)
+                    const resolvedLabels = (tx.labels ?? []).flatMap((lid) => {
+                      const l = labelMap.get(lid)
+                      return l ? [l] : []
+                    })
                     return (
-                      <div className="pb-2">
-                        <Link
-                          to={`/transactions/${tx.id}`}
-                          className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition-colors ${
-                            tx.status === 'cancelled'
-                              ? 'bg-gray-50 border-gray-200 opacity-60'
-                              : 'bg-white hover:bg-gray-50'
-                          }`}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-medium ${tx.status === 'cancelled' ? 'line-through text-gray-400' : ''}`}>{tx.description}</p>
-                            <div className="flex flex-col gap-0.5 mt-0.5">
-                              <p className="text-xs text-gray-400">{getTranslatedCategoryName(cat, t) || '—'}</p>
-                              <p className="text-xs text-gray-400">{timeStr}</p>
-                            </div>
-                            {(tx.labels ?? []).length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {(tx.labels ?? []).map((lid) => {
-                                  const lbl = labels.find((l) => l.id === lid)
-                                  if (!lbl) return null
-                                  return (
-                                    <span
-                                      key={lid}
-                                      className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium border"
-                                      style={{ borderColor: lbl.color ?? '#6b7280', color: lbl.color ?? '#6b7280', backgroundColor: `${lbl.color ?? '#6b7280'}18` }}
-                                    >
-                                      {lbl.name}
-                                    </span>
-                                  )
-                                })}
-                              </div>
-                            )}
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className={`text-sm font-semibold ${
-                              tx.status === 'cancelled' ? 'text-gray-400 line-through' :
-                              tx.type === 'income' ? 'text-green-600' :
-                              tx.type === 'expense' ? 'text-red-500' : 'text-gray-700'
-                            }`}>
-                              {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}
-                              {formatCurrency(tx.amount, tx.currency ?? baseCurrency)}
-                            </p>
-                            {bal && (
-                              <div className="mt-0.5 space-y-0.5">
-                                <p className="text-[11px] text-gray-400">
-                                  {acc?.name}: <span className={bal.accountBalance < 0 ? 'text-red-400' : 'text-gray-500'}>{formatCurrency(bal.accountBalance, bal.accountCurrency)}</span>
-                                </p>
-                                {tx.type === 'transfer' && bal.toAccountBalance != null && bal.toAccountCurrency && (
-                                  <p className="text-[11px] text-gray-400">
-                                    {toAcc?.name}: <span className={bal.toAccountBalance < 0 ? 'text-red-400' : 'text-gray-500'}>{formatCurrency(bal.toAccountBalance, bal.toAccountCurrency)}</span>
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </Link>
-                      </div>
+                      <TransactionListItem
+                        description={tx.description}
+                        status={tx.status}
+                        timeStr={timeStr}
+                        categoryName={getTranslatedCategoryName(cat, t)}
+                        resolvedLabels={resolvedLabels}
+                        linkTo={`/transactions/${tx.id}`}
+                        amount={tx.amount}
+                        amountPrefix={tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}
+                        amountCurrency={tx.currency ?? baseCurrency}
+                        amountTone={
+                          tx.type === 'income' ? 'text-green-600' :
+                          tx.type === 'expense' ? 'text-red-500' : 'text-gray-700'
+                        }
+                        primaryBalance={bal ? { accountName: acc?.name ?? '', balance: bal.accountBalance, currency: bal.accountCurrency } : undefined}
+                        secondaryBalance={
+                          tx.type === 'transfer' && bal?.toAccountBalance != null && bal.toAccountCurrency
+                            ? { accountName: toAcc?.name ?? '', balance: bal.toAccountBalance, currency: bal.toAccountCurrency }
+                            : undefined
+                        }
+                      />
                     )
                   })()}
                 </div>

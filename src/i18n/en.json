@@ -540,18 +540,31 @@
     "noAccounts": "No accounts to show",
     "noTransactionsForAccount": "No transactions for this account",
     "periodLabels": {
-      "lastWeek": "last week",
-      "last2Weeks": "last 2 weeks",
-      "lastMonth": "last month",
-      "lastQuarter": "last quarter",
-      "lastYear": "last year"
+      "endLastWeek": "end of last week",
+      "endLast2Weeks": "end of 2 weeks ago",
+      "endLastMonth": "end of last month",
+      "sameTimeLastMonth": "same time last month",
+      "endLastQuarter": "end of last quarter",
+      "endLastYear": "end of last year",
+      "sameTimeLastYear": "same time last year",
+      "endOfThisMonth": "end of this month"
     },
     "periods": {
-      "lastWeek": "Last week",
-      "last2Weeks": "Last 2 weeks",
-      "lastMonth": "Last month",
-      "lastQuarter": "Last quarter",
-      "lastYear": "Last year"
+      "endLastWeek": "End of last week",
+      "endLast2Weeks": "End of 2 weeks ago",
+      "endLastMonth": "End of last month",
+      "sameTimeLastMonth": "Same time last month",
+      "endLastQuarter": "End of last quarter",
+      "endLastYear": "End of last year",
+      "sameTimeLastYear": "Same time last year",
+      "endOfThisMonth": "End of this month"
+    },
+    "filters": {
+      "apply": "Apply",
+      "button": "Period",
+      "compareTo": "Compare current balances to",
+      "reset": "Reset",
+      "title": "Comparison Period"
     },
     "sectionNetWorth": "Net Worth",
     "shareOfNetWorth": "Share of Net Worth",

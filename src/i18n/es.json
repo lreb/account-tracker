@@ -540,18 +540,31 @@
     "noAccounts": "Sin cuentas para mostrar",
     "noTransactionsForAccount": "Sin transacciones",
     "periodLabels": {
-      "lastWeek": "la última semana",
-      "last2Weeks": "las últimas 2 semanas",
-      "lastMonth": "el último mes",
-      "lastQuarter": "el último trimestre",
-      "lastYear": "el último año"
+      "endLastWeek": "fin de la semana pasada",
+      "endLast2Weeks": "fin de hace 2 semanas",
+      "endLastMonth": "fin del mes pasado",
+      "sameTimeLastMonth": "mismo tiempo mes pasado",
+      "endLastQuarter": "fin del trimestre pasado",
+      "endLastYear": "fin del año pasado",
+      "sameTimeLastYear": "mismo tiempo año pasado",
+      "endOfThisMonth": "fin de este mes"
     },
     "periods": {
-      "lastWeek": "Última semana",
-      "last2Weeks": "Últimas 2 semanas",
-      "lastMonth": "Último mes",
-      "lastQuarter": "Último trimestre",
-      "lastYear": "Último año"
+      "endLastWeek": "Fin de la semana pasada",
+      "endLast2Weeks": "Fin de hace 2 semanas",
+      "endLastMonth": "Fin del mes pasado",
+      "sameTimeLastMonth": "Mismo tiempo mes pasado",
+      "endLastQuarter": "Fin del trimestre pasado",
+      "endLastYear": "Fin del año pasado",
+      "sameTimeLastYear": "Mismo tiempo año pasado",
+      "endOfThisMonth": "Fin de este mes"
+    },
+    "filters": {
+      "apply": "Aplicar",
+      "button": "Período",
+      "compareTo": "Comparar saldos actuales con",
+      "reset": "Restablecer",
+      "title": "Período de comparación"
     },
     "sectionNetWorth": "Patrimonio Neto",
     "shareOfNetWorth": "% Patrimonio Neto",

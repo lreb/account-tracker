@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
-import { ChevronDown, ChevronRight, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
+import { ChevronDown, ChevronRight, Info, SlidersHorizontal, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { getActiveAccounts, sortAccounts } from '@/lib/accounts'
@@ -14,7 +14,6 @@ import { useAccountsStore } from '@/stores/accounts.store'
 import { useExchangeRatesStore } from '@/stores/exchange-rates.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { useTransactionsStore } from '@/stores/transactions.store'
-import { useLabelsStore } from '@/stores/labels.store'
 import {
   BALANCE_SHEET_PRESETS,
   convertBalanceToBase,
@@ -24,14 +23,22 @@ import {
   type BalanceSheetPreset,
 } from '@/lib/balance-sheet'
 import { formatCurrency } from '@/lib/currency'
-import type { Account, AccountType } from '@/types'
+import { db } from '@/db'
+import type { Account, AccountType, Transaction } from '@/types'
 
 import { Button } from '@/components/ui/button'
-import { LabelPickerButton } from '@/components/ui/label-picker-button'
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 const ACCOUNT_TYPES: AccountType[] = ['asset', 'liability']
-const DEFAULT_PRESET: BalanceSheetPreset = 'lastMonth'
+const DEFAULT_PRESET: BalanceSheetPreset = 'endLastMonth'
 
 // Persists selected preset across navigation within the session
 let persistedBalancePreset: BalanceSheetPreset = DEFAULT_PRESET
@@ -94,22 +101,38 @@ function DeltaBadge({
 export default function BalanceSheetPage() {
   const { t } = useTranslation()
   const { accounts } = useAccountsStore()
-  const { transactions } = useTransactionsStore()
-  const { labels } = useLabelsStore()
+  // Reload full transaction history on every mount — TransactionListPage loads a
+  // date-filtered subset into this same store, so without an explicit reload the
+  // Dexie trigger ref would be stale and the first render would show wrong balances.
+  const { transactions: rawTransactions, load: loadTransactions } = useTransactionsStore()
+  const [allTx, setAllTx] = useState<Transaction[]>([])
   const { baseCurrency } = useSettingsStore()
-  const [filterLabelIds, setFilterLabelIds] = useState<string[]>([])
   const { load: loadRates, getRateForPair } = useExchangeRatesStore()
   const [searchParams, setSearchParams] = useSearchParams()
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [draftPreset, setDraftPreset] = useState<BalanceSheetPreset>(DEFAULT_PRESET)
 
   const presetParam = searchParams.get('period')
   const selectedPreset = BALANCE_SHEET_PRESETS.includes(presetParam as BalanceSheetPreset)
     ? (presetParam as BalanceSheetPreset)
     : persistedBalancePreset
 
+  useEffect(() => { void loadTransactions() }, [loadTransactions])
+
   useEffect(() => {
     void loadRates()
   }, [loadRates])
+
+  // Load ALL non-cancelled transactions directly from Dexie — bypasses any
+  // date-range filter another page may have applied to the shared store.
+  useEffect(() => {
+    db.transactions
+      .filter((tx) => tx.status !== 'cancelled')
+      .toArray()
+      .then(setAllTx)
+      .catch(console.error)
+  }, [rawTransactions])
 
   useEffect(() => {
     if (searchParams.get('period') !== selectedPreset) {
@@ -124,18 +147,17 @@ export default function BalanceSheetPage() {
 
   const snapshots = useMemo(() => {
     const rawSnapshots = visibleAccounts.map((account) => {
-      const accountTransactions = transactions.filter((tx) => isTransactionForAccount(tx, account.id))
+      const accountTransactions = allTx.filter((tx) => isTransactionForAccount(tx, account.id))
       const currentBalance = getAccountBalanceAtDate(account, accountTransactions, new Date())
       const previousBalance = getAccountBalanceAtDate(account, accountTransactions, comparisonDate)
       const delta = currentBalance - previousBalance
       const baseBalance = convertBalanceToBase(currentBalance, account.currency, baseCurrency, getRateForPair)
       const previousBaseBalance = convertBalanceToBase(previousBalance, account.currency, baseCurrency, getRateForPair)
-      const signedContribution = baseBalance === null
-        ? null
-        : account.type === 'liability' ? -baseBalance : baseBalance
-      const previousSignedContribution = previousBaseBalance === null
-        ? null
-        : account.type === 'liability' ? -previousBaseBalance : previousBaseBalance
+      // Use the raw signed balance directly — liabilities have negative balances
+      // (expenses reduce them), so no sign flip needed. This matches how
+      // DashboardPage computes net worth and ensures trend arrows are correct.
+      const signedContribution = baseBalance
+      const previousSignedContribution = previousBaseBalance
       return {
         account, currentBalance, previousBalance, delta, baseBalance,
         netWorthContribution: signedContribution,
@@ -143,17 +165,24 @@ export default function BalanceSheetPage() {
         shareOfNetWorth: null,
       } satisfies AccountSnapshot
     })
-    const totalNW = rawSnapshots.reduce((sum, s) => sum + (s.netWorthContribution ?? 0), 0)
+    // Use sum of absolutes as denominator so percentages are always positive
+    // (assets and liabilities both show their magnitude as % of the total pool).
+    const totalAbsNW = rawSnapshots.reduce((sum, s) => sum + Math.abs(s.netWorthContribution ?? 0), 0)
     return rawSnapshots.map((s) => ({
       ...s,
-      shareOfNetWorth: s.netWorthContribution === null || totalNW === 0
+      shareOfNetWorth: s.netWorthContribution === null || totalAbsNW === 0
         ? null
-        : (s.netWorthContribution / totalNW) * 100,
+        : (Math.abs(s.netWorthContribution) / totalAbsNW) * 100,
     }))
-  }, [visibleAccounts, transactions, comparisonDate, baseCurrency, getRateForPair])
+  }, [visibleAccounts, allTx, comparisonDate, baseCurrency, getRateForPair])
 
   const totalNetWorth = useMemo(
     () => snapshots.reduce((sum, s) => sum + (s.netWorthContribution ?? 0), 0),
+    [snapshots],
+  )
+  // Used as denominator for group % — absolute sum so all groups show positive share.
+  const totalAbsoluteNetWorth = useMemo(
+    () => snapshots.reduce((sum, s) => sum + Math.abs(s.netWorthContribution ?? 0), 0),
     [snapshots],
   )
   const previousNetWorth = useMemo(
@@ -168,16 +197,7 @@ export default function BalanceSheetPage() {
   // Build type → subtype → account tree, sorted and with totals
   const typeSections = useMemo((): TypeSection[] => {
     return ACCOUNT_TYPES.flatMap((type) => {
-      let typeSnapshots = snapshots.filter((s) => s.account.type === type)
-      if (filterLabelIds.length > 0) {
-        typeSnapshots = typeSnapshots.filter((s) =>
-          transactions.some(
-            (tx) =>
-              (tx.accountId === s.account.id || tx.toAccountId === s.account.id) &&
-              filterLabelIds.some((id) => tx.labels?.includes(id)),
-          ),
-        )
-      }
+      const typeSnapshots = snapshots.filter((s) => s.account.type === type)
       if (typeSnapshots.length === 0) return []
 
       const sortedAccounts = sortAccounts(typeSnapshots.map((s) => s.account))
@@ -199,7 +219,7 @@ export default function BalanceSheetPage() {
       for (const group of groups) {
         group.currentNW = group.snapshots.reduce((sum, s) => sum + (s.netWorthContribution ?? 0), 0)
         group.previousNW = group.snapshots.reduce((sum, s) => sum + (s.previousNetWorthContribution ?? 0), 0)
-        group.shareOfNW = totalNetWorth === 0 ? null : (group.currentNW / totalNetWorth) * 100
+        group.shareOfNW = totalAbsoluteNetWorth === 0 ? null : (Math.abs(group.currentNW) / totalAbsoluteNetWorth) * 100
       }
       return [{
         type,
@@ -208,12 +228,28 @@ export default function BalanceSheetPage() {
         previousNW: groups.reduce((sum, g) => sum + g.previousNW, 0),
       }]
     })
-  }, [snapshots, filterLabelIds, transactions, totalNetWorth])
+  }, [snapshots, totalAbsoluteNetWorth])
 
-  function updatePeriod(preset: BalanceSheetPreset) {
+  function openSheet() {
+    setDraftPreset(selectedPreset)
+    setSheetOpen(true)
+  }
+
+  function applyPreset() {
     const next = new URLSearchParams(searchParams)
-    next.set('period', preset)
+    next.set('period', draftPreset)
     setSearchParams(next)
+    persistedBalancePreset = draftPreset
+    setSheetOpen(false)
+  }
+
+  function resetPreset() {
+    const next = new URLSearchParams(searchParams)
+    next.set('period', DEFAULT_PRESET)
+    setSearchParams(next)
+    persistedBalancePreset = DEFAULT_PRESET
+    setDraftPreset(DEFAULT_PRESET)
+    setSheetOpen(false)
   }
 
   function toggleGroup(key: string) {
@@ -234,25 +270,17 @@ export default function BalanceSheetPage() {
           <h1 className="text-xl font-bold text-gray-900">{t('balanceSheet.title')}</h1>
           <p className="text-sm text-gray-500">{t('balanceSheet.subtitle')}</p>
         </div>
-        <LabelPickerButton labels={labels} selectedIds={filterLabelIds} onChange={setFilterLabelIds} />
-      </div>
-
-      {/* ── Period pills ── */}
-      <div className="flex flex-wrap gap-2">
-        {BALANCE_SHEET_PRESETS.map((preset) => (
-          <button
-            key={preset}
-            type="button"
-            onClick={() => updatePeriod(preset)}
-            className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-              selectedPreset === preset
-                ? 'border-blue-600 bg-blue-600 text-white'
-                : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300 hover:text-blue-700'
-            }`}
-          >
-            {t(`balanceSheet.periods.${preset}`)}
-          </button>
-        ))}
+        <button
+          type="button"
+          onClick={openSheet}
+          className="relative flex items-center gap-1.5 rounded-full border bg-white px-3 py-1.5 text-sm text-gray-600 shadow-sm"
+        >
+          <SlidersHorizontal size={14} />
+          {t('balanceSheet.filters.button')}
+          <span className="ml-1 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
+            {t(`balanceSheet.periods.${selectedPreset}`)}
+          </span>
+        </button>
       </div>
 
       {/* ── Net Worth comparison card ── */}
@@ -300,10 +328,23 @@ export default function BalanceSheetPage() {
               {/* Type header: name | prev NW | current NW + delta */}
               <div className="flex items-center justify-between gap-3 px-1">
                 <div>
-                  <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-                    {t(`accounts.types.${section.type}`)}
-                  </h2>
-                  <p className="text-[11px] text-gray-400">{t(`accounts.descriptions.${section.type}`)}</p>
+                  <div className="flex items-center gap-1">
+                    <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                      {t(`accounts.types.${section.type}`)}
+                    </h2>
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button type="button" className="text-gray-400 hover:text-gray-600 transition-colors">
+                            <Info size={12} />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                          {t(`accounts.descriptions.${section.type}`)}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                 </div>
                 <div className="flex items-center gap-4 text-right">
                   <div>
@@ -329,31 +370,39 @@ export default function BalanceSheetPage() {
                   return (
                     <div key={group.key} className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
 
-                      {/* Collapsible group header: chevron | label + % | prev | current + delta */}
+                      {/* Collapsible group header */}
                       <button
                         type="button"
                         onClick={() => toggleGroup(group.key)}
-                        className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                        className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
                       >
-                        {isCollapsed
-                          ? <ChevronRight size={14} className="shrink-0 text-gray-400" />
-                          : <ChevronDown size={14} className="shrink-0 text-gray-400" />
-                        }
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-700">{t(group.labelKey)}</p>
-                          {group.shareOfNW !== null && (
-                            <p className="text-[11px] text-gray-400">{group.shareOfNW.toFixed(1)}%</p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-4 text-right shrink-0">
-                          <p className={`text-xs ${group.previousNW >= 0 ? 'text-gray-400' : 'text-red-400'}`}>
-                            {formatCurrency(group.previousNW, baseCurrency)}
-                          </p>
-                          <div>
-                            <p className={`text-sm font-semibold ${group.currentNW >= 0 ? 'text-gray-800' : 'text-red-500'}`}>
-                              {formatCurrency(group.currentNW, baseCurrency)}
+                        <span className="mt-0.5 shrink-0 text-gray-400">
+                          {isCollapsed
+                            ? <ChevronRight size={14} />
+                            : <ChevronDown size={14} />
+                          }
+                        </span>
+                        <div className="flex-1 min-w-0 space-y-1">
+                          {/* Row 1: label (left) + share % (right) */}
+                          <div className="flex items-baseline justify-between gap-1.5">
+                            <p className="text-sm font-medium text-gray-700 whitespace-nowrap">{t(group.labelKey)}</p>
+                            {group.shareOfNW !== null && (
+                              <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 whitespace-nowrap">
+                                {group.shareOfNW.toFixed(1)}%
+                              </span>
+                            )}
+                          </div>
+                          {/* Row 2: previous amount (left) | current amount + delta (right) */}
+                          <div className="flex items-center justify-between gap-2">
+                            <p className={`text-xs ${group.previousNW >= 0 ? 'text-gray-400' : 'text-red-400'}`}>
+                              {formatCurrency(group.previousNW, baseCurrency)}
                             </p>
-                            <DeltaBadge currentNW={group.currentNW} previousNW={group.previousNW} currency={baseCurrency} size="xs" />
+                            <div className="text-right">
+                              <p className={`text-sm font-semibold ${group.currentNW >= 0 ? 'text-gray-800' : 'text-red-500'}`}>
+                                {formatCurrency(group.currentNW, baseCurrency)}
+                              </p>
+                              <DeltaBadge currentNW={group.currentNW} previousNW={group.previousNW} currency={baseCurrency} size="xs" />
+                            </div>
                           </div>
                         </div>
                       </button>
@@ -369,33 +418,35 @@ export default function BalanceSheetPage() {
                               <Link
                                 key={snapshot.account.id}
                                 to={`/balance-sheet/${snapshot.account.id}?period=${selectedPreset}`}
-                                className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+                                className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
                               >
-                                {/* Left: name + prev balance */}
-                                <div className="min-w-0 flex-1">
+                                <div className="flex-1 min-w-0 space-y-1">
+                                  {/* Row 1: account name + currency badge */}
                                   <div className="flex items-center gap-2">
                                     <p className="text-sm font-medium text-gray-900 truncate">{snapshot.account.name}</p>
                                     <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500">
                                       {snapshot.account.currency}
                                     </span>
                                   </div>
-                                  <p className="text-[11px] text-gray-400 mt-0.5">
-                                    {t(`balanceSheet.periods.${selectedPreset}`)}: {formatCurrency(snapshot.previousBalance, snapshot.account.currency)}
-                                  </p>
+                                  {/* Row 2: previous balance (left) | current balance + delta (right) */}
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className={`text-xs ${snapshot.previousBalance >= 0 ? 'text-gray-400' : 'text-red-400'}`}>
+                                      {formatCurrency(snapshot.previousBalance, snapshot.account.currency)}
+                                    </p>
+                                    <div className="text-right shrink-0">
+                                      <p className={`text-sm font-semibold ${snapshot.currentBalance < 0 ? 'text-red-500' : 'text-gray-900'}`}>
+                                        {formatCurrency(snapshot.currentBalance, snapshot.account.currency)}XX
+                                      </p>
+                                      {balDelta !== 0 && (
+                                        <span className={`inline-flex items-center gap-0.5 text-[11px] font-medium ${nwDelta > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                          {nwDelta > 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                                          {balDelta > 0 ? '+' : ''}{formatCurrency(balDelta, snapshot.account.currency)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
-                                {/* Right: current balance + NW-direction arrow + delta */}
-                                <div className="text-right shrink-0">
-                                  <p className={`text-sm font-semibold ${snapshot.currentBalance < 0 ? 'text-red-500' : 'text-gray-900'}`}>
-                                    {formatCurrency(snapshot.currentBalance, snapshot.account.currency)}
-                                  </p>
-                                  {balDelta !== 0 && (
-                                    <span className={`inline-flex items-center gap-0.5 text-[11px] font-medium ${nwDelta > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                                      {nwDelta > 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                                      {balDelta > 0 ? '+' : ''}{formatCurrency(balDelta, snapshot.account.currency)}
-                                    </span>
-                                  )}
-                                </div>
-                                <ChevronRight size={14} className="shrink-0 text-gray-300" />
+                                <ChevronRight size={14} className="shrink-0 mt-0.5 text-gray-300" />
                               </Link>
                             )
                           })}
@@ -443,6 +494,42 @@ export default function BalanceSheetPage() {
         </div>
       )}
       <ScrollToTopButton />
+
+      {/* ── Comparison period filter sheet ── */}
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent side="bottom" className="max-h-[70dvh] overflow-y-auto rounded-t-2xl px-5 pt-2 pb-8">
+          <SheetHeader className="mb-4">
+            <SheetTitle>{t('balanceSheet.filters.title')}</SheetTitle>
+          </SheetHeader>
+
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              {t('balanceSheet.filters.compareTo')}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {BALANCE_SHEET_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setDraftPreset(preset)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    draftPreset === preset
+                      ? 'border-blue-600 bg-blue-600 text-white'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300 hover:text-blue-700'
+                  }`}
+                >
+                  {t(`balanceSheet.periods.${preset}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <SheetFooter className="mt-6 flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={resetPreset}>{t('balanceSheet.filters.reset')}</Button>
+            <Button className="flex-1" onClick={applyPreset}>{t('balanceSheet.filters.apply')}</Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

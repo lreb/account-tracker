@@ -1,30 +1,47 @@
-import { isAfter, subMonths, subQuarters, subWeeks, subYears } from 'date-fns'
+import { endOfMonth, endOfQuarter, endOfWeek, endOfYear, isAfter, subMonths, subQuarters, subWeeks, subYears } from 'date-fns'
 
 import { convertToBase } from '@/lib/currency'
 import type { Account, Transaction } from '@/types'
 
-export type BalanceSheetPreset = 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'lastQuarter' | 'lastYear'
+export type BalanceSheetPreset =
+  | 'endLastWeek'
+  | 'endLast2Weeks'
+  | 'endLastMonth'
+  | 'sameTimeLastMonth'
+  | 'endLastQuarter'
+  | 'endLastYear'
+  | 'sameTimeLastYear'
+  | 'endOfThisMonth'
 
 export const BALANCE_SHEET_PRESETS: BalanceSheetPreset[] = [
-  'lastWeek',
-  'last2Weeks',
-  'lastMonth',
-  'lastQuarter',
-  'lastYear',
+  'endLastWeek',
+  'endLast2Weeks',
+  'endLastMonth',
+  'sameTimeLastMonth',
+  'endLastQuarter',
+  'endLastYear',
+  'sameTimeLastYear',
+  'endOfThisMonth',
 ]
 
 export function getComparisonDate(preset: BalanceSheetPreset, now = new Date()): Date {
   switch (preset) {
-    case 'lastWeek':
-      return subWeeks(now, 1)
-    case 'last2Weeks':
-      return subWeeks(now, 2)
-    case 'lastMonth':
+    case 'endLastWeek':
+      return endOfWeek(subWeeks(now, 1))
+    case 'endLast2Weeks':
+      return endOfWeek(subWeeks(now, 2))
+    case 'endLastMonth':
+      return endOfMonth(subMonths(now, 1))
+    case 'sameTimeLastMonth':
       return subMonths(now, 1)
-    case 'lastQuarter':
-      return subQuarters(now, 1)
-    case 'lastYear':
+    case 'endLastQuarter':
+      return endOfQuarter(subQuarters(now, 1))
+    case 'endLastYear':
+      return endOfYear(subYears(now, 1))
+    case 'sameTimeLastYear':
       return subYears(now, 1)
+    case 'endOfThisMonth':
+      return endOfMonth(now)
   }
 }
 

@@ -1,31 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { format } from 'date-fns'
-import { ArrowLeft, ChevronDown, ChevronRight, Fuel, Plus, TrendingDown, TrendingUp, Wrench } from 'lucide-react'
+import { format, isToday, isYesterday, parseISO } from 'date-fns'
+import { ArrowLeft, ChevronDown, Fuel, Plus, Wrench } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { db } from '@/db'
 import { getVisibleAccounts } from '@/lib/accounts'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useCategoriesStore } from '@/stores/categories.store'
-import { useExchangeRatesStore } from '@/stores/exchange-rates.store'
-import { useSettingsStore } from '@/stores/settings.store'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useLabelsStore } from '@/stores/labels.store'
 import { useVehiclesStore } from '@/stores/vehicles.store'
 import {
   BALANCE_SHEET_PRESETS,
-  convertBalanceToBase,
   getAccountBalanceAtDate,
   getAccountTransactionAmount,
-  getComparisonDate,
   isTransactionForAccount,
   type BalanceSheetPreset,
 } from '@/lib/balance-sheet'
+import { getTranslatedCategoryName } from '@/lib/categories'
 import { formatCurrency } from '@/lib/currency'
 import type { Account, Transaction } from '@/types'
 
 import { LabelPickerButton } from '@/components/ui/label-picker-button'
 import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
+import { TransactionListItem } from '@/components/ui/transaction-list-item'
+import { TransactionDateGroupHeader } from '@/components/ui/transaction-date-group-header'
 
 function getTransactionPresentation(transaction: Transaction, account: Account) {
   const signedAmount = getAccountTransactionAmount(transaction, account)
@@ -56,29 +56,46 @@ export default function BalanceSheetDetailPage() {
   const { accountId } = useParams<{ accountId: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
   const { accounts } = useAccountsStore()
-  const { transactions } = useTransactionsStore()
+  // Reload full transaction history on every mount — TransactionListPage loads a
+  // date-filtered subset into this same store, so without this the balance would
+  // be wrong until the user does a full page refresh.
+  const { transactions, load: loadTransactions } = useTransactionsStore()
+  // allTx mirrors BalanceSheetPage: all transactions except cancelled, loaded
+  // directly from Dexie so balance calculation is never affected by the store's
+  // date filter or by cancelled entries.
+  const [allTx, setAllTx] = useState<Transaction[]>([])
   const { categories } = useCategoriesStore()
   const { labels } = useLabelsStore()
   const { vehicles } = useVehiclesStore()
   const [filterLabelIds, setFilterLabelIds] = useState<string[]>([])
   const [addMenuOpen, setAddMenuOpen] = useState(false)
   const addMenuRef = useRef<HTMLDivElement>(null)
-  const { baseCurrency } = useSettingsStore()
-  const { load: loadRates, getRateForPair } = useExchangeRatesStore()
   const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
+
+  // O(1) lookup maps
+  const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
+  const labelMap    = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels])
 
   const presetParam = searchParams.get('period')
   const selectedPreset = BALANCE_SHEET_PRESETS.includes(presetParam as BalanceSheetPreset)
     ? (presetParam as BalanceSheetPreset)
-    : 'lastMonth'
+    : 'endLastMonth'
+
+  useEffect(() => { void loadTransactions() }, [loadTransactions])
+
+  // Load ALL non-cancelled transactions directly from Dexie — same source as
+  // BalanceSheetPage so both pages always produce identical balances.
+  useEffect(() => {
+    db.transactions
+      .filter((tx) => tx.status !== 'cancelled')
+      .toArray()
+      .then(setAllTx)
+      .catch(console.error)
+  }, [transactions])
 
   useEffect(() => {
     document.getElementById('main-scroll')?.scrollTo({ top: 0, behavior: 'instant' })
   }, [])
-
-  useEffect(() => {
-    void loadRates()
-  }, [loadRates])
 
   useEffect(() => {
     if (searchParams.get('period') !== selectedPreset) {
@@ -89,24 +106,28 @@ export default function BalanceSheetDetailPage() {
   }, [searchParams, selectedPreset, setSearchParams])
 
   const account = visibleAccounts.find((item) => item.id === accountId) ?? null
-  const comparisonDate = useMemo(() => getComparisonDate(selectedPreset), [selectedPreset])
 
+  // accountTransactions: non-cancelled only — used exclusively for balance maths.
+  // filteredAccountTransactions below uses the store's full `transactions` list
+  // so cancelled entries remain visible in the UI with strikethrough styling.
   const accountTransactions = useMemo(() => {
     if (!account) {
       return []
     }
 
-    return transactions
+    return allTx
       .filter((transaction) => isTransactionForAccount(transaction, account.id))
       .sort((left, right) => right.date.localeCompare(left.date))
-  }, [account, transactions])
+  }, [account, allTx])
 
-  const filteredAccountTransactions = useMemo(
-    () => filterLabelIds.length === 0
-      ? accountTransactions
-      : accountTransactions.filter((t) => filterLabelIds.some((id) => t.labels?.includes(id))),
-    [accountTransactions, filterLabelIds],
-  )
+  const filteredAccountTransactions = useMemo(() => {
+    const all = transactions
+      .filter((transaction) => isTransactionForAccount(transaction, account?.id ?? ''))
+      .sort((left, right) => right.date.localeCompare(left.date))
+    return filterLabelIds.length === 0
+      ? all
+      : all.filter((t) => filterLabelIds.some((id) => t.labels?.includes(id)))
+  }, [account, transactions, filterLabelIds])
 
   const currentBalance = useMemo(() => {
     if (!account) {
@@ -116,30 +137,50 @@ export default function BalanceSheetDetailPage() {
     return getAccountBalanceAtDate(account, accountTransactions, new Date())
   }, [account, accountTransactions])
 
-  const previousBalance = useMemo(() => {
-    if (!account) {
-      return 0
+  // Running account balance after each non-cancelled transaction (for balance column in list)
+  const balanceAfterTx = useMemo(() => {
+    if (!account) return new Map<string, number>()
+    const result = new Map<string, number>()
+    // accountTransactions is newest-first; traverse oldest-first for accumulation
+    let running = account.openingBalance
+    const sorted = [...accountTransactions].reverse()
+    for (const tx of sorted) {
+      running += getAccountTransactionAmount(tx, account)
+      result.set(tx.id, running)
     }
-
-    return getAccountBalanceAtDate(account, accountTransactions, comparisonDate)
-  }, [account, accountTransactions, comparisonDate])
-
-  const delta = currentBalance - previousBalance
-
-  const netWorthContribution = useMemo(() => {
-    if (!account) {
-      return null
-    }
-
-    const baseValue = convertBalanceToBase(currentBalance, account.currency, baseCurrency, getRateForPair)
-    if (baseValue === null) {
-      return null
-    }
-
-    return account.type === 'liability' ? -baseValue : baseValue
-  }, [account, currentBalance, baseCurrency, getRateForPair])
+    return result
+  }, [account, accountTransactions])
 
   const activeVehicles = useMemo(() => vehicles.filter((v) => !v.archivedAt), [vehicles])
+
+  type FlatItem =
+    | { kind: 'header'; dateKey: string; headerLabel: string; count: number }
+    | { kind: 'tx'; tx: Transaction; timeStr: string }
+
+  const flatItems = useMemo<FlatItem[]>(() => {
+    const result: FlatItem[] = []
+    const timeFormatter = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
+    const map = new Map<string, Transaction[]>()
+    for (const tx of filteredAccountTransactions) {
+      const key = tx.date.substring(0, 10)
+      const arr = map.get(key)
+      if (arr) arr.push(tx)
+      else map.set(key, [tx])
+    }
+    for (const [dateKey, txs] of map) {
+      const d = parseISO(dateKey)
+      const headerLabel = isToday(d)
+        ? t('transactions.today')
+        : isYesterday(d)
+          ? t('transactions.yesterday')
+          : format(d, 'EEEE, MMM d, yyyy')
+      result.push({ kind: 'header', dateKey, headerLabel, count: txs.length })
+      for (const tx of txs) {
+        result.push({ kind: 'tx', tx, timeStr: timeFormatter.format(new Date(tx.date)) })
+      }
+    }
+    return result
+  }, [filteredAccountTransactions, t])
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -183,12 +224,7 @@ export default function BalanceSheetDetailPage() {
               <p className="mt-1 text-sm text-gray-500">
                 {t(`accounts.types.${account.type}`)} · {account.currency}
               </p>
-              <p className="mt-1 text-xs text-gray-400">
-                {t('balanceSheet.sameDateComparison', {
-                  date: format(comparisonDate, 'MMM d, yyyy'),
-                  period: t(`balanceSheet.periodLabels.${selectedPreset}`),
-                })}
-              </p>
+
             </div>
             <div ref={addMenuRef} className="relative">
               <button
@@ -263,23 +299,10 @@ export default function BalanceSheetDetailPage() {
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="mt-4">
             <div className="rounded-2xl bg-gray-50 px-4 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">{t('balanceSheet.currentBalance')}</p>
               <p className="mt-1 text-lg font-bold text-gray-900">{formatCurrency(currentBalance, account.currency)}</p>
-            </div>
-            <div className="rounded-2xl bg-gray-50 px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">{t('balanceSheet.change')}</p>
-              <div className={`mt-1 inline-flex items-center gap-1 text-lg font-bold ${delta >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                {delta >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-                <span>{delta >= 0 ? '+' : '-'}{formatCurrency(Math.abs(delta), account.currency)}</span>
-              </div>
-            </div>
-            <div className="rounded-2xl bg-gray-50 px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">{t('balanceSheet.netWorthImpact')}</p>
-              <p className={`mt-1 text-lg font-bold ${netWorthContribution !== null && netWorthContribution >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                {netWorthContribution === null ? t('balanceSheet.unavailable') : formatCurrency(netWorthContribution, baseCurrency)}
-              </p>
             </div>
           </div>
         </div>
@@ -322,39 +345,42 @@ export default function BalanceSheetDetailPage() {
             {t('balanceSheet.noTransactionsForAccount')}
           </p>
         ) : (
-          <ul className="space-y-2">
-            {filteredAccountTransactions.map((transaction) => {
-              const category = categories.find((item) => item.id === transaction.categoryId)
-              const presentation = getTransactionPresentation(transaction, account)
-              return (
-                <li key={transaction.id}>
-                  <Link
-                    to={`/transactions/${transaction.id}?accountId=${encodeURIComponent(account.id)}&returnTo=${encodeURIComponent(returnTo)}`}
-                    className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition-colors ${
-                      transaction.status === 'cancelled'
-                        ? 'bg-gray-50 border-gray-200 opacity-60'
-                        : 'border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className={`truncate text-sm font-medium ${transaction.status === 'cancelled' ? 'line-through text-gray-400' : 'text-gray-900'}`}>{transaction.description}</p>
-                      <p className="text-xs text-gray-400">
-                        {category?.name ?? '—'} · {t(presentation.labelKey)} · {format(new Date(transaction.date), 'MMM d, yyyy')}
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className={`text-sm font-semibold ${transaction.status === 'cancelled' ? 'line-through text-gray-400' : presentation.tone}`}>
-                        {presentation.prefix}
-                        {formatCurrency(presentation.amount, presentation.currency)}
-                      </p>
-                      <p className="mt-1 text-[11px] text-gray-400">{t(`transactions.status.${transaction.status}`)}</p>
-                    </div>
-                    <ChevronRight size={16} className="text-gray-300" />
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
+          <div>
+            {flatItems.map((item, i) =>
+              item.kind === 'header' ? (
+                <TransactionDateGroupHeader
+                  key={item.dateKey}
+                  headerLabel={item.headerLabel}
+                  count={item.count}
+                />
+              ) : (() => {
+                const { tx, timeStr } = item
+                const cat = categoryMap.get(tx.categoryId)
+                const presentation = getTransactionPresentation(tx, account)
+                const resolvedLabels = (tx.labels ?? []).flatMap((lid) => {
+                  const l = labelMap.get(lid)
+                  return l ? [l] : []
+                })
+                const bal = balanceAfterTx.get(tx.id)
+                return (
+                  <TransactionListItem
+                    key={tx.id + String(i)}
+                    description={tx.description}
+                    status={tx.status}
+                    timeStr={timeStr}
+                    categoryName={getTranslatedCategoryName(cat, t)}
+                    resolvedLabels={resolvedLabels}
+                    linkTo={`/transactions/${tx.id}?accountId=${encodeURIComponent(account.id)}&returnTo=${encodeURIComponent(returnTo)}`}
+                    amount={presentation.amount}
+                    amountPrefix={presentation.prefix}
+                    amountCurrency={presentation.currency}
+                    amountTone={presentation.tone}
+                    primaryBalance={bal != null ? { accountName: account.name, balance: bal, currency: account.currency } : undefined}
+                  />
+                )
+              })()
+            )}
+          </div>
         )}
       </section>
       <ScrollToTopButton />
