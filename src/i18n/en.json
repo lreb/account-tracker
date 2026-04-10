@@ -149,6 +149,9 @@
     "addFirstVehicle": "Add your first vehicle",
     "addVehicle": "Add Vehicle",
     "title": "Vehicles",
+    "vehicle": "Vehicle",
+    "selectVehicle": "Select vehicle",
+    "linkToVehicle": "Link to vehicle",
     "addFillUp": "Add fill-up",
     "addFuelLog": "Add Fuel Log",
     "addService": "Add Service",
@@ -240,6 +243,10 @@
       "title": "Statistics",
       "totalCost": "Total Cost",
       "totalDistance": "Total Distance",
+      "distanceNoLogs": "No fuel logs recorded yet",
+      "distanceOneFillUp": "At least 2 fill-ups needed to calculate distance",
+      "distanceNoInitialOdo": "Set the vehicle's initial odometer in Settings for accurate distance tracking",
+      "distanceOdometerFlat": "Odometer readings are not increasing between fill-ups",
       "totalFuelCost": "Total Fuel Cost",
       "totalLiters": "Total Liters",
       "totalServiceCost": "Total Service Cost"
@@ -270,7 +277,14 @@
     "noBudgets": "No budgets yet.",
     "createFirstBudget": "Create your first budget",
     "spent": "Spent",
-    "remaining": "Remaining"
+    "remaining": "Remaining",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "today": "Today",
+    "selectMonth": "Select month",
+    "rolloverCarried": "+ {{amount}} carried over from last period",
+    "allCategories": "All",
+    "noMatch": "No budgets match the selected categories."
   },
   "insights": {
     "title": "Insights"

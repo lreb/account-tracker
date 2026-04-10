@@ -2,9 +2,18 @@ import { useState, useEffect, useMemo } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
-import { format } from 'date-fns'
+import {
+  format,
+  addMonths,
+  subMonths,
+  startOfMonth,
+  isSameMonth,
+  getYear,
+  setYear,
+  setMonth,
+} from 'date-fns'
 import { v4 as uuid } from 'uuid'
-import { Plus, Pencil, Trash2, PiggyBank } from 'lucide-react'
+import { Plus, Pencil, Trash2, PiggyBank, ChevronLeft, ChevronRight, ChevronDown, RotateCcw } from 'lucide-react'
 
 import { budgetSchema, type BudgetFormValues } from '../schemas/budget.schema'
 import { getActiveAccountIds } from '@/lib/accounts'
@@ -12,16 +21,14 @@ import { useBudgetsStore } from '@/stores/budgets.store'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useCategoriesStore } from '@/stores/categories.store'
 import { useSettingsStore } from '@/stores/settings.store'
-import { useTransactionsStore } from '@/stores/transactions.store'
-import { useLabelsStore } from '@/stores/labels.store'
 import { getBudgetUsage, type BudgetUsage } from '@/lib/budgets'
 import { formatCurrency } from '@/lib/currency'
 import { CategoryIcon } from '@/lib/icon-map'
-import type { Budget } from '@/types'
+import { getTranslatedCategoryName } from '@/lib/categories'
+import type { Budget, Category } from '@/types'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { LabelPickerButton } from '@/components/ui/label-picker-button'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -40,50 +47,92 @@ import {
 } from '@/components/ui/dialog'
 import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
 
-const DEFAULT_CATEGORY_NAME_TO_ID: Record<string, string> = {
-  Transportation: 'transportation',
-  'Food & Groceries': 'food-groceries',
-  Health: 'health',
-  Housing: 'housing',
-  'Fuel / Gas': 'fuel-gas',
-  Restaurants: 'restaurants',
-  'Medical / Pharmacy': 'medical-pharmacy',
-  'Rent / Mortgage': 'rent-mortgage',
-  'Vehicle Maintenance': 'vehicle-maintenance',
-  Supermarket: 'supermarket',
-  'Health Insurance': 'health-insurance',
-  Utilities: 'utilities',
-  Entertainment: 'entertainment',
-  Education: 'education',
-  'Investments / Savings': 'investments-savings',
-  Salary: 'salary',
-  Freelance: 'freelance',
-  Interest: 'interest',
-  'Rental income': 'rental-income',
-  Refund: 'refund',
-  Other: 'other',
-}
+// ─── Month Picker Dialog ──────────────────────────────────────────────────────
 
-function getTranslatedCategoryName(
-  t: (key: string, options?: { defaultValue?: string }) => string,
-  category: { id: string; name: string },
-): string {
-  const keyById = `categories.names.${category.id}`
-  const byId = t(keyById)
-  if (byId !== keyById) {
-    return byId
-  }
+const MONTH_NAMES = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+]
 
-  const mappedId = DEFAULT_CATEGORY_NAME_TO_ID[category.name]
-  if (mappedId) {
-    const keyByNameMap = `categories.names.${mappedId}`
-    const byNameMap = t(keyByNameMap)
-    if (byNameMap !== keyByNameMap) {
-      return byNameMap
-    }
-  }
+function MonthPickerDialog({
+  open,
+  current,
+  onSelect,
+  onClose,
+}: {
+  open: boolean
+  current: Date
+  onSelect: (d: Date) => void
+  onClose: () => void
+}) {
+  const { t } = useTranslation()
+  const [year, setPickerYear] = useState(getYear(current))
+  const today = new Date()
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose() }}>
+      <DialogContent className="max-w-xs">
+        <DialogHeader>
+          <DialogTitle>{t('budgets.selectMonth')}</DialogTitle>
+        </DialogHeader>
 
-  return category.name
+        {/* Year navigation */}
+        <div className="flex items-center justify-between px-1">
+          <button
+            type="button"
+            onClick={() => setPickerYear((y) => y - 1)}
+            className="rounded-full p-1.5 hover:bg-gray-100"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <span className="text-sm font-semibold">{year}</span>
+          <button
+            type="button"
+            onClick={() => setPickerYear((y) => y + 1)}
+            className="rounded-full p-1.5 hover:bg-gray-100"
+            disabled={year >= getYear(today)}
+          >
+            <ChevronRight size={16} className={year >= getYear(today) ? 'text-gray-300' : ''} />
+          </button>
+        </div>
+
+        {/* Month grid */}
+        <div className="grid grid-cols-3 gap-2">
+          {MONTH_NAMES.map((name, idx) => {
+            const candidate = startOfMonth(setMonth(setYear(new Date(), year), idx))
+            const isSelected = isSameMonth(candidate, current)
+            const isFuture = candidate > startOfMonth(today)
+            return (
+              <button
+                key={name}
+                type="button"
+                disabled={isFuture}
+                onClick={() => { onSelect(candidate); onClose() }}
+                className={`rounded-xl py-2 text-sm font-medium transition-colors ${
+                  isSelected
+                    ? 'bg-blue-600 text-white'
+                    : isFuture
+                      ? 'text-gray-300 cursor-not-allowed'
+                      : 'hover:bg-gray-100 text-gray-700'
+                }`}
+              >
+                {name}
+              </button>
+            )
+          })}
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => { onSelect(startOfMonth(today)); onClose() }}
+          >
+            {t('budgets.today')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 // ─── Budget progress bar ─────────────────────────────────────────────────────
@@ -106,10 +155,12 @@ function ProgressBar({ percent }: { percent: number }) {
 
 function BudgetCard({
   budget,
+  referenceDate,
   onEdit,
   onDelete,
 }: {
   budget: Budget
+  referenceDate: Date
   onEdit: (b: Budget) => void
   onDelete: (id: string) => void
 }) {
@@ -121,13 +172,11 @@ function BudgetCard({
   const activeAccountIds = useMemo(() => getActiveAccountIds(accounts), [accounts])
 
   useEffect(() => {
-    getBudgetUsage(budget, activeAccountIds).then(setUsage).catch(console.error)
-  }, [budget, activeAccountIds])
+    getBudgetUsage(budget, activeAccountIds, referenceDate).then(setUsage).catch(console.error)
+  }, [budget, activeAccountIds, referenceDate])
 
   const category = categories.find((c) => c.id === budget.categoryId)
-  const categoryLabel = category
-    ? getTranslatedCategoryName(t, category)
-    : budget.categoryId
+  const categoryLabel = getTranslatedCategoryName(category, t)
   const percent = usage?.percent ?? 0
   const statusColor =
     percent >= 100 ? 'text-red-500' : percent >= 75 ? 'text-amber-500' : 'text-emerald-600'
@@ -158,6 +207,16 @@ function BudgetCard({
         </div>
       </div>
 
+      {/* Rollover banner */}
+      {usage && usage.rolloverAmount > 0 && (
+        <div className="flex items-center gap-1.5 rounded-xl bg-blue-50 px-3 py-1.5 text-xs text-blue-700">
+          <RotateCcw size={11} className="shrink-0" />
+          <span>
+            {t('budgets.rolloverCarried', { amount: formatCurrency(usage.rolloverAmount, baseCurrency) })}
+          </span>
+        </div>
+      )}
+
       {/* Progress */}
       <ProgressBar percent={percent} />
 
@@ -167,7 +226,7 @@ function BudgetCard({
           {usage ? formatCurrency(usage.spent, baseCurrency) : '—'} {t('budgets.spent')}
         </span>
         <span className="text-gray-400">
-          {t('budgets.of')} {formatCurrency(budget.amount, baseCurrency)}
+          {t('budgets.of')} {usage ? formatCurrency(usage.limit, baseCurrency) : formatCurrency(budget.amount, baseCurrency)}
           {budget.rollover && (
             <Badge variant="outline" className="ml-1.5 text-[10px] px-1.5 py-0">
               {t('budgets.rollover')}
@@ -237,7 +296,7 @@ function BudgetDialog({
         endDate: '',
       })
     }
-  }, [open, editing])
+  }, [open, editing, reset])
 
   const onSubmit = async (values: BudgetFormValues) => {
     const amountCents = Math.round(parseFloat(values.amount) * 100)
@@ -281,7 +340,7 @@ function BudgetDialog({
               <SelectContent>
                 {categories.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id}>
-                    {getTranslatedCategoryName(t, cat)}
+                    {getTranslatedCategoryName(cat, t)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -334,7 +393,9 @@ function BudgetDialog({
 
           {/* End date (optional) */}
           <div className="space-y-1">
-            <Label htmlFor="bEnd">{t('budgets.endDate')} <span className="text-gray-400">({t('common.optional')})</span></Label>
+            <Label htmlFor="bEnd">
+              {t('budgets.endDate')} <span className="text-gray-400">({t('common.optional')})</span>
+            </Label>
             <Input id="bEnd" type="date" {...register('endDate')} />
           </div>
 
@@ -378,50 +439,132 @@ function BudgetDialog({
   )
 }
 
+// ─── Category filter chip bar ─────────────────────────────────────────────────
+
+function CategoryFilterBar({
+  categories,
+  selected,
+  onChange,
+}: {
+  categories: Category[]
+  selected: string[]
+  onChange: (ids: string[]) => void
+}) {
+  const { t } = useTranslation()
+  const toggle = (id: string) =>
+    onChange(selected.includes(id) ? selected.filter((s) => s !== id) : [...selected, id])
+
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+      <button
+        type="button"
+        onClick={() => onChange([])}
+        className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+          selected.length === 0
+            ? 'border-blue-600 bg-blue-600 text-white'
+            : 'border-gray-200 bg-white text-gray-600'
+        }`}
+      >
+        {t('budgets.allCategories')}
+      </button>
+      {categories.map((cat) => {
+        const active = selected.includes(cat.id)
+        return (
+          <button
+            key={cat.id}
+            type="button"
+            onClick={() => toggle(cat.id)}
+            className={`shrink-0 flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+              active
+                ? 'border-blue-600 bg-blue-600 text-white'
+                : 'border-gray-200 bg-white text-gray-600'
+            }`}
+          >
+            <CategoryIcon name={cat.icon} size={11} />
+            {getTranslatedCategoryName(cat, t)}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function BudgetsPage() {
   const { t } = useTranslation()
   const { budgets, remove } = useBudgetsStore()
-  const { transactions } = useTransactionsStore()
-  const { labels } = useLabelsStore()
-  const { accounts } = useAccountsStore()
+  const { categories } = useCategoriesStore()
+  useAccountsStore()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Budget | null>(null)
-  const [filterLabelIds, setFilterLabelIds] = useState<string[]>([])
+  const [referenceDate, setReferenceDate] = useState<Date>(() => startOfMonth(new Date()))
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false)
+  const [filterCategoryIds, setFilterCategoryIds] = useState<string[]>([])
 
-  const activeAccountIds = useMemo(() => getActiveAccountIds(accounts), [accounts])
+  const today = new Date()
+  const isCurrentMonth = isSameMonth(referenceDate, today)
+
+  // Only show categories that have at least one budget
+  const budgetCategories = useMemo(
+    () => categories.filter((c) => budgets.some((b) => b.categoryId === c.id)),
+    [categories, budgets],
+  )
 
   const filteredBudgets = useMemo(() => {
-    if (filterLabelIds.length === 0) return budgets
-    return budgets.filter((b) =>
-      transactions.some(
-        (t) =>
-          t.type === 'expense' &&
-          activeAccountIds.has(t.accountId) &&
-          t.categoryId === b.categoryId &&
-          filterLabelIds.some((id) => t.labels?.includes(id)),
-      )
-    )
-  }, [budgets, transactions, filterLabelIds, activeAccountIds])
+    if (filterCategoryIds.length === 0) return budgets
+    return budgets.filter((b) => filterCategoryIds.includes(b.categoryId))
+  }, [budgets, filterCategoryIds])
 
   const openAdd = () => { setEditing(null); setDialogOpen(true) }
   const openEdit = (b: Budget) => { setEditing(b); setDialogOpen(true) }
   const closeDialog = () => { setDialogOpen(false); setEditing(null) }
 
   return (
-    <div className="p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold">{t('budgets.title')}</h1>
-        <div className="flex items-center gap-2">
-          <LabelPickerButton labels={labels} selectedIds={filterLabelIds} onChange={setFilterLabelIds} />
-          <Button size="sm" onClick={openAdd} className="gap-1">
-            <Plus size={16} />
-            {t('common.add')}
-          </Button>
-        </div>
+    <div className="p-4 pb-24 space-y-4">
+      {/* Header with month navigation */}
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setReferenceDate((d) => startOfMonth(subMonths(d, 1)))}
+          className="rounded-full p-1.5 hover:bg-gray-100"
+          aria-label={t('budgets.prevMonth')}
+        >
+          <ChevronLeft size={20} />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMonthPickerOpen(true)}
+          className="flex items-center gap-1 rounded-full px-3 py-1 hover:bg-gray-100 transition-colors"
+        >
+          <span className="text-base font-bold">
+            {format(referenceDate, 'MMMM yyyy')}
+          </span>
+          <ChevronDown size={14} className="text-gray-500" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setReferenceDate((d) => startOfMonth(addMonths(d, 1)))}
+          disabled={isCurrentMonth}
+          className="rounded-full p-1.5 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+          aria-label={t('budgets.nextMonth')}
+        >
+          <ChevronRight size={20} />
+        </button>
       </div>
 
+      {/* Category filter chips */}
+      {budgetCategories.length > 1 && (
+        <CategoryFilterBar
+          categories={budgetCategories}
+          selected={filterCategoryIds}
+          onChange={setFilterCategoryIds}
+        />
+      )}
+
+      {/* Budget list */}
       {budgets.length === 0 ? (
         <div className="text-center mt-16 space-y-2">
           <PiggyBank size={40} className="mx-auto text-gray-300" />
@@ -434,13 +577,35 @@ export default function BudgetsPage() {
         <ul className="space-y-3">
           {filteredBudgets.map((budget) => (
             <li key={budget.id}>
-              <BudgetCard budget={budget} onEdit={openEdit} onDelete={remove} />
+              <BudgetCard
+                budget={budget}
+                referenceDate={referenceDate}
+                onEdit={openEdit}
+                onDelete={remove}
+              />
             </li>
           ))}
         </ul>
       )}
 
+      {/* FAB */}
+      <button
+        type="button"
+        onClick={openAdd}
+        aria-label={t('budgets.newBudget')}
+        className="fixed bottom-6 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 active:scale-95 transition-all"
+      >
+        <Plus size={24} />
+      </button>
+
       <BudgetDialog open={dialogOpen} editing={editing} onClose={closeDialog} />
+      <MonthPickerDialog
+        key={monthPickerOpen ? format(referenceDate, 'yyyy-MM') : 'closed'}
+        open={monthPickerOpen}
+        current={referenceDate}
+        onSelect={setReferenceDate}
+        onClose={() => setMonthPickerOpen(false)}
+      />
       <ScrollToTopButton />
     </div>
   )

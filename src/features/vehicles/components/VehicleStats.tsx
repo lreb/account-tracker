@@ -15,9 +15,12 @@ import {
   Legend,
 } from 'recharts'
 
+import { Info } from 'lucide-react'
+
 import { formatCurrency } from '@/lib/currency'
 import { calcKmSinceLastFill, getServiceTypeLabel } from '@/lib/vehicles'
 import type { FuelLog, VehicleService } from '@/types'
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 const CHART_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316']
 
@@ -112,37 +115,62 @@ export function VehicleStats({
     const avgKmPerL = totalLitersForEff > 0 ? totalKm / totalLitersForEff : 0
 
     // Total distance (single-vehicle mode)
-    const maxOdo = sortedLogs.length > 0 ? sortedLogs[sortedLogs.length - 1].odometer : 0
-    const minOdo = sortedLogs.length > 0 ? (initialOdometer || sortedLogs[0].odometer) : initialOdometer
+    const safeInitialOdo = Number(initialOdometer) || 0
+    const odometerValues = sortedLogs.map((l) => Number(l.odometer))
+    const maxOdo = odometerValues.length > 0 ? Math.max(...odometerValues) : 0
+    const minOdo = odometerValues.length > 0
+      ? (safeInitialOdo > 0 ? safeInitialOdo : Math.min(...odometerValues))
+      : safeInitialOdo
     const totalDistance = Math.max(0, maxOdo - minOdo)
 
-    return { totalFuelCost, totalServiceCost, totalLiters, fillUpCount, avgKmPerL, totalDistance }
+    return { totalFuelCost, totalServiceCost, totalLiters, fillUpCount, avgKmPerL, totalDistance, hasInitialOdo: safeInitialOdo > 0 }
   }, [logs, services, initialOdometer])
 
   // In fleet mode, overrides replace the internally computed values
   const displayAvgKmPerL = overrideAvgKmPerL ?? stats.avgKmPerL
   const displayTotalDistance = overrideTotalDistance ?? stats.totalDistance
 
+  const distanceTooltip =
+    displayTotalDistance > 0
+      ? undefined
+      : logs.length === 0
+        ? t('vehicles.stats.distanceNoLogs')
+        : logs.length === 1
+          ? t('vehicles.stats.distanceOneFillUp')
+          : !stats.hasInitialOdo
+            ? t('vehicles.stats.distanceNoInitialOdo')
+            : t('vehicles.stats.distanceOdometerFlat')
+
   return (
     <div className="space-y-6">
       {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-2">
-        {[
-          { label: t('vehicles.stats.totalFuelCost'), value: formatCurrency(stats.totalFuelCost, baseCurrency) },
-          { label: t('vehicles.stats.totalServiceCost'), value: formatCurrency(stats.totalServiceCost, baseCurrency) },
-          { label: t('vehicles.stats.totalCost'), value: formatCurrency(stats.totalFuelCost + stats.totalServiceCost, baseCurrency) },
-          { label: t('vehicles.stats.avgKmPerL'), value: displayAvgKmPerL > 0 ? `${displayAvgKmPerL.toFixed(1)} km/L` : '—' },
-          { label: t('vehicles.stats.totalDistance'), value: displayTotalDistance > 0 ? `${displayTotalDistance.toLocaleString()} km` : '—' },
-          { label: t('vehicles.stats.fillUps'), value: stats.fillUpCount.toString() },
-          { label: t('vehicles.stats.totalLiters'), value: `${stats.totalLiters.toFixed(1)} L` },
-          { label: t('vehicles.stats.serviceCount'), value: services.length.toString() },
-        ].map(({ label, value }) => (
-          <div key={label} className="rounded-xl border bg-white px-3 py-2">
-            <p className="text-[10px] uppercase tracking-wide text-gray-400">{label}</p>
-            <p className="text-sm font-bold mt-0.5">{value}</p>
-          </div>
-        ))}
-      </div>
+      <TooltipProvider>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { label: t('vehicles.stats.totalFuelCost'), value: formatCurrency(stats.totalFuelCost, baseCurrency) },
+            { label: t('vehicles.stats.totalServiceCost'), value: formatCurrency(stats.totalServiceCost, baseCurrency) },
+            { label: t('vehicles.stats.totalCost'), value: formatCurrency(stats.totalFuelCost + stats.totalServiceCost, baseCurrency) },
+            { label: t('vehicles.stats.avgKmPerL'), value: displayAvgKmPerL > 0 ? `${displayAvgKmPerL.toFixed(1)} km/L` : '—' },
+            { label: t('vehicles.stats.totalDistance'), value: displayTotalDistance > 0 ? `${displayTotalDistance.toLocaleString()} km` : '—', tooltip: distanceTooltip },
+            { label: t('vehicles.stats.fillUps'), value: stats.fillUpCount.toString() },
+            { label: t('vehicles.stats.totalLiters'), value: `${stats.totalLiters.toFixed(1)} L` },
+            { label: t('vehicles.stats.serviceCount'), value: services.length.toString() },
+          ].map(({ label, value, tooltip }) => (
+            <UITooltip key={label}>
+              <TooltipTrigger asChild>
+                <div className="rounded-xl border bg-white px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wide text-gray-400">{label}</p>
+                  <p className="text-sm font-bold mt-0.5 flex items-center gap-1">
+                    {value}
+                    {tooltip && <Info size={11} className="text-gray-400 shrink-0" />}
+                  </p>
+                </div>
+              </TooltipTrigger>
+              {tooltip && <TooltipContent>{tooltip}</TooltipContent>}
+            </UITooltip>
+          ))}
+        </div>
+      </TooltipProvider>
 
       {/* Fuel cost by month */}
       {logs.length > 0 && (

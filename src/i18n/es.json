@@ -148,8 +148,9 @@
   "vehicles": {
     "addFirstVehicle": "Agrega tu primer vehículo",
     "addVehicle": "Agregar vehículo",
-    "title": "Vehiculos",
-    "addFillUp": "Añadir carga",
+    "title": "Vehiculos",    "vehicle": "Vehículo",
+    "selectVehicle": "Seleccionar vehículo",
+    "linkToVehicle": "Vincular a vehículo",    "addFillUp": "Añadir carga",
     "addFuelLog": "Añadir registro de combustible",
     "addService": "Añadir servicio",
     "addServiceBtn": "Añadir servicio",
@@ -240,6 +241,10 @@
       "title": "Estadísticas",
       "totalCost": "Costo total",
       "totalDistance": "Distancia total",
+      "distanceNoLogs": "Aún no hay registros de combustible",
+      "distanceOneFillUp": "Se necesitan al menos 2 cargas para calcular la distancia",
+      "distanceNoInitialOdo": "Configura el odómetro inicial del vehículo en Ajustes para calcular la distancia",
+      "distanceOdometerFlat": "Los odómetros no aumentan entre cargas",
       "totalFuelCost": "Costo total comb.",
       "totalLiters": "Total de litros",
       "totalServiceCost": "Costo total serv."
@@ -270,7 +275,14 @@
     "noBudgets": "Aún no hay presupuestos.",
     "createFirstBudget": "Crea tu primer presupuesto",
     "spent": "Gastado",
-    "remaining": "Restante"
+    "remaining": "Restante",
+    "prevMonth": "Mes anterior",
+    "nextMonth": "Mes siguiente",
+    "today": "Hoy",
+    "selectMonth": "Seleccionar mes",
+    "rolloverCarried": "+ {{amount}} arrastrado del período anterior",
+    "allCategories": "Todos",
+    "noMatch": "No hay presupuestos para las categorías seleccionadas."
   },
   "insights": {
     "title": "Análisis"

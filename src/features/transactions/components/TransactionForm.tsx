@@ -26,6 +26,11 @@ import { LabelPickerButton } from '@/components/ui/label-picker-button'
 import { StatusSelect } from '@/components/ui/status-select'
 import { AccountSelect } from '@/components/ui/account-select'
 import { CategorySelect } from '@/components/ui/category-select'
+import { useVehiclesStore } from '@/stores/vehicles.store'
+import type { FuelLog, VehicleService } from '@/types'
+import VehicleLinkSection from './VehicleLinkSection'
+import { VEHICLE_LINK_INITIAL_STATE } from './vehicle-link-section.types'
+import type { VehicleLinkState } from './vehicle-link-section.types'
 
 const TYPE_OPTIONS = [
   { value: 'expense',  label: 'transactions.expense' },
@@ -49,6 +54,7 @@ export default function TransactionForm() {
   const { labels, load: loadLabels } = useLabelsStore()
   const { getRateForPair, load: loadRates } = useExchangeRatesStore()
   const { baseCurrency, load: loadSettings } = useSettingsStore()
+  const { addFuelLog, updateFuelLog, addService, updateService, load: loadVehicles } = useVehiclesStore()
   const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
 
   // Ensure the store is hydrated before we try to find the transaction.
@@ -56,7 +62,7 @@ export default function TransactionForm() {
   const [storeReady, setStoreReady] = useState(!isEdit || transactions.length > 0)
 
   useEffect(() => {
-    const tasks: Promise<void>[] = [loadLabels(), loadRates(), loadSettings()]
+    const tasks: Promise<void>[] = [loadLabels(), loadRates(), loadSettings(), loadVehicles()]
     if (isEdit && transactions.length === 0) {
       tasks.push(loadTransactions().then(() => setStoreReady(true)))
     }
@@ -70,6 +76,13 @@ export default function TransactionForm() {
   const [selectedLabels, setSelectedLabels] = useState<string[]>(
     () => existing?.labels ?? []
   )
+
+  // ─── Vehicle link state ────────────────────────────────────────────────────
+  const [vehicleLink, setVehicleLink] = useState<VehicleLinkState>(VEHICLE_LINK_INITIAL_STATE)
+  const [existingVehicleLink, setExistingVehicleLink] = useState<{
+    type: 'fuel' | 'service'
+    id: string
+  } | null>(null)
 
   const {
     register,
@@ -141,6 +154,47 @@ export default function TransactionForm() {
     })
     setSelectedLabels(existing.labels ?? [])
   }, [storeReady]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Detect any existing vehicle link when editing a transaction
+  useEffect(() => {
+    if (!isEdit || !id) return
+    async function detectLink() {
+      const [allFuel, allServices] = await Promise.all([
+        db.fuelLogs.toArray(),
+        db.vehicleServices.toArray(),
+      ])
+      const linked = allFuel.find((l) => l.transactionId === id)
+      const linkedSvc = allServices.find((s) => s.transactionId === id)
+      if (linked) {
+        setExistingVehicleLink({ type: 'fuel', id: linked.id })
+        setVehicleLink({
+          enabled: true,
+          vehicleId: linked.vehicleId,
+          linkType: 'fuel',
+          odometer: linked.odometer.toString(),
+          liters: linked.liters.toString(),
+          serviceType: '',
+          nextServiceKm: '',
+          nextServiceDate: '',
+        })
+      } else if (linkedSvc) {
+        setExistingVehicleLink({ type: 'service', id: linkedSvc.id })
+        setVehicleLink({
+          enabled: true,
+          vehicleId: linkedSvc.vehicleId,
+          linkType: 'service',
+          odometer: linkedSvc.odometer.toString(),
+          liters: '',
+          serviceType: linkedSvc.serviceType,
+          nextServiceKm: linkedSvc.nextServiceKm?.toString() ?? '',
+          nextServiceDate: linkedSvc.nextServiceDate
+            ? format(new Date(linkedSvc.nextServiceDate), 'yyyy-MM-dd')
+            : '',
+        })
+      }
+    }
+    detectLink()
+  }, [storeReady, isEdit, id])
 
   // Current balance per account: openingBalance + income − expense ± transfers
   // Queried directly from Dexie (all-time) so the result is always correct,
@@ -238,6 +292,16 @@ export default function TransactionForm() {
   const watchCurrency    = watch('currency')
   const watchRate        = watch('exchangeRate')
 
+  // Auto-select vehicle link type when category matches fuel-gas or vehicle-maintenance
+  useEffect(() => {
+    if (watchType !== 'expense') return
+    if (watchCategoryId === 'fuel-gas') {
+      setVehicleLink((prev) => ({ ...prev, linkType: 'fuel' }))
+    } else if (watchCategoryId === 'vehicle-maintenance') {
+      setVehicleLink((prev) => ({ ...prev, linkType: 'service' }))
+    }
+  }, [watchCategoryId, watchType])
+
   const sourceAccountOptions = useMemo(() => {
     return getAccountSelectOptions(accounts, [watchAccountId, accountContextId ?? '', existing?.accountId ?? ''])
   }, [accounts, watchAccountId, accountContextId, existing])
@@ -281,10 +345,12 @@ export default function TransactionForm() {
   const onSubmit = async (values: TransactionFormValues) => {
     const amountCents = Math.round(parseFloat(values.amount) * 100)
     const rateValue = values.exchangeRate ? parseFloat(values.exchangeRate) : undefined
+    const isoDate = new Date(`${values.date}T${values.time}:00`).toISOString()
+    const txId = isEdit && existing ? existing.id : uuid()
     const base = {
       type:         values.type,
       amount:       amountCents,
-      date:         new Date(`${values.date}T${values.time}:00`).toISOString(),
+      date:         isoDate,
       categoryId:   values.categoryId,
       accountId:    values.accountId,
       toAccountId:  values.toAccountId || undefined,
@@ -299,8 +365,49 @@ export default function TransactionForm() {
     if (isEdit && existing) {
       await update({ ...existing, ...base })
     } else {
-      await add({ id: uuid(), ...base })
+      await add({ id: txId, ...base })
     }
+
+    // Create or update linked vehicle record when type is expense
+    if (vehicleLink.enabled && vehicleLink.vehicleId && values.type === 'expense') {
+      const linkedRecordId = existingVehicleLink?.id ?? uuid()
+      if (vehicleLink.linkType === 'fuel' && vehicleLink.liters) {
+        const fuelPayload: FuelLog = {
+          id: linkedRecordId,
+          vehicleId: vehicleLink.vehicleId,
+          date: isoDate,
+          liters: parseFloat(vehicleLink.liters),
+          totalCost: amountCents,
+          odometer: parseInt(vehicleLink.odometer, 10) || 0,
+          transactionId: txId,
+        }
+        if (existingVehicleLink?.type === 'fuel') {
+          await updateFuelLog(fuelPayload)
+        } else {
+          await addFuelLog(fuelPayload)
+        }
+      } else if (vehicleLink.linkType === 'service' && vehicleLink.serviceType) {
+        const svcPayload: VehicleService = {
+          id: linkedRecordId,
+          vehicleId: vehicleLink.vehicleId,
+          date: isoDate,
+          serviceType: vehicleLink.serviceType,
+          cost: amountCents,
+          odometer: parseInt(vehicleLink.odometer, 10) || 0,
+          transactionId: txId,
+          nextServiceKm: vehicleLink.nextServiceKm ? parseInt(vehicleLink.nextServiceKm, 10) : undefined,
+          nextServiceDate: vehicleLink.nextServiceDate
+            ? new Date(vehicleLink.nextServiceDate).toISOString()
+            : undefined,
+        }
+        if (existingVehicleLink?.type === 'service') {
+          await updateService(svcPayload)
+        } else {
+          await addService(svcPayload)
+        }
+      }
+    }
+
     if (returnTo?.startsWith('/')) {
       navigate(returnTo)
       return
@@ -487,6 +594,11 @@ export default function TransactionForm() {
         selectedIds={selectedLabels}
         onChange={setSelectedLabels}
       />
+
+      {/* Vehicle link — expense only */}
+      {watchType === 'expense' && (
+        <VehicleLinkSection vehicleLink={vehicleLink} onChange={setVehicleLink} />
+      )}
 
       {/* Notes */}
       <div className="space-y-1">
