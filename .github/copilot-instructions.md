@@ -354,6 +354,7 @@ Data is persisted in **Dexie.js (IndexedDB)**. Zustand holds in-memory state and
 ### Linting
 - ESLint is configured in `eslint.config.js` (flat config, ESLint 9+) with `@typescript-eslint`, `eslint-plugin-react-hooks`, and `eslint-plugin-react-refresh`
 - `@typescript-eslint/no-unused-vars: error` — **unused imports are a lint error and will block commits**
+- `react-refresh/only-export-components: warning (treated as error)` — a `.tsx` file must export **only React components**. If a component file also needs to export types, interfaces, or constants that other files consume, move those exports into a companion `<name>.types.ts` file (e.g. `balance-sheet-detail-filters.types.ts`) and import from there in both the component and its consumers.
 - `npm run lint` — checks all of `src/` with zero warnings allowed
 - `npm run lint:fix` — auto-fixes what ESLint can
 - A **Husky pre-commit hook** runs `lint-staged` before every `git commit`; only staged `src/**/*.{ts,tsx}` files are linted, so commits are blocked if any staged file has a lint error

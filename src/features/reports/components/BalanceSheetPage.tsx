@@ -332,14 +332,17 @@ export default function BalanceSheetPage() {
                     <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
                       {t(`accounts.types.${section.type}`)}
                     </h2>
-                    <TooltipProvider delayDuration={200}>
+                    <TooltipProvider delayDuration={2000} skipDelayDuration={500} >
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <button type="button" className="text-gray-400 hover:text-gray-600 transition-colors">
                             <Info size={12} />
                           </button>
                         </TooltipTrigger>
-                        <TooltipContent side="right">
+                        <TooltipContent side="right"
+                        sideOffset={4}
+                        className="max-w-[200px] text-xs leading-snug"
+                        >
                           {t(`accounts.descriptions.${section.type}`)}
                         </TooltipContent>
                       </Tooltip>
