@@ -263,7 +263,7 @@ export default function TransactionListPage() {
   const grouped = useMemo(() => {
     const map = new Map<string, typeof filtered>()
     for (const tx of filtered) {
-      const key = tx.date.substring(0, 10)
+      const key = format(new Date(tx.date), 'yyyy-MM-dd')
       const arr = map.get(key)
       if (arr) arr.push(tx)
       else map.set(key, [tx])
