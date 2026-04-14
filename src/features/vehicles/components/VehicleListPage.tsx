@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { v4 as uuid } from 'uuid'
 import { format } from 'date-fns'
-import { Plus, Car, ChevronRight, Pencil, Archive, ArchiveRestore, ChevronDown, ChevronUp, X } from 'lucide-react'
+import { Car, ChevronRight, Pencil, Archive, ArchiveRestore, ChevronDown, ChevronUp, X } from 'lucide-react'
 
 import { vehicleSchema, type VehicleFormValues } from '../schemas/vehicle.schema'
 import { useVehiclesStore } from '@/stores/vehicles.store'
@@ -422,10 +422,6 @@ export default function VehicleListPage() {
     <div className="p-4 pb-24">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold">{t('vehicles.title')}</h1>
-        <Button size="sm" onClick={openAdd} className="gap-1">
-          <Plus size={16} />
-          {t('common.add')}
-        </Button>
       </div>
 
       {/* Active vehicles */}
