@@ -122,6 +122,9 @@ src/
 │   ├── transactions.store.ts
 │   ├── accounts.store.ts
 │   ├── budgets.store.ts
+│   ├── categories.store.ts
+│   ├── labels.store.ts
+│   ├── exchange-rates.store.ts
 │   ├── vehicles.store.ts
 │   └── settings.store.ts
 ├── lib/
@@ -129,7 +132,7 @@ src/
 │   ├── budgets.ts           # getBudgetUsage()
 │   ├── vehicles.ts          # calcKmPerLiter(), calcCostPerKm()
 │   └── dates.ts             # getPeriodRange(), helpers wrapping date-fns
-├── hooks/                   # Shared custom hooks (useSettings, useToast, etc.)
+├── hooks/                   # Shared custom hooks (used by 2+ features; currently empty — see Hooks Reference)
 ├── types/                   # Shared TypeScript interfaces and enums
 └── i18n/
     ├── index.ts             # i18next init
@@ -331,6 +334,59 @@ Data is persisted in **Dexie.js (IndexedDB)**. Zustand holds in-memory state and
 - Google Drive / Dropbox sync uses OAuth2 PKCE flow (no client secrets in code)
 - PDF exports may optionally be password-protected
 - No analytics, tracking pixels, or telemetry in MVP
+
+---
+
+## Hooks Reference
+
+> **Rule for AI agents**: Before adding a new hook, check this section. Prefer extending an existing hook over creating a new one. A hook must be co-located with its feature unless it is consumed by two or more features — then it moves to `src/hooks/`.
+
+### Feature Hooks (`src/features/<module>/hooks/`)
+
+| Hook | File | Signature | Purpose |
+|---|---|---|---|
+| `useGroupedTransactions` | `src/features/transactions/hooks/useGroupedTransactions.ts` | `(transactions: Transaction[]) => FlatTransactionItem[]` | Groups a `Transaction[]` (pre-sorted newest-first) by **local** calendar date into a flat array of `{ kind: 'header' }` and `{ kind: 'tx' }` items ready for plain or virtual-list rendering. Uses `format(new Date(tx.date), 'yyyy-MM-dd')` to bucket by local date (prevents UTC midnight crossings from landing in the wrong day group). Shared by `TransactionListPage` and `BalanceSheetDetailPage`. |
+
+**`FlatTransactionItem` type** (exported from the same file):
+```ts
+type FlatTransactionItem =
+  | { kind: 'header'; dateKey: string; headerLabel: string; count: number }
+  | { kind: 'tx'; tx: Transaction; timeStr: string }
+```
+
+### Store Hooks (`src/stores/`)
+
+Each Zustand store is a hook. All mutations write through to Dexie and surface errors via `toast.error()`. Never call Dexie directly from a component — go through the store.
+
+| Hook | File | State & Methods |
+|---|---|---|
+| `useTransactionsStore()` | `transactions.store.ts` | `transactions: Transaction[]`, `loading: boolean`, `load(since?: string)`, `add(t)`, `update(t)`, `remove(id)`, `removeMany(ids)` — `load` accepts an optional ISO lower-bound to load only a date-range slice from Dexie |
+| `useAccountsStore()` | `accounts.store.ts` | `accounts: Account[]`, `load()`, `add(a)`, `update(a)`, `remove(id)` |
+| `useCategoriesStore()` | `categories.store.ts` | `categories: Category[]`, `load()`, `add(c)`, `update(c)`, `remove(id)` |
+| `useLabelsStore()` | `labels.store.ts` | `labels: Label[]`, `load()`, `add(l)`, `update(l)`, `remove(id)` |
+| `useBudgetsStore()` | `budgets.store.ts` | `budgets: Budget[]`, `load()`, `add(b)`, `update(b)`, `remove(id)` |
+| `useExchangeRatesStore()` | `exchange-rates.store.ts` | `rates: ExchangeRate[]`, `isFetching: boolean`, `load()`, `fetchFromApi(baseCurrency)`, `addManual(rate)`, `remove(id)`, `getRateForPair(from, to): number \| null` |
+| `useSettingsStore()` | `settings.store.ts` | `baseCurrency: string`, `language: string`, `theme: AppTheme`, `googleClientId: string`, `load()`, `saveSetting(key, value)` |
+| `useVehiclesStore()` | `vehicles.store.ts` | `vehicles`, `fuelLogs`, `vehicleServices`, `load()`, `addVehicle(v)`, `updateVehicle(v)`, `archiveVehicle(id)`, `unarchiveVehicle(id)`, `removeVehicle(id)`, `addFuelLog(f)`, `updateFuelLog(log, linkedTx?)`, `removeFuelLog(id)`, `addService(s)`, `updateService(svc, linkedTx?)`, `removeService(id)` |
+
+### Third-Party Hooks Used Directly in Components
+
+| Hook | Package | Notes |
+|---|---|---|
+| `useTranslation()` | `react-i18next` | All user-facing strings must go through `t()` — no hardcoded English in JSX |
+| `useParams()` | `react-router-dom` | Route path params (e.g. `accountId`, `vehicleId`) |
+| `useSearchParams()` | `react-router-dom` | URL query-string state (period presets, filter state that should survive back-navigation) |
+| `useNavigate()` | `react-router-dom` | Programmatic navigation |
+| `useForm()` | `react-hook-form` | Always with `zodResolver` — never raw `useState` for form state |
+| `useVirtualizer()` | `@tanstack/react-virtual` | Virtual list in `TransactionListPage`; `estimateSize` tuned per row kind (`header` ≈ 40 px, `tx` ≈ 88 px) |
+
+### Conventions for New Hooks
+
+- Feature-scoped hook (one feature only) → `src/features/<module>/hooks/<hookName>.ts`
+- Shared hook (two or more features) → `src/hooks/<hookName>.ts`
+- A hook file must export **only the hook** (and its return/param types) — no React components — to satisfy `react-refresh/only-export-components`. If the hook's types are consumed elsewhere, move them to a companion `<hookName>.types.ts` file.
+- Hooks that call Dexie directly must wrap in `try/catch` → `console.error` + `toast.error()`
+- All `useMemo` / `useCallback` deps must be listed explicitly — no lint-suppression comments
 
 ---
 

@@ -7,9 +7,11 @@ import { useVehiclesStore } from '@/stores/vehicles.store'
 interface AddFabMenuProps {
   /** When provided, restricts vehicle links to this specific vehicle only (VehicleDetailPage use case). */
   vehicleId?: string
+  /** When provided, appended as ?returnTo=<value> on the new-transaction link so the form returns here after save/cancel. */
+  returnTo?: string
 }
 
-export function AddFabMenu({ vehicleId }: AddFabMenuProps) {
+export function AddFabMenu({ vehicleId, returnTo }: AddFabMenuProps) {
   const { t } = useTranslation()
   const { vehicles } = useVehiclesStore()
   const [open, setOpen] = useState(false)
@@ -41,7 +43,7 @@ export function AddFabMenu({ vehicleId }: AddFabMenuProps) {
         {open && (
           <>
             <Link
-              to="/transactions/new"
+              to={`/transactions/new${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`}
               onClick={() => setOpen(false)}
               className="flex items-center gap-2 rounded-full bg-white pl-3 pr-4 py-2 shadow-lg border text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all animate-in fade-in slide-in-from-bottom-2 duration-150"
             >

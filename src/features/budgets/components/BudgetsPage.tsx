@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
@@ -17,6 +18,7 @@ import { Plus, Pencil, Trash2, PiggyBank, ChevronLeft, ChevronRight, ChevronDown
 
 import { budgetSchema, type BudgetFormValues } from '../schemas/budget.schema'
 import { getActiveAccountIds } from '@/lib/accounts'
+import { getPeriodRange } from '@/lib/dates'
 import { useBudgetsStore } from '@/stores/budgets.store'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useCategoriesStore } from '@/stores/categories.store'
@@ -181,8 +183,11 @@ function BudgetCard({
   const statusColor =
     percent >= 100 ? 'text-red-500' : percent >= 75 ? 'text-amber-500' : 'text-emerald-600'
 
+  const { start, end } = getPeriodRange(budget.period, referenceDate)
+  const txLink = `/transactions?categoryId=${budget.categoryId}&dateFrom=${format(start, 'yyyy-MM-dd')}&dateTo=${format(end, 'yyyy-MM-dd')}`
+
   return (
-    <div className="rounded-2xl border bg-white px-4 pt-3 pb-4 space-y-3">
+    <Link to={txLink} className="block rounded-2xl border bg-white px-4 pt-3 pb-4 space-y-3 hover:bg-gray-50 transition-colors">
       {/* Header row */}
       <div className="flex items-center gap-3">
         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 shrink-0">
@@ -193,14 +198,14 @@ function BudgetCard({
           <p className="text-xs text-gray-400 capitalize">{t(`budgets.periods.${budget.period}`)}</p>
         </div>
         <div className="flex gap-1 shrink-0">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(budget)}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.preventDefault(); onEdit(budget) }}>
             <Pencil size={14} />
           </Button>
           <Button
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-red-500 hover:text-red-600"
-            onClick={() => onDelete(budget.id)}
+            onClick={(e) => { e.preventDefault(); onDelete(budget.id) }}
           >
             <Trash2 size={14} />
           </Button>
@@ -235,7 +240,7 @@ function BudgetCard({
         </span>
         <span className={`font-bold ${statusColor}`}>{percent}%</span>
       </div>
-    </div>
+    </Link>
   )
 }
 
@@ -512,9 +517,15 @@ export default function BudgetsPage() {
   )
 
   const filteredBudgets = useMemo(() => {
-    if (filterCategoryIds.length === 0) return budgets
-    return budgets.filter((b) => filterCategoryIds.includes(b.categoryId))
-  }, [budgets, filterCategoryIds])
+    const list = filterCategoryIds.length === 0
+      ? budgets
+      : budgets.filter((b) => filterCategoryIds.includes(b.categoryId))
+    return [...list].sort((a, b) => {
+      const nameA = getTranslatedCategoryName(categories.find((c) => c.id === a.categoryId), t)
+      const nameB = getTranslatedCategoryName(categories.find((c) => c.id === b.categoryId), t)
+      return nameA.localeCompare(nameB)
+    })
+  }, [budgets, filterCategoryIds, categories, t])
 
   const openAdd = () => { setEditing(null); setDialogOpen(true) }
   const openEdit = (b: Budget) => { setEditing(b); setDialogOpen(true) }

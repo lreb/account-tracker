@@ -19,7 +19,7 @@ interface TransactionListItemProps {
   amount: number
   amountPrefix: string
   amountCurrency: string
-  amountTone: string
+  txType: 'income' | 'expense' | 'transfer'
   primaryBalance?: TxBalanceEntry
   secondaryBalance?: TxBalanceEntry
 }
@@ -34,7 +34,7 @@ export function TransactionListItem({
   amount,
   amountPrefix,
   amountCurrency,
-  amountTone,
+  txType,
   primaryBalance,
   secondaryBalance,
 }: TransactionListItemProps) {
@@ -75,7 +75,7 @@ export function TransactionListItem({
           )}
         </div>
         <div className="text-right shrink-0">
-          <p className={`text-sm font-semibold ${status === 'cancelled' ? 'text-gray-400 line-through' : amountTone}`}>
+          <p className={`text-sm font-semibold ${status === 'cancelled' ? 'text-gray-400 line-through' : txType === 'income' ? 'text-green-600' : txType === 'expense' ? 'text-red-500' : 'text-blue-600'}`}>
             {amountPrefix}
             {formatCurrency(amount, amountCurrency)}
           </p>
