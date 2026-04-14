@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef, type ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
@@ -24,6 +24,7 @@ import type { FuelLog, VehicleService } from '@/types'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
 import { AddFabMenu } from '@/components/ui/add-fab-menu'
 import { VehicleStats } from './VehicleStats'
@@ -37,6 +38,47 @@ type CombinedEntry =
   | { kind: 'service'; svc: VehicleService }
 
 let persistedTab: Tab = 'all'
+
+// ─── Stat card with auto-dismiss tooltip (3 s) ───────────────────────────────
+
+interface StatCardProps {
+  icon: ReactNode
+  label: string
+  value: string
+  tooltip: string
+}
+
+function StatCard({ icon, label, value, tooltip }: StatCardProps) {
+  const [open, setOpen] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function handleOpenChange(next: boolean) {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    setOpen(next)
+    if (next) {
+      timerRef.current = setTimeout(() => setOpen(false), 3000)
+    }
+  }
+
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+  }, [])
+
+  return (
+    <Tooltip open={open} onOpenChange={handleOpenChange}>
+      <TooltipTrigger asChild>
+        <div className="rounded-xl border bg-white px-3 py-2 text-center cursor-default">
+          <div className="flex items-center justify-center gap-1 text-gray-400 mb-0.5">
+            {icon}
+            <span className="text-[10px] uppercase tracking-wide">{label}</span>
+          </div>
+          <p className="text-sm font-bold">{value}</p>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{tooltip}</TooltipContent>
+    </Tooltip>
+  )
+}
 
 export default function VehicleDetailPage() {
   const { t } = useTranslation()
@@ -119,21 +161,28 @@ export default function VehicleDetailPage() {
 
       {/* Stats bar */}
       {kmPerL !== null && (
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          {[
-            { icon: <Gauge size={16} />, label: 'km/L', value: kmPerL.toFixed(1) },
-            { icon: <TrendingDown size={16} />, label: t('vehicles.costPerKm'), value: costPerKm ? formatCurrency(costPerKm, baseCurrency) : '—' },
-            { icon: <Fuel size={16} />, label: t('vehicles.lastKm'), value: kmSince?.toString() ?? '—' },
-          ].map(({ icon, label, value }) => (
-            <div key={label} className="rounded-xl border bg-white px-3 py-2 text-center">
-              <div className="flex items-center justify-center gap-1 text-gray-400 mb-0.5">
-                {icon}
-                <span className="text-[10px] uppercase tracking-wide">{label}</span>
-              </div>
-              <p className="text-sm font-bold">{value}</p>
-            </div>
-          ))}
-        </div>
+        <TooltipProvider delayDuration={0}>
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <StatCard
+              icon={<Gauge size={16} />}
+              label="km/L"
+              value={kmPerL.toFixed(1)}
+              tooltip={t('vehicles.tooltips.kmPerL')}
+            />
+            <StatCard
+              icon={<TrendingDown size={16} />}
+              label={t('vehicles.costPerKm')}
+              value={costPerKm ? formatCurrency(costPerKm, baseCurrency) : '—'}
+              tooltip={t('vehicles.tooltips.costPerKm')}
+            />
+            <StatCard
+              icon={<Fuel size={16} />}
+              label={t('vehicles.lastKm')}
+              value={kmSince?.toString() ?? '—'}
+              tooltip={t('vehicles.tooltips.lastKm')}
+            />
+          </div>
+        </TooltipProvider>
       )}
 
       {/* Tabs */}

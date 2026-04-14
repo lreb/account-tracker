@@ -1,118 +1,29 @@
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
-import { SlidersHorizontal, X } from 'lucide-react'
-import { format, subMonths, subYears } from 'date-fns'
-import { useGroupedTransactions } from '@/features/transactions/hooks/useGroupedTransactions'
-import { useVirtualizer } from '@tanstack/react-virtual'
+import { subMonths, subYears } from 'date-fns'
 import { useTransactionsStore } from '@/stores/transactions.store'
-import { useCategoriesStore } from '@/stores/categories.store'
 import { useAccountsStore } from '@/stores/accounts.store'
-import { useSettingsStore } from '@/stores/settings.store'
 import { useLabelsStore } from '@/stores/labels.store'
-import { AddFabMenu } from '@/components/ui/add-fab-menu'
-import { TransactionListItem } from '@/components/ui/transaction-list-item'
-import { TransactionDateGroupHeader } from '@/components/ui/transaction-date-group-header'
 import {
   getVisibleAccountIds,
   getVisibleAccounts,
   isTransactionForVisiblePrimaryAccount,
 } from '@/lib/accounts'
-import { getTranslatedCategoryName } from '@/lib/categories'
 import { getAccountBalanceAtDate } from '@/lib/balance-sheet'
 import type { Transaction } from '@/types'
 import { db } from '@/db'
-import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
-import { ComputingOverlay } from '@/components/ui/computing-overlay'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { TransactionList } from './TransactionList'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetFooter,
-} from '@/components/ui/sheet'
+  EMPTY_TX_LIST_FILTERS,
+  DEFAULT_TX_LIST_QUICK_RANGE,
+  type TransactionListFilters,
+  type TxListQuickRange,
+  type TxRunningBalance,
+} from './transaction-list.types'
 
-type TxType = 'income' | 'expense' | 'transfer'
-type TxStatus = 'cleared' | 'pending' | 'reconciled' | 'cancelled'
+// ── Quick-range DB cutoff helper ──────────────────────────────────────────────
 
-interface Filters {
-  search: string
-  type: TxType | ''
-  categoryId: string
-  accountId: string
-  labelId: string
-  status: TxStatus | ''
-  dateFrom: string
-  dateTo: string
-}
-
-const EMPTY_FILTERS: Filters = {
-  search: '',
-  type: '',
-  categoryId: '',
-  accountId: '',
-  labelId: '',
-  status: '',
-  dateFrom: '',
-  dateTo: '',
-}
-
-const TYPE_OPTIONS: { value: TxType; label: string }[] = [
-  { value: 'expense',  label: 'transactions.expense' },
-  { value: 'income',   label: 'transactions.income' },
-  { value: 'transfer', label: 'transactions.transfer' },
-]
-
-const STATUS_OPTIONS: { value: TxStatus; label: string }[] = [
-  { value: 'cleared',    label: 'transactions.status.cleared' },
-  { value: 'pending',    label: 'transactions.status.pending' },
-  { value: 'reconciled', label: 'transactions.status.reconciled' },
-  { value: 'cancelled',  label: 'transactions.status.cancelled' },
-]
-
-type BalanceEntry = {
-  accountBalance: number
-  accountCurrency: string
-  toAccountBalance?: number
-  toAccountCurrency?: string
-}
-
-type QuickRange = 'all' | '1m' | '3m' | '6m' | '1y' | '2y'
-
-const DEFAULT_QUICK_RANGE: QuickRange = '1y'
-
-function getQuickRangeDateFrom(range: QuickRange): string {
-  const today = new Date()
-  if (range === '1m') return format(subMonths(today, 1), 'yyyy-MM-dd')
-  if (range === '3m') return format(subMonths(today, 3), 'yyyy-MM-dd')
-  if (range === '6m') return format(subMonths(today, 6), 'yyyy-MM-dd')
-  if (range === '1y') return format(subYears(today, 1), 'yyyy-MM-dd')
-  if (range === '2y') return format(subYears(today, 2), 'yyyy-MM-dd')
-  return ''
-}
-
-const DEFAULT_FILTERS: Filters = {
-  ...EMPTY_FILTERS,
-  dateFrom: getQuickRangeDateFrom(DEFAULT_QUICK_RANGE),
-}
-
-// Persists across component mounts within the same session
-let persistedFilters: Filters = { ...DEFAULT_FILTERS }
-
-let persistedQuickRange: QuickRange = DEFAULT_QUICK_RANGE
-
-// Map quick range value to an ISO date cutoff for DB-level filtering (undefined = load all)
-function getQuickRangeSince(range: QuickRange): string | undefined {
+function getQuickRangeSince(range: TxListQuickRange): string | undefined {
   const today = new Date()
   if (range === '1m') return subMonths(today, 1).toISOString()
   if (range === '3m') return subMonths(today, 3).toISOString()
@@ -122,90 +33,63 @@ function getQuickRangeSince(range: QuickRange): string | undefined {
   return undefined
 }
 
-function getUtcStartIso(dateValue: string): string {
-  return `${dateValue}T00:00:00.000Z`
-}
-
-function getUtcEndIso(dateValue: string): string {
-  return `${dateValue}T23:59:59.999Z`
-}
+// Persists filter and quick-range selection across component mounts (same session).
+// undefined means "no saved state" — TransactionList will use its own default.
+let persistedFilters: TransactionListFilters | undefined = undefined
+let persistedQuickRange: TxListQuickRange = DEFAULT_TX_LIST_QUICK_RANGE
 
 export default function TransactionListPage() {
-  const { t } = useTranslation()
   const { transactions, loading, load: loadTx } = useTransactionsStore()
-  const { categories } = useCategoriesStore()
   const { accounts } = useAccountsStore()
-  const { baseCurrency } = useSettingsStore()
-  const { labels, load: loadLabels } = useLabelsStore()
-  const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
+  const { load: loadLabels } = useLabelsStore()
+
   const visibleAccountIds = useMemo(() => getVisibleAccountIds(accounts), [accounts])
-  // O(1) lookup maps — avoid .find() on every virtual row render (Option B)
-  const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
-  const accountMap  = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
-  const labelMap    = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels])
+  const visibleAccounts   = useMemo(() => getVisibleAccounts(accounts), [accounts])
+  const accountMap        = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
+
   const visibleTransactions = useMemo(
-    () => transactions.filter((transaction) => isTransactionForVisiblePrimaryAccount(transaction, visibleAccountIds)),
+    () => transactions.filter((tx) => isTransactionForVisiblePrimaryAccount(tx, visibleAccountIds)),
     [transactions, visibleAccountIds],
   )
 
   const [searchParams] = useSearchParams()
 
-  const [sheetOpen, setSheetOpen] = useState(false)
-  // Read URL params on first mount to support cross-feature navigation (e.g. clicking a budget card).
-  // URL params are used only for this navigation instance — we deliberately do NOT
-  // write to persistedFilters / persistedQuickRange here so that navigating to
-  // /transactions without URL params always restores the user's last manual state.
-  const [filters, setFiltersRaw] = useState<Filters>(() => {
+  // ── Seed initial filter + quick-range state from URL params or session ────
+
+  const [initialFilters] = useState<TransactionListFilters | undefined>(() => {
     const urlCategoryId = searchParams.get('categoryId')
-    const urlDateFrom = searchParams.get('dateFrom')
-    const urlDateTo = searchParams.get('dateTo')
+    const urlDateFrom   = searchParams.get('dateFrom')
+    const urlDateTo     = searchParams.get('dateTo')
     if (urlCategoryId || urlDateFrom || urlDateTo) {
       return {
-        ...EMPTY_FILTERS,
+        ...EMPTY_TX_LIST_FILTERS,
         categoryId: urlCategoryId ?? '',
-        dateFrom: urlDateFrom ?? '',
-        dateTo: urlDateTo ?? '',
+        dateFrom:   urlDateFrom   ?? '',
+        dateTo:     urlDateTo     ?? '',
       }
     }
+    // May be undefined on first visit — TransactionList will use its own default
     return persistedFilters
   })
-  // draft = filters being edited inside the sheet; only committed on Apply
-  const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS)
-  // When arriving via URL params (e.g. from a budget card), use 'all' so the DB
-  // loads enough history to cover the URL-specified date range — but don't persist
-  // that to persistedQuickRange so normal visits are unaffected.
-  const [quickRange, setQuickRangeRaw] = useState<QuickRange>(() => {
-    const hasUrlParams = searchParams.get('categoryId') || searchParams.get('dateFrom') || searchParams.get('dateTo')
+
+  const [initialQuickRange] = useState<TxListQuickRange>(() => {
+    const hasUrlParams =
+      searchParams.get('categoryId') || searchParams.get('dateFrom') || searchParams.get('dateTo')
     return hasUrlParams ? 'all' : persistedQuickRange
   })
-  const [draftQuickRange, setDraftQuickRange] = useState<QuickRange>(persistedQuickRange)
+
+  // returnTo propagated into the FAB + edit links so another page can be the
+  // return destination (e.g. navigating here from a budget card with &returnTo=%2Fbudgets)
+  const listReturnTo = useMemo(() => {
+    const raw = searchParams.get('returnTo')
+    return raw?.startsWith('/') ? raw : '/transactions'
+  }, [searchParams])
+
+  // ── Full Dexie load for accurate running balance computation ──────────────
+  // Uses ALL non-cancelled transactions regardless of the store's date filter,
+  // so the balance next to the most-recent transaction matches BalanceSheetPage.
+
   const [allTx, setAllTx] = useState<Transaction[]>([])
-
-  // Keep module-level caches in sync so state survives navigation
-  const setFilters = (next: Filters | ((prev: Filters) => Filters)) => {
-    setFiltersRaw((prev) => {
-      const value = typeof next === 'function' ? next(prev) : next
-      persistedFilters = value
-      return value
-    })
-  }
-  const setQuickRange = (range: QuickRange) => {
-    setQuickRangeRaw(range)
-    persistedQuickRange = range
-  }
-
-  // On mount: load transactions using the effective quick range — uses 'all' when
-  // arriving via URL params (e.g. budget link) so the full date range is covered.
-  useEffect(() => {
-    loadTx(getQuickRangeSince(quickRange))
-    loadLabels()
-  // quickRange is intentionally excluded from deps — this runs only on mount.
-  // Changes to quickRange after mount go through setQuickRange which calls loadTx directly.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadTx, loadLabels])
-
-  // Load ALL non-cancelled transactions from Dexie — used for correct running
-  // balance calculation regardless of the store's active date filter.
   useEffect(() => {
     db.transactions
       .filter((tx) => tx.status !== 'cancelled')
@@ -214,51 +98,18 @@ export default function TransactionListPage() {
       .catch(console.error)
   }, [transactions])
 
-  const openSheet = () => { setDraft(filters); setDraftQuickRange(quickRange); setSheetOpen(true) }
-  // Sheet Apply: reload DB with the custom dateFrom if set, then apply all draft filters
-  const applyFilters = () => {
-    setFilters(draft)
-    setQuickRange(draftQuickRange)
-    loadTx(draft.dateFrom ? getUtcStartIso(draft.dateFrom) : undefined)
-    setSheetOpen(false)
-  }
-  const resetFilters = () => {
-    setDraft(DEFAULT_FILTERS)
-    setFilters(DEFAULT_FILTERS)
-    setDraftQuickRange(DEFAULT_QUICK_RANGE)
-    setQuickRange(DEFAULT_QUICK_RANGE)
-    loadTx(getQuickRangeSince(DEFAULT_QUICK_RANGE))
-    setSheetOpen(false)
-  }
-  const removeChip = (key: keyof Filters) => {
-    if (key === 'dateFrom') {
-      setQuickRange('all')
-      loadTx()  // lower bound removed — reload full dataset from DB
-    } else if (key === 'dateTo') {
-      setQuickRange('all')  // dateTo is JS-only; no DB reload needed
-    }
-    setFilters((prev) => ({ ...prev, [key]: '' }))
-  }
+  // ── Mount: load transaction slice and labels ──────────────────────────────
 
-  const filtered = useMemo(() => {
-    const q = filters.search.trim().toLowerCase()
-    const dateFromISO = filters.dateFrom ? getUtcStartIso(filters.dateFrom) : ''
-    const dateToISO = filters.dateTo ? getUtcEndIso(filters.dateTo) : ''
-    return visibleTransactions.filter((tx) => {
-      if (q && !tx.description.toLowerCase().includes(q) && !(tx.notes ?? '').toLowerCase().includes(q)) return false
-      if (filters.type && tx.type !== filters.type) return false
-      if (filters.categoryId && tx.categoryId !== filters.categoryId) return false
-      if (filters.accountId && tx.accountId !== filters.accountId) return false
-      if (filters.labelId && !(tx.labels ?? []).includes(filters.labelId)) return false
-      if (filters.status && tx.status !== filters.status) return false
-      if (dateFromISO && tx.date < dateFromISO) return false
-      if (dateToISO  && tx.date > dateToISO)   return false
-      return true
-    })
-  }, [visibleTransactions, filters])
+  useEffect(() => {
+    loadTx(getQuickRangeSince(initialQuickRange))
+    loadLabels()
+    // initialQuickRange is a stable useState seed (never changes after mount).
+    // Subsequent DB reloads go through the onLoadRange callback on TransactionList.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadTx, loadLabels])
 
-  // Pre-group all non-cancelled transactions by account (both source and transfer
-  // destination) so balanceAfterTx can look up any account's history in O(1).
+  // ── Running balance per transaction ──────────────────────────────────────
+
   const allTxByAccount = useMemo(() => {
     const map = new Map<string, Transaction[]>()
     const push = (id: string, tx: Transaction) => {
@@ -276,13 +127,8 @@ export default function TransactionListPage() {
     return map
   }, [allTx])
 
-  // Compute the running account balance after each transaction using a backward walk
-  // anchored from getAccountBalanceAtDate — the same function BalanceSheetPage uses —
-  // so the balance next to the latest transaction always matches BalanceSheetPage.
-  // Using allTxByAccount (full history) instead of date-filtered visibleTransactions
-  // ensures transfer-in credits and pre-filter-window transactions are not missed.
   const balanceAfterTx = useMemo(() => {
-    const result = new Map<string, BalanceEntry>()
+    const result = new Map<string, TxRunningBalance>()
 
     for (const acc of visibleAccounts) {
       const accTxns = allTxByAccount.get(acc.id) ?? []
@@ -290,15 +136,15 @@ export default function TransactionListPage() {
 
       for (const tx of accTxns) {
         if (tx.accountId === acc.id) {
-          const entry: BalanceEntry = {
-            accountBalance: running,
+          const entry: TxRunningBalance = {
+            accountBalance:  running,
             accountCurrency: acc.currency,
           }
           if (tx.type === 'transfer' && tx.toAccountId) {
             const toAcc = accountMap.get(tx.toAccountId)
             if (toAcc) {
               const toAccTxns = allTxByAccount.get(toAcc.id) ?? []
-              entry.toAccountBalance = getAccountBalanceAtDate(toAcc, toAccTxns, new Date(tx.date))
+              entry.toAccountBalance  = getAccountBalanceAtDate(toAcc, toAccTxns, new Date(tx.date))
               entry.toAccountCurrency = toAcc.currency
             }
           }
@@ -306,9 +152,9 @@ export default function TransactionListPage() {
         }
         // Undo this tx's effect on acc.id to step back in time
         if (tx.accountId === acc.id) {
-          if (tx.type === 'income') running -= tx.amount
-          else if (tx.type === 'expense') running += tx.amount
-          else if (tx.type === 'transfer') running += tx.amount
+          if (tx.type === 'income')    running -= tx.amount
+          else if (tx.type === 'expense')   running += tx.amount
+          else if (tx.type === 'transfer')  running += tx.amount
         } else {
           // tx.toAccountId === acc.id: undo the incoming transfer credit
           running -= (tx.originalAmount ?? tx.amount)
@@ -319,362 +165,19 @@ export default function TransactionListPage() {
     return result
   }, [visibleAccounts, allTxByAccount, accountMap])
 
-  const flatItems = useGroupedTransactions(filtered)
-
-  const activeCount = Object.values(filters).filter(Boolean).length
-
-  // ── Virtual list ────────────────────────────────────────────────────────────
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
-
-  const rowVirtualizer = useVirtualizer({
-    count: flatItems.length,
-    getScrollElement: () => scrollContainerRef.current,
-    // header rows are ~40 px; tx rows ~88 px (more with label badges)
-    estimateSize: (i) => (flatItems[i]?.kind === 'header' ? 40 : 88),
-    overscan: 5,
-    // auto-measure actual DOM heights so variable-height rows (labels) are correct
-    measureElement: (el) => el.getBoundingClientRect().height,
-  })
-
-  const chips: { key: keyof Filters; label: string }[] = [
-    filters.search    ? { key: 'search',     label: `"${filters.search}"` }                                              : null,
-    filters.type      ? { key: 'type',        label: t(`transactions.${filters.type}`) }                                 : null,
-    filters.categoryId? { key: 'categoryId',  label: getTranslatedCategoryName(categories.find((c) => c.id === filters.categoryId), t) }   : null,
-    filters.accountId ? { key: 'accountId',   label: accounts.find((a) => a.id === filters.accountId)?.name ?? '' }      : null,
-    filters.labelId   ? { key: 'labelId',      label: labels.find((l) => l.id === filters.labelId)?.name ?? '' }           : null,
-    filters.status    ? { key: 'status',      label: t(`transactions.status.${filters.status}`) }                        : null,
-    filters.dateFrom  ? { key: 'dateFrom',    label: `From ${filters.dateFrom}` }                                        : null,
-    filters.dateTo    ? { key: 'dateTo',      label: `To ${filters.dateTo}` }                                            : null,
-  ].filter(Boolean) as { key: keyof Filters; label: string }[]
-
   return (
-    // h-full + overflow-hidden gives this page a bounded height equal to <main>.
-    // The scroll happens inside the list container below, not on <main> itself.
-    <div className="flex flex-col h-full overflow-hidden">
-      <ComputingOverlay visible={loading && visibleTransactions.length > 0} />
-      {/* ── Non-scrolling header ──────────────────────────────────────────── */}
-      <div className="shrink-0 px-4 pt-4">
-        <div className="flex items-center justify-between mb-3">
-          <h1 className="text-xl font-bold">{t('transactions.title')}</h1>
-          <button
-            type="button"
-            onClick={openSheet}
-            className="relative flex items-center gap-1 rounded-full border bg-white px-3 py-1.5 text-sm text-gray-600 shadow-sm"
-          >
-            <SlidersHorizontal size={14} />
-            {t('transactions.filters.button')}
-            {activeCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
-                {activeCount}
-              </span>
-            )}
-          </button>
-        </div>
-
-        {/* Active filter chips */}
-        {chips.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {chips.map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => removeChip(key)}
-                className="flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-xs text-indigo-700"
-              >
-                {label} <X size={10} />
-              </button>
-            ))}
-            {chips.length > 1 && (
-              <button
-                type="button"
-                onClick={() => setFilters(EMPTY_FILTERS)}
-                className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-500"
-              >
-                {t('transactions.clearAll')}
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ── Scrollable list area (owns the scroll; <main> won't scroll) ──── */}
-      <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto px-4 pb-24">
-        {loading && visibleTransactions.length === 0 ? (
-          <div className="space-y-3 mt-2" aria-label="Loading transactions">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-[72px] rounded-2xl bg-gray-100 animate-pulse" />
-            ))}
-          </div>
-        ) : visibleTransactions.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center mt-12">
-            {t('transactions.noTransactions')}
-          </p>
-        ) : filtered.length === 0 ? (
-          <div className="text-center mt-12 space-y-2">
-            <p className="text-sm text-gray-400">{t('transactions.noMatch')}</p>
-            <Button variant="outline" size="sm" onClick={resetFilters}>{t('transactions.clearFilters')}</Button>
-          </div>
-        ) : (
-          // Virtual list: total height reserves scroll space; only visible rows are in the DOM
-          <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
-            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const item = flatItems[virtualRow.index]
-              return (
-                <div
-                  key={virtualRow.key}
-                  data-index={virtualRow.index}
-                  ref={rowVirtualizer.measureElement}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    transform: `translateY(${virtualRow.start}px)`,
-                  }}
-                >
-                  {item.kind === 'header' ? (
-                    <TransactionDateGroupHeader
-                      headerLabel={item.headerLabel}
-                      count={item.count}
-                    />
-                  ) : (() => {
-                    const { tx, timeStr } = item
-                    const cat      = categoryMap.get(tx.categoryId)
-                    const acc      = accountMap.get(tx.accountId)
-                    const toAcc    = tx.toAccountId ? accountMap.get(tx.toAccountId) : undefined
-                    const bal      = balanceAfterTx.get(tx.id)
-                    const resolvedLabels = (tx.labels ?? []).flatMap((lid) => {
-                      const l = labelMap.get(lid)
-                      return l ? [l] : []
-                    })
-                    return (
-                      <TransactionListItem
-                        description={tx.description}
-                        status={tx.status}
-                        timeStr={timeStr}
-                        categoryName={getTranslatedCategoryName(cat, t)}
-                        resolvedLabels={resolvedLabels}
-                        linkTo={`/transactions/${tx.id}`}
-                        amount={tx.amount}
-                        amountPrefix={tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}
-                        amountCurrency={tx.currency ?? baseCurrency}
-                        txType={tx.type}
-                        primaryBalance={bal ? { accountName: acc?.name ?? '', balance: bal.accountBalance, currency: bal.accountCurrency } : undefined}
-                        secondaryBalance={
-                          tx.type === 'transfer' && bal?.toAccountBalance != null && bal.toAccountCurrency
-                            ? { accountName: toAcc?.name ?? '', balance: bal.toAccountBalance, currency: bal.toAccountCurrency }
-                            : undefined
-                        }
-                      />
-                    )
-                  })()}
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
-      <ScrollToTopButton scrollRef={scrollContainerRef} threshold={320} />
-
-      {/* ── FAB: Add menu (right side) ────────────────────────────────────── */}
-      <AddFabMenu returnTo="/transactions" />
-
-      {/* Filter sheet */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-2xl px-5 pt-2 pb-8">
-          <SheetHeader className="mb-4">
-            <SheetTitle>{t('transactions.filters.title')}</SheetTitle>
-          </SheetHeader>
-
-          <div className="space-y-5">
-            {/* Quick date range */}
-            <div className="space-y-1">
-              <Label>{t('transactions.filters.period')}</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {([
-                  { value: 'all', label: t('transactions.quickRange.all') },
-                  { value: '1m',  label: t('transactions.quickRange.lastMonth') },
-                  { value: '3m',  label: t('transactions.quickRange.lastQuarter') },
-                  { value: '6m',  label: t('transactions.quickRange.last6Months') },
-                  { value: '1y',  label: t('transactions.quickRange.lastYear') },
-                  { value: '2y',  label: t('transactions.quickRange.last2Years') },
-                ] as { value: QuickRange; label: string }[]).map(({ value, label }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => {
-                      setDraftQuickRange(value)
-                      setDraft((p) => ({ ...p, dateFrom: getQuickRangeDateFrom(value), dateTo: '' }))
-                    }}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                      draftQuickRange === value
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Search */}
-            <div className="space-y-1">
-              <Label>{t('transactions.filters.keyword')}</Label>
-              <Input
-                placeholder={t('transactions.filters.keywordPlaceholder')}
-                value={draft.search}
-                onChange={(e) => setDraft((p) => ({ ...p, search: e.target.value }))}
-              />
-            </div>
-
-            {/* Date range */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>{t('transactions.filters.dateFrom')}</Label>
-                <Input
-                  type="date"
-                  value={draft.dateFrom}
-                  onChange={(e) => { setDraft((p) => ({ ...p, dateFrom: e.target.value })); setDraftQuickRange('all') }}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>{t('transactions.filters.dateTo')}</Label>
-                <Input
-                  type="date"
-                  value={draft.dateTo}
-                  onChange={(e) => setDraft((p) => ({ ...p, dateTo: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            {/* Type */}
-            <div className="space-y-1">
-              <Label>{t('transactions.filters.type')}</Label>
-              <div className="grid grid-cols-4 gap-1 rounded-xl bg-gray-100 p-1">
-                {[{ value: '' as const, label: 'transactions.filters.all' }, ...TYPE_OPTIONS].map(({ value, label }) => (
-                  <button
-                    key={value || 'all'}
-                    type="button"
-                    onClick={() => setDraft((p) => ({ ...p, type: value as Filters['type'] }))}
-                    className={`rounded-lg py-1.5 text-xs font-medium transition-colors ${
-                      draft.type === value ? 'bg-white shadow text-gray-900' : 'text-gray-500'
-                    }`}
-                  >
-                    {t(label)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Category */}
-            <div className="space-y-1">
-              <Label>{t('transactions.filters.category')}</Label>
-              <Select
-                value={draft.categoryId || '__all__'}
-                onValueChange={(v) => setDraft((p) => ({ ...p, categoryId: v === '__all__' ? '' : (v ?? '') }))}
-              >
-                <SelectTrigger>
-                  <SelectValue>
-                    {draft.categoryId
-                      ? getTranslatedCategoryName(categories.find((c) => c.id === draft.categoryId), t)
-                      : t('transactions.filters.allCategories')}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">{t('transactions.filters.allCategories')}</SelectItem>
-                  {categories.filter((cat) => !cat.deletedAt).map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>{getTranslatedCategoryName(cat, t)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Account */}
-            <div className="space-y-1">
-              <Label>{t('transactions.filters.account')}</Label>
-              <Select
-                value={draft.accountId || '__all__'}
-                onValueChange={(v) => setDraft((p) => ({ ...p, accountId: v === '__all__' ? '' : (v ?? '') }))}
-              >
-                <SelectTrigger>
-                  <SelectValue>
-                    {draft.accountId ? accounts.find((a) => a.id === draft.accountId)?.name : t('transactions.filters.allAccounts')}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">{t('transactions.filters.allAccounts')}</SelectItem>
-                  {visibleAccounts.map((acc) => (
-                    <SelectItem key={acc.id} value={acc.id}>
-                      <span className={acc.cancelled ? 'text-gray-400' : undefined}>
-                        {acc.name}{acc.cancelled ? ` (${t('accounts.cancelled')})` : ''}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Label */}
-            {labels.length > 0 && (
-              <div className="space-y-1">
-                <Label>{t('settings.labels')}</Label>
-                <Select
-                  value={draft.labelId || '__all__'}
-                  onValueChange={(v) => setDraft((p) => ({ ...p, labelId: v === '__all__' ? '' : (v ?? '') }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue>
-                      {draft.labelId ? labels.find((l) => l.id === draft.labelId)?.name : t('transactions.filters.allLabels')}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">{t('transactions.filters.allLabels')}</SelectItem>
-                    {labels.map((lbl) => (
-                      <SelectItem key={lbl.id} value={lbl.id}>
-                        <span className="flex items-center gap-2">
-                          <span
-                            className="inline-block h-2.5 w-2.5 rounded-full"
-                            style={{ backgroundColor: lbl.color ?? '#6b7280' }}
-                          />
-                          {lbl.name}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Status */}
-            <div className="space-y-1">
-              <Label>{t('transactions.filters.status')}</Label>
-              <Select
-                value={draft.status || '__all__'}
-                onValueChange={(v) => setDraft((p) => ({ ...p, status: v === '__all__' ? '' : v as TxStatus }))}
-              >
-                <SelectTrigger>
-                  <SelectValue>
-                    {draft.status ? t(`transactions.status.${draft.status}`) : t('transactions.filters.allStatuses')}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">{t('transactions.filters.allStatuses')}</SelectItem>
-                  {STATUS_OPTIONS.map(({ value, label }) => (
-                    <SelectItem key={value} value={value}>{t(label)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <SheetFooter className="mt-6 flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={resetFilters}>{t('transactions.filters.reset')}</Button>
-            <Button className="flex-1" onClick={applyFilters}>{t('transactions.filters.apply')}</Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
-    </div>
+    <TransactionList
+      transactions={visibleTransactions}
+      loading={loading}
+      returnTo={listReturnTo}
+      balanceMap={balanceAfterTx}
+      layout="page"
+      showQuickRangePicker
+      initialFilters={initialFilters}
+      initialQuickRange={initialQuickRange}
+      onFiltersChange={(f) => { persistedFilters = f }}
+      onQuickRangeChange={(qr) => { persistedQuickRange = qr }}
+      onLoadRange={(since) => loadTx(since)}
+    />
   )
 }

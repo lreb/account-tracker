@@ -184,7 +184,8 @@ function BudgetCard({
     percent >= 100 ? 'text-red-500' : percent >= 75 ? 'text-amber-500' : 'text-emerald-600'
 
   const { start, end } = getPeriodRange(budget.period, referenceDate)
-  const txLink = `/transactions?categoryId=${budget.categoryId}&dateFrom=${format(start, 'yyyy-MM-dd')}&dateTo=${format(end, 'yyyy-MM-dd')}`
+  const baseLink = `/transactions?categoryId=${budget.categoryId}&dateFrom=${format(start, 'yyyy-MM-dd')}&dateTo=${format(end, 'yyyy-MM-dd')}`
+  const txLink = `${baseLink}&returnTo=${encodeURIComponent(baseLink)}`
 
   return (
     <Link to={txLink} className="block rounded-2xl border bg-white px-4 pt-3 pb-4 space-y-3 hover:bg-gray-50 transition-colors">
@@ -446,52 +447,12 @@ function BudgetDialog({
 
 // ─── Category filter chip bar ─────────────────────────────────────────────────
 
-function CategoryFilterBar({
-  categories,
-  selected,
-  onChange,
-}: {
+function CategoryFilterBar(_props: {
   categories: Category[]
   selected: string[]
   onChange: (ids: string[]) => void
 }) {
-  const { t } = useTranslation()
-  const toggle = (id: string) =>
-    onChange(selected.includes(id) ? selected.filter((s) => s !== id) : [...selected, id])
-
-  return (
-    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-      <button
-        type="button"
-        onClick={() => onChange([])}
-        className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-          selected.length === 0
-            ? 'border-blue-600 bg-blue-600 text-white'
-            : 'border-gray-200 bg-white text-gray-600'
-        }`}
-      >
-        {t('budgets.allCategories')}
-      </button>
-      {categories.map((cat) => {
-        const active = selected.includes(cat.id)
-        return (
-          <button
-            key={cat.id}
-            type="button"
-            onClick={() => toggle(cat.id)}
-            className={`shrink-0 flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-              active
-                ? 'border-blue-600 bg-blue-600 text-white'
-                : 'border-gray-200 bg-white text-gray-600'
-            }`}
-          >
-            <CategoryIcon name={cat.icon} size={11} />
-            {getTranslatedCategoryName(cat, t)}
-          </button>
-        )
-      })}
-    </div>
-  )
+  return null
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────

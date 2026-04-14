@@ -177,6 +177,11 @@
     "initialOdometer": "Odómetro inicial",
     "last": "Último",
     "lastKm": "Último km",
+    "tooltips": {
+      "kmPerL": "Kilómetros por litro en el último llenado. Mayor es mejor — indica qué tan eficiente es tu vehículo.",
+      "costPerKm": "Cuánto gastas por kilómetro recorrido. Ayuda a calcular el costo real de uso de tu vehículo.",
+      "lastKm": "Kilómetros recorridos desde el llenado anterior, calculados a partir de lecturas consecutivas del odómetro."
+    },
     "liters": "Litros",
     "make": "Marca",
     "model": "Modelo",
@@ -285,7 +290,29 @@
     "noMatch": "No hay presupuestos para las categorías seleccionadas."
   },
   "insights": {
-    "title": "Análisis"
+    "title": "Análisis",
+    "savingCapacity": "Capacidad de Ahorro",
+    "savingCapacityDesc": "Qué parte de tus ingresos conservas después de gastos.",
+    "thisMonth": "Este mes",
+    "last3Months": "Prom. últimos 3 meses",
+    "last6Months": "Prom. últimos 6 meses",
+    "income": "Ingresos",
+    "expenses": "Gastos",
+    "net": "Neto",
+    "savingsRate": "Tasa de ahorro",
+    "noIncome": "Sin ingresos registrados en este período.",
+    "trend": "Tendencia mensual",
+    "rateExcellent": "Excelente — estás ahorrando una gran parte de tus ingresos.",
+    "rateGood": "Bien — estás ahorrando una parte sólida de tus ingresos.",
+    "rateLow": "Aceptable — intenta reducir gastos para aumentar tu tasa de ahorro.",
+    "rateNegative": "Alerta — tus gastos superaron tus ingresos en este período.",
+    "tipTitle": "Cómo mejorar",
+    "tipIncreaseIncome": "Busca oportunidades para aumentar ingresos (freelance, aumentos, ingresos pasivos).",
+    "tipReduceExpenses": "Revisa tus categorías de mayor gasto e identifica áreas de reducción.",
+    "tipAutomate": "Automatiza transferencias a una cuenta de ahorro justo después de cobrar.",
+    "tipBudget": "Define presupuestos mensuales por categoría para mantenerte en control.",
+    "avgLabel": "Prom. {{months}} meses",
+    "monthlyBreakdown": "Mes a mes"
   },
   "reports": {
     "title": "Reportes",

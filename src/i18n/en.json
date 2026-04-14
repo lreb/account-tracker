@@ -179,6 +179,11 @@
     "initialOdometer": "Initial Odometer",
     "last": "Last",
     "lastKm": "Last km",
+    "tooltips": {
+      "kmPerL": "Kilometers per liter from your last fill-up. Higher is better — shows how efficiently your vehicle uses fuel.",
+      "costPerKm": "How much you spend per kilometer driven. Helps you track the real running cost of your vehicle.",
+      "lastKm": "Distance driven since your previous fill-up, calculated from consecutive odometer readings."
+    },
     "liters": "Liters",
     "make": "Make",
     "model": "Model",
@@ -287,7 +292,29 @@
     "noMatch": "No budgets match the selected categories."
   },
   "insights": {
-    "title": "Insights"
+    "title": "Insights",
+    "savingCapacity": "Saving Capacity",
+    "savingCapacityDesc": "How much of your income you're keeping after expenses.",
+    "thisMonth": "This month",
+    "last3Months": "Last 3 months avg.",
+    "last6Months": "Last 6 months avg.",
+    "income": "Income",
+    "expenses": "Expenses",
+    "net": "Net",
+    "savingsRate": "Savings rate",
+    "noIncome": "No income recorded for this period.",
+    "trend": "Monthly trend",
+    "rateExcellent": "Excellent — you're saving a high share of your income.",
+    "rateGood": "Good — you're saving a solid portion of your income.",
+    "rateLow": "Fair — try to reduce expenses to increase your savings rate.",
+    "rateNegative": "Alert — your expenses exceeded your income this period.",
+    "tipTitle": "How to improve",
+    "tipIncreaseIncome": "Look for opportunities to grow income (freelance, raises, passive income).",
+    "tipReduceExpenses": "Review your top expense categories and identify areas to cut back.",
+    "tipAutomate": "Automate transfers to a savings account right after payday.",
+    "tipBudget": "Set monthly budgets per category to stay on track.",
+    "avgLabel": "{{months}}-month avg",
+    "monthlyBreakdown": "Month-by-month"
   },
   "reports": {
     "title": "Reports",
