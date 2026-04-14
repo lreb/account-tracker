@@ -1,7 +1,9 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { SlidersHorizontal, X } from 'lucide-react'
-import { format, isToday, isYesterday, parseISO, subMonths, subYears } from 'date-fns'
+import { format, subMonths, subYears } from 'date-fns'
+import { useGroupedTransactions } from '@/features/transactions/hooks/useGroupedTransactions'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useCategoriesStore } from '@/stores/categories.store'
@@ -17,7 +19,9 @@ import {
   isTransactionForVisiblePrimaryAccount,
 } from '@/lib/accounts'
 import { getTranslatedCategoryName } from '@/lib/categories'
+import { getAccountBalanceAtDate } from '@/lib/balance-sheet'
 import type { Transaction } from '@/types'
+import { db } from '@/db'
 import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
 import { ComputingOverlay } from '@/components/ui/computing-overlay'
 import { Button } from '@/components/ui/button'
@@ -83,10 +87,6 @@ type BalanceEntry = {
   toAccountCurrency?: string
 }
 
-type FlatItem =
-  | { kind: 'header'; dateKey: string; headerLabel: string; count: number }
-  | { kind: 'tx'; tx: Transaction; timeStr: string }
-
 type QuickRange = 'all' | '1m' | '3m' | '6m' | '1y' | '2y'
 
 const DEFAULT_QUICK_RANGE: QuickRange = '1y'
@@ -148,12 +148,38 @@ export default function TransactionListPage() {
     [transactions, visibleAccountIds],
   )
 
+  const [searchParams] = useSearchParams()
+
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [filters, setFiltersRaw] = useState<Filters>(persistedFilters)
+  // Read URL params on first mount to support cross-feature navigation (e.g. clicking a budget card).
+  // URL params are used only for this navigation instance — we deliberately do NOT
+  // write to persistedFilters / persistedQuickRange here so that navigating to
+  // /transactions without URL params always restores the user's last manual state.
+  const [filters, setFiltersRaw] = useState<Filters>(() => {
+    const urlCategoryId = searchParams.get('categoryId')
+    const urlDateFrom = searchParams.get('dateFrom')
+    const urlDateTo = searchParams.get('dateTo')
+    if (urlCategoryId || urlDateFrom || urlDateTo) {
+      return {
+        ...EMPTY_FILTERS,
+        categoryId: urlCategoryId ?? '',
+        dateFrom: urlDateFrom ?? '',
+        dateTo: urlDateTo ?? '',
+      }
+    }
+    return persistedFilters
+  })
   // draft = filters being edited inside the sheet; only committed on Apply
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS)
-  const [quickRange, setQuickRangeRaw] = useState<QuickRange>(persistedQuickRange)
+  // When arriving via URL params (e.g. from a budget card), use 'all' so the DB
+  // loads enough history to cover the URL-specified date range — but don't persist
+  // that to persistedQuickRange so normal visits are unaffected.
+  const [quickRange, setQuickRangeRaw] = useState<QuickRange>(() => {
+    const hasUrlParams = searchParams.get('categoryId') || searchParams.get('dateFrom') || searchParams.get('dateTo')
+    return hasUrlParams ? 'all' : persistedQuickRange
+  })
   const [draftQuickRange, setDraftQuickRange] = useState<QuickRange>(persistedQuickRange)
+  const [allTx, setAllTx] = useState<Transaction[]>([])
 
   // Keep module-level caches in sync so state survives navigation
   const setFilters = (next: Filters | ((prev: Filters) => Filters)) => {
@@ -168,12 +194,25 @@ export default function TransactionListPage() {
     persistedQuickRange = range
   }
 
-  // On mount: restore the persisted quick range — push its cutoff into Dexie so only
-  // the needed rows are loaded from IndexedDB (Option E).
+  // On mount: load transactions using the effective quick range — uses 'all' when
+  // arriving via URL params (e.g. budget link) so the full date range is covered.
   useEffect(() => {
-    loadTx(getQuickRangeSince(persistedQuickRange))
+    loadTx(getQuickRangeSince(quickRange))
     loadLabels()
+  // quickRange is intentionally excluded from deps — this runs only on mount.
+  // Changes to quickRange after mount go through setQuickRange which calls loadTx directly.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadTx, loadLabels])
+
+  // Load ALL non-cancelled transactions from Dexie — used for correct running
+  // balance calculation regardless of the store's active date filter.
+  useEffect(() => {
+    db.transactions
+      .filter((tx) => tx.status !== 'cancelled')
+      .toArray()
+      .then(setAllTx)
+      .catch(console.error)
+  }, [transactions])
 
   const openSheet = () => { setDraft(filters); setDraftQuickRange(quickRange); setSheetOpen(true) }
   // Sheet Apply: reload DB with the custom dateFrom if set, then apply all draft filters
@@ -218,84 +257,69 @@ export default function TransactionListPage() {
     })
   }, [visibleTransactions, filters])
 
-  // Compute running account balance at the time of every transaction.
-  // This is intentionally independent of `filtered` so that applied filters (type,
-  // category, account, label, status, date range) never alter the displayed balance —
-  // the value always reflects the true account balance at the moment each transaction
-  // was recorded, regardless of what is currently shown in the list.
-  const balanceAfterTx = useMemo(() => {
-    const accBalances = new Map<string, number>()
-    for (let i = 0; i < visibleAccounts.length; i++) accBalances.set(visibleAccounts[i].id, visibleAccounts[i].openingBalance)
+  // Pre-group all non-cancelled transactions by account (both source and transfer
+  // destination) so balanceAfterTx can look up any account's history in O(1).
+  const allTxByAccount = useMemo(() => {
+    const map = new Map<string, Transaction[]>()
+    const push = (id: string, tx: Transaction) => {
+      const list = map.get(id)
+      if (list) list.push(tx)
+      else map.set(id, [tx])
+    }
+    for (const tx of allTx) {
+      push(tx.accountId, tx)
+      if (tx.toAccountId) push(tx.toAccountId, tx)
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => b.date.localeCompare(a.date))
+    }
+    return map
+  }, [allTx])
 
+  // Compute the running account balance after each transaction using a backward walk
+  // anchored from getAccountBalanceAtDate — the same function BalanceSheetPage uses —
+  // so the balance next to the latest transaction always matches BalanceSheetPage.
+  // Using allTxByAccount (full history) instead of date-filtered visibleTransactions
+  // ensures transfer-in credits and pre-filter-window transactions are not missed.
+  const balanceAfterTx = useMemo(() => {
     const result = new Map<string, BalanceEntry>()
 
-    for (let i = visibleTransactions.length - 1; i >= 0; i--) {
-      const tx = visibleTransactions[i]
-      const bal = accBalances.get(tx.accountId) ?? 0
+    for (const acc of visibleAccounts) {
+      const accTxns = allTxByAccount.get(acc.id) ?? []
+      let running = getAccountBalanceAtDate(acc, accTxns, new Date())
 
-      if (tx.type === 'income') {
-        accBalances.set(tx.accountId, bal + tx.amount)
-      } else if (tx.type === 'expense') {
-        accBalances.set(tx.accountId, bal - tx.amount)
-      } else if (tx.type === 'transfer') {
-        accBalances.set(tx.accountId, bal - tx.amount)
-        if (tx.toAccountId) {
-          const destBal = accBalances.get(tx.toAccountId) ?? 0
-          accBalances.set(tx.toAccountId, destBal + (tx.originalAmount ?? tx.amount))
+      for (const tx of accTxns) {
+        if (tx.accountId === acc.id) {
+          const entry: BalanceEntry = {
+            accountBalance: running,
+            accountCurrency: acc.currency,
+          }
+          if (tx.type === 'transfer' && tx.toAccountId) {
+            const toAcc = accountMap.get(tx.toAccountId)
+            if (toAcc) {
+              const toAccTxns = allTxByAccount.get(toAcc.id) ?? []
+              entry.toAccountBalance = getAccountBalanceAtDate(toAcc, toAccTxns, new Date(tx.date))
+              entry.toAccountCurrency = toAcc.currency
+            }
+          }
+          result.set(tx.id, entry)
+        }
+        // Undo this tx's effect on acc.id to step back in time
+        if (tx.accountId === acc.id) {
+          if (tx.type === 'income') running -= tx.amount
+          else if (tx.type === 'expense') running += tx.amount
+          else if (tx.type === 'transfer') running += tx.amount
+        } else {
+          // tx.toAccountId === acc.id: undo the incoming transfer credit
+          running -= (tx.originalAmount ?? tx.amount)
         }
       }
-
-      const acc = accountMap.get(tx.accountId)
-      const entry: BalanceEntry = {
-        accountBalance: accBalances.get(tx.accountId) ?? 0,
-        accountCurrency: acc?.currency ?? tx.currency ?? baseCurrency,
-      }
-      if (tx.type === 'transfer' && tx.toAccountId) {
-        const toAcc = accountMap.get(tx.toAccountId)
-        entry.toAccountBalance = accBalances.get(tx.toAccountId)
-        entry.toAccountCurrency = toAcc?.currency ?? baseCurrency
-      }
-      result.set(tx.id, entry)
     }
+
     return result
-  }, [visibleTransactions, visibleAccounts, accountMap, baseCurrency])
+  }, [visibleAccounts, allTxByAccount, accountMap])
 
-  const grouped = useMemo(() => {
-    const map = new Map<string, typeof filtered>()
-    for (const tx of filtered) {
-      const key = tx.date.substring(0, 10)
-      const arr = map.get(key)
-      if (arr) arr.push(tx)
-      else map.set(key, [tx])
-    }
-    return Array.from(map.entries()).map(([dateKey, txs]) => ({ dateKey, txs }))
-  }, [filtered])
-
-  // Flatten grouped data and precompute all display strings once.
-  // Best practice: parse ISO strings to Date objects once per item, reuse the result —
-  // never call parseISO() inside the virtual row renderer.
-  const flatItems = useMemo<FlatItem[]>(() => {
-    const result: FlatItem[] = []
-    const timeFormatter = new Intl.DateTimeFormat(undefined, {
-      hour: 'numeric',
-      minute: '2-digit',
-    })
-
-    for (const { dateKey, txs } of grouped) {
-      const d = parseISO(dateKey)
-      const headerLabel = isToday(d)
-        ? t('transactions.today')
-        : isYesterday(d)
-          ? t('transactions.yesterday')
-          : format(d, 'EEEE, MMM d, yyyy')
-      result.push({ kind: 'header', dateKey, headerLabel, count: txs.length })
-      for (const tx of txs) {
-        // format via Intl vs massive date-fns string parsing
-        result.push({ kind: 'tx', tx, timeStr: timeFormatter.format(new Date(tx.date)) })
-      }
-    }
-    return result
-  }, [grouped, t])
+  const flatItems = useGroupedTransactions(filtered)
 
   const activeCount = Object.values(filters).filter(Boolean).length
 
@@ -434,10 +458,7 @@ export default function TransactionListPage() {
                         amount={tx.amount}
                         amountPrefix={tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}
                         amountCurrency={tx.currency ?? baseCurrency}
-                        amountTone={
-                          tx.type === 'income' ? 'text-green-600' :
-                          tx.type === 'expense' ? 'text-red-500' : 'text-gray-700'
-                        }
+                        txType={tx.type}
                         primaryBalance={bal ? { accountName: acc?.name ?? '', balance: bal.accountBalance, currency: bal.accountCurrency } : undefined}
                         secondaryBalance={
                           tx.type === 'transfer' && bal?.toAccountBalance != null && bal.toAccountCurrency
@@ -457,7 +478,7 @@ export default function TransactionListPage() {
       <ScrollToTopButton scrollRef={scrollContainerRef} threshold={320} />
 
       {/* ── FAB: Add menu (right side) ────────────────────────────────────── */}
-      <AddFabMenu />
+      <AddFabMenu returnTo="/transactions" />
 
       {/* Filter sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>

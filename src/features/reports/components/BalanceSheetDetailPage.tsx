@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { format, isToday, isYesterday, parseISO } from 'date-fns'
 import { ArrowLeft, SlidersHorizontal, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -26,6 +25,7 @@ import { Button } from '@/components/ui/button'
 import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
 import { TransactionListItem } from '@/components/ui/transaction-list-item'
 import { TransactionDateGroupHeader } from '@/components/ui/transaction-date-group-header'
+import { useGroupedTransactions } from '@/features/transactions/hooks/useGroupedTransactions'
 import { BalanceSheetDetailFiltersSheet } from './BalanceSheetDetailFiltersSheet'
 import { EMPTY_FILTERS, type DetailFilters } from './balance-sheet-detail-filters.types'
 
@@ -37,7 +37,6 @@ function getTransactionPresentation(transaction: Transaction, account: Account) 
     const isIncoming = transaction.toAccountId === account.id
     return {
       amount: absoluteAmount,
-      tone: isIncoming ? 'text-green-600' : 'text-red-500',
       prefix: isIncoming ? '+' : '-',
       labelKey: isIncoming ? 'balanceSheet.transactionKinds.transferIn' : 'balanceSheet.transactionKinds.transferOut',
       currency: account.currency,
@@ -46,7 +45,6 @@ function getTransactionPresentation(transaction: Transaction, account: Account) 
 
   return {
     amount: absoluteAmount,
-    tone: signedAmount >= 0 ? 'text-green-600' : 'text-red-500',
     prefix: signedAmount >= 0 ? '+' : '-',
     labelKey: transaction.type === 'income' ? 'transactions.income' : 'transactions.expense',
     currency: transaction.currency,
@@ -77,6 +75,7 @@ export default function BalanceSheetDetailPage() {
   // O(1) lookup maps
   const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
   const labelMap    = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels])
+  const accountMap  = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
 
   const presetParam = searchParams.get('period')
   const selectedPreset = BALANCE_SHEET_PRESETS.includes(presetParam as BalanceSheetPreset)
@@ -166,48 +165,64 @@ export default function BalanceSheetDetailPage() {
     return getAccountBalanceAtDate(account, accountTransactions, new Date())
   }, [account, accountTransactions])
 
-  // Running account balance after each non-cancelled transaction (for balance column in list)
+  type BalanceEntry = {
+    accountBalance: number
+    accountCurrency: string
+    toAccountBalance?: number
+    toAccountCurrency?: string
+  }
+
+  // Running balance after each transaction — seeded from getAccountBalanceAtDate
+  // (the same call BalanceSheetPage uses) then walked backwards so the most recent
+  // transaction's displayed balance is guaranteed to match BalanceSheetPage exactly.
   const balanceAfterTx = useMemo(() => {
-    if (!account) return new Map<string, number>()
-    const result = new Map<string, number>()
-    // accountTransactions is newest-first; traverse oldest-first for accumulation
-    let running = account.openingBalance
-    const sorted = [...accountTransactions].reverse()
-    for (const tx of sorted) {
-      running += getAccountTransactionAmount(tx, account)
-      result.set(tx.id, running)
-    }
-    return result
-  }, [account, accountTransactions])
+    if (!account) return new Map<string, BalanceEntry>()
 
-  type FlatItem =
-    | { kind: 'header'; dateKey: string; headerLabel: string; count: number }
-    | { kind: 'tx'; tx: Transaction; timeStr: string }
+    const result = new Map<string, BalanceEntry>()
+    // accountTransactions is newest-first; walk in order (newest→oldest)
+    // and subtract each tx's effect to recover the balance *before* it.
+    let running = currentBalance
 
-  const flatItems = useMemo<FlatItem[]>(() => {
-    const result: FlatItem[] = []
-    const timeFormatter = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
-    const map = new Map<string, Transaction[]>()
-    for (const tx of filteredAccountTransactions) {
-      const key = tx.date.substring(0, 10)
-      const arr = map.get(key)
-      if (arr) arr.push(tx)
-      else map.set(key, [tx])
-    }
-    for (const [dateKey, txs] of map) {
-      const d = parseISO(dateKey)
-      const headerLabel = isToday(d)
-        ? t('transactions.today')
-        : isYesterday(d)
-          ? t('transactions.yesterday')
-          : format(d, 'EEEE, MMM d, yyyy')
-      result.push({ kind: 'header', dateKey, headerLabel, count: txs.length })
-      for (const tx of txs) {
-        result.push({ kind: 'tx', tx, timeStr: timeFormatter.format(new Date(tx.date)) })
+    for (const tx of accountTransactions) {
+      // running is the balance after this tx — record it first
+      const primaryAcc = accountMap.get(tx.accountId)
+      const entry: BalanceEntry = {
+        accountBalance: running,
+        accountCurrency: primaryAcc?.currency ?? tx.currency ?? account.currency,
+      }
+
+      if (tx.type === 'transfer' && tx.toAccountId) {
+        const toAcc = accountMap.get(tx.toAccountId)
+        if (toAcc) {
+          // Derive the counterpart account's balance at this exact moment using
+          // the same getAccountBalanceAtDate function — avoids tracking a separate
+          // running total for every account and uses the same source of truth.
+          const toAccTxns = allTx.filter((t) => isTransactionForAccount(t, toAcc.id))
+          entry.toAccountBalance = getAccountBalanceAtDate(toAcc, toAccTxns, new Date(tx.date))
+          entry.toAccountCurrency = toAcc.currency
+        }
+      }
+
+      result.set(tx.id, entry)
+
+      // Undo this tx's effect to step back to the balance before it
+      if (tx.type === 'income') {
+        running -= tx.amount
+      } else if (tx.type === 'expense') {
+        running += tx.amount
+      } else if (tx.type === 'transfer') {
+        if (tx.accountId === account.id) {
+          running += tx.amount                        // undo debit from source
+        } else {
+          running -= (tx.originalAmount ?? tx.amount) // undo credit to destination
+        }
       }
     }
+
     return result
-  }, [filteredAccountTransactions, t])
+  }, [account, accountTransactions, allTx, currentBalance, accountMap])
+
+  const flatItems = useGroupedTransactions(filteredAccountTransactions)
 
   const overviewUrl = `/balance-sheet?period=${selectedPreset}`
   const returnTo = `/balance-sheet/${accountId}?period=${selectedPreset}`
@@ -341,6 +356,7 @@ export default function BalanceSheetDetailPage() {
                   return l ? [l] : []
                 })
                 const bal = balanceAfterTx.get(tx.id)
+                const toAcc = tx.toAccountId ? accountMap.get(tx.toAccountId) : undefined
                 return (
                   <TransactionListItem
                     key={tx.id + String(i)}
@@ -353,8 +369,13 @@ export default function BalanceSheetDetailPage() {
                     amount={presentation.amount}
                     amountPrefix={presentation.prefix}
                     amountCurrency={presentation.currency}
-                    amountTone={presentation.tone}
-                    primaryBalance={bal != null ? { accountName: account.name, balance: bal, currency: account.currency } : undefined}
+                    txType={tx.type}
+                    primaryBalance={bal != null ? { accountName: account.name, balance: bal.accountBalance, currency: bal.accountCurrency } : undefined}
+                    secondaryBalance={
+                      tx.type === 'transfer' && bal?.toAccountBalance != null && bal.toAccountCurrency
+                        ? { accountName: toAcc?.name ?? '', balance: bal.toAccountBalance, currency: bal.toAccountCurrency }
+                        : undefined
+                    }
                   />
                 )
               })()
@@ -363,7 +384,7 @@ export default function BalanceSheetDetailPage() {
         )}
       </section>
 
-      <AddFabMenu />
+      <AddFabMenu returnTo={returnTo} />
       <ScrollToTopButton />
 
       <BalanceSheetDetailFiltersSheet
