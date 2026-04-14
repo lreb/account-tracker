@@ -1,8 +1,8 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef, type ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { format } from 'date-fns'
-import { ArrowLeft, Trash2, Pencil, Gauge, TrendingDown, Fuel, Wrench } from 'lucide-react'
+import { format, parseISO, addDays } from 'date-fns'
+import { ArrowLeft, Trash2, Pencil, Gauge, TrendingDown, Fuel, Wrench, AlertCircle, Clock, CheckCircle2 } from 'lucide-react'
 
 import {
   getVisibleAccountIds,
@@ -24,19 +24,68 @@ import type { FuelLog, VehicleService } from '@/types'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
 import { AddFabMenu } from '@/components/ui/add-fab-menu'
 import { VehicleStats } from './VehicleStats'
 
 // ─── Page ───────────────────────────────────────────── (stats live in VehicleStats.tsx) ───
 
-type Tab = 'all' | 'fuel' | 'service' | 'stats'
+type Tab = 'all' | 'fuel' | 'service' | 'stats' | 'upcoming'
+
+interface UpcomingServiceItem {
+  svc: VehicleService
+  urgency: 'overdue' | 'soon' | 'upcoming'
+  kmRemaining: number | null
+  dueDate: Date | null
+}
 
 type CombinedEntry =
   | { kind: 'fuel'; log: FuelLog; prevOdometer: number | null }
   | { kind: 'service'; svc: VehicleService }
 
 let persistedTab: Tab = 'all'
+
+// ─── Stat card with auto-dismiss tooltip (3 s) ───────────────────────────────
+
+interface StatCardProps {
+  icon: ReactNode
+  label: string
+  value: string
+  tooltip: string
+}
+
+function StatCard({ icon, label, value, tooltip }: StatCardProps) {
+  const [open, setOpen] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function handleOpenChange(next: boolean) {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    setOpen(next)
+    if (next) {
+      timerRef.current = setTimeout(() => setOpen(false), 3000)
+    }
+  }
+
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+  }, [])
+
+  return (
+    <Tooltip open={open} onOpenChange={handleOpenChange}>
+      <TooltipTrigger asChild>
+        <div className="rounded-xl border bg-white px-3 py-2 text-center cursor-default">
+          <div className="flex items-center justify-center gap-1 text-gray-400 mb-0.5">
+            {icon}
+            <span className="text-[10px] uppercase tracking-wide">{label}</span>
+          </div>
+          <p className="text-sm font-bold">{value}</p>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{tooltip}</TooltipContent>
+    </Tooltip>
+  )
+}
 
 export default function VehicleDetailPage() {
   const { t } = useTranslation()
@@ -75,6 +124,36 @@ export default function VehicleDetailPage() {
     })
     .sort((a, b) => b.date.localeCompare(a.date))
 
+  // Hooks must be before the early return
+  const currentOdometer = useMemo(
+    () => (logs.length > 0 ? Math.max(...logs.map((l) => l.odometer)) : 0),
+    [logs],
+  )
+
+  const upcomingServices = useMemo((): UpcomingServiceItem[] => {
+    const byType = new Map<string, VehicleService>()
+    for (const svc of [...services].sort((a, b) => a.date.localeCompare(b.date))) {
+      if (svc.nextServiceKm != null || svc.nextServiceDate) byType.set(svc.serviceType, svc)
+    }
+    const today    = new Date()
+    const soonDate = addDays(today, 30)
+    return Array.from(byType.values())
+      .map((svc): UpcomingServiceItem => {
+        const kmRemaining = svc.nextServiceKm != null ? svc.nextServiceKm - currentOdometer : null
+        const dueDate     = svc.nextServiceDate ? parseISO(svc.nextServiceDate) : null
+        let urgency: UpcomingServiceItem['urgency'] = 'upcoming'
+        if ((kmRemaining !== null && kmRemaining <= 0) || (dueDate !== null && dueDate < today)) {
+          urgency = 'overdue'
+        } else if ((kmRemaining !== null && kmRemaining <= 500) || (dueDate !== null && dueDate <= soonDate)) {
+          urgency = 'soon'
+        }
+        return { svc, urgency, kmRemaining, dueDate }
+      })
+      .sort((a, b) => ({ overdue: 0, soon: 1, upcoming: 2 }[a.urgency] - { overdue: 0, soon: 1, upcoming: 2 }[b.urgency]))
+  }, [services, currentOdometer])
+
+  const urgentCount = upcomingServices.filter((i) => i.urgency === 'overdue' || i.urgency === 'soon').length
+
   if (!vehicle) {
     return (
       <div className="p-4 text-center mt-16">
@@ -95,7 +174,6 @@ export default function VehicleDetailPage() {
     return db.localeCompare(da)
   })
 
-  // Stats from the most recent two fills
   const lastLog = logs[0]
   const prevLog = logs[1]
   const kmSince = lastLog && prevLog ? calcKmSinceLastFill(lastLog.odometer, prevLog.odometer) : null
@@ -119,40 +197,53 @@ export default function VehicleDetailPage() {
 
       {/* Stats bar */}
       {kmPerL !== null && (
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          {[
-            { icon: <Gauge size={16} />, label: 'km/L', value: kmPerL.toFixed(1) },
-            { icon: <TrendingDown size={16} />, label: t('vehicles.costPerKm'), value: costPerKm ? formatCurrency(costPerKm, baseCurrency) : '—' },
-            { icon: <Fuel size={16} />, label: t('vehicles.lastKm'), value: kmSince?.toString() ?? '—' },
-          ].map(({ icon, label, value }) => (
-            <div key={label} className="rounded-xl border bg-white px-3 py-2 text-center">
-              <div className="flex items-center justify-center gap-1 text-gray-400 mb-0.5">
-                {icon}
-                <span className="text-[10px] uppercase tracking-wide">{label}</span>
-              </div>
-              <p className="text-sm font-bold">{value}</p>
-            </div>
-          ))}
-        </div>
+        <TooltipProvider delayDuration={0}>
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <StatCard
+              icon={<Gauge size={16} />}
+              label="km/L"
+              value={kmPerL.toFixed(1)}
+              tooltip={t('vehicles.tooltips.kmPerL')}
+            />
+            <StatCard
+              icon={<TrendingDown size={16} />}
+              label={t('vehicles.costPerKm')}
+              value={costPerKm ? formatCurrency(costPerKm, baseCurrency) : '—'}
+              tooltip={t('vehicles.tooltips.costPerKm')}
+            />
+            <StatCard
+              icon={<Fuel size={16} />}
+              label={t('vehicles.lastKm')}
+              value={kmSince?.toString() ?? '—'}
+              tooltip={t('vehicles.tooltips.lastKm')}
+            />
+          </div>
+        </TooltipProvider>
       )}
 
       {/* Tabs */}
-      <div className="grid grid-cols-4 gap-1 rounded-xl bg-gray-100 p-1 mb-4">
+      <div className="grid grid-cols-5 gap-1 rounded-xl bg-gray-100 p-1 mb-4">
         {([
           { key: 'all' as Tab, label: t('vehicles.tabAll') },
           { key: 'fuel' as Tab, label: t('vehicles.tabFuel') },
           { key: 'service' as Tab, label: t('vehicles.tabService') },
           { key: 'stats' as Tab, label: t('vehicles.tabStats') },
+          { key: 'upcoming' as Tab, label: t('vehicles.tabUpcoming') },
         ]).map(({ key, label }) => (
           <button
             key={key}
             type="button"
             onClick={() => setTab(key)}
-            className={`rounded-lg py-1.5 text-xs font-medium transition-colors ${
+            className={`relative rounded-lg py-1.5 text-xs font-medium transition-colors ${
               tab === key ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             {label}
+            {key === 'upcoming' && urgentCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-[0.875rem] items-center justify-center rounded-full bg-red-500 px-0.5 text-[8px] font-bold text-white leading-none">
+                {urgentCount}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -420,6 +511,77 @@ export default function VehicleDetailPage() {
           baseCurrency={baseCurrency}
           initialOdometer={vehicle.initialOdometer ?? 0}
         />
+      )}
+
+      {/* Upcoming services tab */}
+      {tab === 'upcoming' && (
+        upcomingServices.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center mt-8">{t('vehicles.noUpcoming')}</p>
+        ) : (
+          <div className="space-y-2">
+            {upcomingServices.map(({ svc, urgency, kmRemaining, dueDate }) => {
+              const bgClass =
+                urgency === 'overdue' ? 'bg-red-50 border-red-200'
+                : urgency === 'soon'  ? 'bg-amber-50 border-amber-200'
+                : 'bg-emerald-50 border-emerald-200'
+              const textClass =
+                urgency === 'overdue' ? 'text-red-700'
+                : urgency === 'soon'  ? 'text-amber-700'
+                : 'text-emerald-700'
+              const badgeBg =
+                urgency === 'overdue' ? 'bg-red-100 text-red-700'
+                : urgency === 'soon'  ? 'bg-amber-100 text-amber-700'
+                : 'bg-emerald-100 text-emerald-700'
+              const UrgencyIcon =
+                urgency === 'overdue' ? AlertCircle
+                : urgency === 'soon'  ? Clock
+                : CheckCircle2
+              const urgencyLabel =
+                urgency === 'overdue' ? t('vehicles.stats.overdue')
+                : urgency === 'soon'  ? t('vehicles.stats.dueSoon')
+                : t('vehicles.stats.upcomingLabel')
+
+              return (
+                <div key={svc.id} className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 ${bgClass}`}>
+                  <UrgencyIcon size={14} className={`${textClass} shrink-0 mt-0.5`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className={`text-sm font-medium truncate ${textClass}`}>
+                        {getServiceTypeLabel(svc.serviceType, t)}
+                      </p>
+                      <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full shrink-0 ${badgeBg}`}>
+                        {urgencyLabel}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                      {svc.nextServiceKm != null && (
+                        <p className={`text-xs ${textClass} opacity-80`}>
+                          {t('vehicles.stats.dueAt', { km: svc.nextServiceKm.toLocaleString() })}
+                          {kmRemaining !== null && kmRemaining > 0 && (
+                            <span className="ml-1 opacity-70">
+                              ({t('vehicles.stats.kmLeft', { km: kmRemaining.toLocaleString() })})
+                            </span>
+                          )}
+                        </p>
+                      )}
+                      {dueDate && (
+                        <p className={`text-xs ${textClass} opacity-80`}>
+                          {t('vehicles.stats.dueOn', { date: format(dueDate, 'MMM d, yyyy') })}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 mt-2">
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-400 hover:text-gray-700"
+                        onClick={() => navigate(`/vehicles/${vehicle.id}/service/${svc.id}`)}>
+                        <Pencil size={13} />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
       )}
 
       <ScrollToTopButton />

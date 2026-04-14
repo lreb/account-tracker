@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -10,9 +10,6 @@ import {
   Car,
   Lightbulb,
   Settings,
-  Plus,
-  Fuel,
-  Wrench,
   Wallet,
   Tag,
   RefreshCw,
@@ -28,26 +25,25 @@ interface SidebarProps {
 const mainItems = [
   { to: '/',              icon: LayoutDashboard, labelKey: 'nav.dashboard',    end: true },
   { to: '/transactions',  icon: ArrowLeftRight,  labelKey: 'nav.transactions', end: false },
+  { to: '/vehicles',      icon: Car,             labelKey: 'nav.vehicles',     end: false },
   { to: '/balance-sheet', icon: Scale,           labelKey: 'nav.balanceSheet', end: false },
   { to: '/reports',       icon: BarChart3,       labelKey: 'nav.reports',      end: false },
   { to: '/budgets',       icon: PiggyBank,       labelKey: 'nav.budgets',      end: false },
-  { to: '/vehicles',      icon: Car,             labelKey: 'nav.vehicles',     end: false },
-  { to: '/insights',      icon: Lightbulb,       labelKey: 'nav.insights',     end: false },
-  { to: '/settings',      icon: Settings,        labelKey: 'nav.settings',     end: true },
+  { to: '/insights',      icon: Lightbulb,       labelKey: 'nav.insights',     end: true },
 ] as const
 
 const settingsItems = [
-  { to: '/settings/accounts',       icon: Wallet,    labelKey: 'settings.accounts' },
-  { to: '/settings/categories',     icon: Tag,       labelKey: 'settings.categories' },
-  { to: '/settings/labels',         icon: Tag,       labelKey: 'settings.labels' },
-  { to: '/settings/exchange-rates', icon: RefreshCw, labelKey: 'settings.exchangeRates' },
+  { to: '/settings/accounts',       icon: Wallet,    labelKey: 'settings.accounts',    end: false },
+  { to: '/settings/categories',     icon: Tag,       labelKey: 'settings.categories',  end: false },
+  { to: '/settings/labels',         icon: Tag,       labelKey: 'settings.labels',      end: false },
+  { to: '/settings/exchange-rates', icon: RefreshCw, labelKey: 'settings.exchangeRates', end: false },
+  { to: '/settings',                icon: Settings,  labelKey: 'nav.settings',         end: true  },
 ] as const
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
   const { t } = useTranslation()
   const location = useLocation()
-  const { vehicles } = useVehiclesStore()
-  const activeVehicles = useMemo(() => vehicles.filter((v) => !v.archivedAt), [vehicles])
+  useVehiclesStore()
 
   // Close sidebar on route change
   useEffect(() => {
@@ -122,68 +118,6 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
             ))}
           </ul>
 
-          {/* ── Quick Create ────────────────────────────── */}
-          <div className="mt-4 px-3 mb-1">
-            <p className="px-2 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-              {t('sidebar.quickCreate')}
-            </p>
-          </div>
-          <ul className="space-y-0.5 px-3">
-            <li>
-              <NavLink
-                to="/transactions/new"
-                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-              >
-                <Plus size={18} className="shrink-0" />
-                <span>{t('transactions.addTransaction')}</span>
-              </NavLink>
-            </li>
-            {activeVehicles.length === 1 ? (
-              <>
-                <li>
-                  <NavLink
-                    to={`/vehicles/${activeVehicles[0].id}/fuel/new`}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-                  >
-                    <Fuel size={18} className="shrink-0" />
-                    <span>{t('vehicles.addFuelLog')}</span>
-                  </NavLink>
-                </li>
-                <li>
-                  <NavLink
-                    to={`/vehicles/${activeVehicles[0].id}/service/new`}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-                  >
-                    <Wrench size={18} className="shrink-0" />
-                    <span>{t('vehicles.addService')}</span>
-                  </NavLink>
-                </li>
-              </>
-            ) : activeVehicles.length > 1 ? (
-              activeVehicles.map((v) => (
-                <li key={v.id}>
-                  <p className="px-3 pt-2 pb-0.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
-                    {v.name}
-                  </p>
-                  <NavLink
-                    to={`/vehicles/${v.id}/fuel/new`}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-                  >
-                    <Fuel size={18} className="shrink-0" />
-                    <span>{t('vehicles.addFuelLog')}</span>
-                  </NavLink>
-                  <NavLink
-                    to={`/vehicles/${v.id}/service/new`}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-                  >
-                    <Wrench size={18} className="shrink-0" />
-                    <span>{t('vehicles.addService')}</span>
-                  </NavLink>
-                </li>
-              ))
-            ) : null}
-          </ul>
-
           {/* ── Settings shortcuts ──────────────────────── */}
           <div className="mt-4 px-3 mb-1">
             <p className="px-2 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
@@ -191,10 +125,11 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
             </p>
           </div>
           <ul className="space-y-0.5 px-3 pb-4">
-            {settingsItems.map(({ to, icon: Icon, labelKey }) => (
+            {settingsItems.map(({ to, icon: Icon, labelKey, end }) => (
               <li key={to}>
                 <NavLink
                   to={to}
+                  end={end}
                   className={({ isActive }) =>
                     `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                       isActive

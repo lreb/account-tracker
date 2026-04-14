@@ -35,7 +35,7 @@ export default [
       // Catch unused imports/variables — this is what caught the formatCurrency issue
       '@typescript-eslint/no-unused-vars': [
         'error',
-        { vars: 'all', args: 'after-used', ignoreRestSiblings: true },
+        { vars: 'all', args: 'after-used', ignoreRestSiblings: true, argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
       // Disable the base rule in favour of the TS-aware one
       'no-unused-vars': 'off',
