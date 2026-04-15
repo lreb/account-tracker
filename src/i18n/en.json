@@ -374,6 +374,7 @@
     "labelsTab": "Labels",
     "breakdown": "Breakdown",
     "presets": {
+      "thisWeek": "This Week",
       "thisMonth": "This Month",
       "lastMonth": "Last Month",
       "last3Months": "Last 3 Months",
@@ -404,7 +405,8 @@
     "month": "Month",
     "inflow": "Inflow",
     "outflow": "Outflow",
-    "cumulative": "Cumulative"
+    "cumulative": "Cumulative",
+    "total": "Total"
   },
   "settings": {
     "title": "Settings",

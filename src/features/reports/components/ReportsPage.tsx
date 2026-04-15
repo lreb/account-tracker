@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useDeferredValue } from 'react'
+import React, { useMemo, useState, useDeferredValue } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear } from 'date-fns'
 import {
@@ -9,8 +9,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
   Cell,
   Legend,
   LineChart,
@@ -45,6 +43,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LabelPickerButton } from '@/components/ui/label-picker-button'
+import { ExpensesByCategoryReport } from './ExpensesByCategoryReport'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -175,27 +174,27 @@ export default function ReportsPage() {
   const [filterLabelIds, setFilterLabelIds] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<'overview' | 'category' | 'accounts' | 'cashflow' | 'labels'>('overview')
 
-  useEffect(() => {
-    if (filterAccount !== 'all' && !visibleAccounts.some((account) => account.id === filterAccount)) {
-      setFilterAccount('all')
-    }
-  }, [filterAccount, visibleAccounts])
+  // If the selected account is no longer in the visible list (e.g. hidden/removed),
+  // treat it as 'all' without a setState-in-effect cycle.
+  const effectiveAccount = visibleAccounts.some((a) => a.id === filterAccount)
+    ? filterAccount
+    : 'all'
 
   const filters: ReportFilters = useMemo(() => {
     if (preset === 'custom') {
       return {
         from: new Date(customFrom),
         to: new Date(customTo),
-        accountId: filterAccount === 'all' ? undefined : filterAccount,
+        accountId: effectiveAccount === 'all' ? undefined : effectiveAccount,
       }
     }
     const { from, to } = getPresetRange(preset)
     return {
       from,
       to,
-      accountId: filterAccount === 'all' ? undefined : filterAccount,
+      accountId: effectiveAccount === 'all' ? undefined : effectiveAccount,
     }
-  }, [preset, customFrom, customTo, filterAccount])
+  }, [preset, customFrom, customTo, effectiveAccount])
 
   const filteredTransactions = useMemo(
     () => filterLabelIds.length === 0
@@ -224,16 +223,12 @@ export default function ReportsPage() {
     () => computeMonthlyTrend(
       filteredTransactions,
       monthCount,
-      filterAccount === 'all' ? undefined : filterAccount,
+      effectiveAccount === 'all' ? undefined : effectiveAccount,
       visibleAccountIds,
     ),
-    [filteredTransactions, monthCount, filterAccount, visibleAccountIds],
+    [filteredTransactions, monthCount, effectiveAccount, visibleAccountIds],
   )
 
-  const expensesByCategory = useMemo(
-    () => computeCategoryBreakdown(filteredTransactions, categories, filters, 'expense', visibleAccountIds),
-    [filteredTransactions, categories, filters, visibleAccountIds],
-  )
   const incomeByCategory = useMemo(
     () => computeCategoryBreakdown(filteredTransactions, categories, filters, 'income', visibleAccountIds),
     [filteredTransactions, categories, filters, visibleAccountIds],
@@ -248,10 +243,10 @@ export default function ReportsPage() {
     () => computeCashFlow(
       filteredTransactions,
       monthCount,
-      filterAccount === 'all' ? undefined : filterAccount,
+      effectiveAccount === 'all' ? undefined : effectiveAccount,
       visibleAccountIds,
     ),
-    [filteredTransactions, monthCount, filterAccount, visibleAccountIds],
+    [filteredTransactions, monthCount, effectiveAccount, visibleAccountIds],
   )
 
   const labelBreakdown = useMemo(
@@ -404,47 +399,14 @@ export default function ReportsPage() {
       {/* ── Category tab: pie + ranked list ─────────────────────────────── */}
       {activeTab === 'category' && (
         <div className="space-y-5">
-          {/* Expenses by category */}
-          <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <SectionTitle>{t('reports.expensesByCategory')}</SectionTitle>
-            {expensesByCategory.length === 0 ? <EmptyChart /> : (
-              <>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie
-                      data={expensesByCategory}
-                      dataKey="amount"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      label={({ name, percent }) => `${name} ${percent}%`}
-                      labelLine={false}
-                    >
-                      {expensesByCategory.map((_, i) => (
-                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => typeof value === 'number' ? formatCurrency(value, baseCurrency) : ''} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <ul className="space-y-2 mt-2">
-                  {expensesByCategory.map((slice, i) => (
-                    <li key={slice.categoryId} className="flex items-center gap-3">
-                      <span
-                        className="w-3 h-3 rounded-full shrink-0"
-                        style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
-                      />
-                      <CategoryIcon name={slice.icon} size={14} className="text-gray-500 shrink-0" />
-                      <span className="flex-1 text-sm text-gray-700 truncate">{slice.name}</span>
-                      <span className="text-xs text-gray-400">{slice.percent}%</span>
-                      <span className="text-sm font-medium">{formatCurrency(slice.amount, baseCurrency)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </div>
+          {/* Expenses by category — independent component with its own period filter */}
+          <ExpensesByCategoryReport
+            transactions={filteredTransactions}
+            categories={categories}
+            accounts={visibleAccounts}
+            baseCurrency={baseCurrency}
+            visibleAccountIds={visibleAccountIds}
+          />
 
           {/* Income by category */}
           <div className="rounded-2xl border bg-white p-4 shadow-sm">

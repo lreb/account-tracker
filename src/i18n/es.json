@@ -372,6 +372,7 @@
     "labelsTab": "Etiquetas",
     "breakdown": "Desglose",
     "presets": {
+      "thisWeek": "Esta Semana",
       "thisMonth": "Este Mes",
       "lastMonth": "Mes Pasado",
       "last3Months": "Últimos 3 Meses",
@@ -402,7 +403,8 @@
     "month": "Mes",
     "inflow": "Entradas",
     "outflow": "Salidas",
-    "cumulative": "Acumulado"
+    "cumulative": "Acumulado",
+    "total": "Total"
   },
   "settings": {
     "title": "Configuración",
