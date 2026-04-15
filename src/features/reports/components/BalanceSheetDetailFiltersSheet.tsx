@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 
 import { BALANCE_SHEET_PRESETS, type BalanceSheetPreset } from '@/lib/balance-sheet'
-import type { Label } from '@/types'
+import type { Label, Category } from '@/types'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,6 +21,9 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 
+import { getTranslatedCategoryName } from '@/lib/categories'
+import { CategoryIcon } from '@/lib/icon-map'
+
 import type { DetailFilters, TxStatus } from './balance-sheet-detail-filters.types'
 
 const STATUS_OPTIONS: { value: TxStatus; label: string }[] = [
@@ -37,6 +40,7 @@ interface BalanceSheetDetailFiltersSheetProps {
   onDraftChange: (updater: (prev: DetailFilters) => DetailFilters) => void
   draftPeriod: BalanceSheetPreset
   onDraftPeriodChange: (preset: BalanceSheetPreset) => void
+  categories: Category[]
   labels: Label[]
   onApply: () => void
   onReset: () => void
@@ -49,6 +53,7 @@ export function BalanceSheetDetailFiltersSheet({
   onDraftChange,
   draftPeriod,
   onDraftPeriodChange,
+  categories,
   labels,
   onApply,
   onReset,
@@ -134,6 +139,36 @@ export function BalanceSheetDetailFiltersSheet({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Categories */}
+          {categories.length > 0 && (
+            <div className="space-y-1">
+              <FormLabel>{t('transactions.filters.category')}</FormLabel>
+              <Select
+                value={draft.categoryId || '__all__'}
+                onValueChange={(v) => onDraftChange((p) => ({ ...p, categoryId: v === '__all__' ? '' : (v ?? '') }))}
+              >
+                <SelectTrigger>
+                  <SelectValue>
+                    {draft.categoryId
+                      ? getTranslatedCategoryName(categories.find((c) => c.id === draft.categoryId), t)
+                      : t('transactions.filters.allCategories')}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">{t('transactions.filters.allCategories')}</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      <span className="flex items-center gap-2">
+                        <CategoryIcon name={cat.icon} size={14} className="text-gray-500 shrink-0" />
+                        {getTranslatedCategoryName(cat, t)}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Labels */}
           {labels.length > 0 && (

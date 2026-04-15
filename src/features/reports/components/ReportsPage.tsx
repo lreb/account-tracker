@@ -33,16 +33,10 @@ import {
 } from '@/lib/reports'
 import { CategoryIcon } from '@/lib/icon-map'
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LabelPickerButton } from '@/components/ui/label-picker-button'
+import { AccountSelect } from '@/components/ui/account-select'
 import { ExpensesByCategoryReport } from './ExpensesByCategoryReport'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -106,14 +100,16 @@ function StatCard({
   currency: string
 }) {
   return (
-    <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-1">
-      <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
-      <p className={`text-xl font-bold ${color}`}>{formatCurrency(value, currency)}</p>
-      {delta !== undefined && (
-        <p className={`text-xs ${delta >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-          {delta >= 0 ? '+' : ''}{formatCurrency(delta, currency)} vs last month
-        </p>
-      )}
+    <div className="rounded-2xl border bg-white px-4 py-3 shadow-sm flex items-center justify-between gap-4">
+      <div className="min-w-0">
+        <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
+        {delta !== undefined && (
+          <p className={`text-xs mt-0.5 ${delta >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            {delta >= 0 ? '+' : ''}{formatCurrency(delta, currency)} vs last month
+          </p>
+        )}
+      </div>
+      <p className={`text-lg font-bold shrink-0 ${color}`}>{formatCurrency(value, currency)}</p>
     </div>
   )
 }
@@ -299,23 +295,32 @@ export default function ReportsPage() {
         )}
 
         <div className="flex items-center gap-2 flex-wrap">
-          <Select value={filterAccount} onValueChange={(value) => setFilterAccount(value ?? 'all')}>
-            <SelectTrigger className="h-8 text-xs w-44">
-              <SelectValue placeholder={t('reports.allAccounts')} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t('reports.allAccounts')}</SelectItem>
-              {visibleAccounts.map((a) => (
-                <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-1">
+            <div className="w-56">
+              <AccountSelect
+                value={effectiveAccount === 'all' ? '' : effectiveAccount}
+                onChange={(id) => setFilterAccount(id)}
+                options={visibleAccounts}
+                label=""
+              />
+            </div>
+            {effectiveAccount !== 'all' && (
+              <button
+                type="button"
+                onClick={() => setFilterAccount('all')}
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                title={t('reports.allAccounts')}
+              >
+                ×
+              </button>
+            )}
+          </div>
           <LabelPickerButton labels={labels} selectedIds={filterLabelIds} onChange={setFilterLabelIds} />
         </div>
       </div>
 
       {/* ── Summary cards ────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="flex flex-col gap-2">
         <StatCard
           label="Income"
           value={summary.income}
