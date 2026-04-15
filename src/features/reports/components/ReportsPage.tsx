@@ -25,25 +25,19 @@ import { formatCurrency } from '@/lib/currency'
 import {
   computePeriodSummary,
   computeMonthlyTrend,
-  computeCategoryBreakdown,
   computeAccountBalances,
   computeCashFlow,
-  computeLabelBreakdown,
   type ReportFilters,
 } from '@/lib/reports'
 import { CategoryIcon } from '@/lib/icon-map'
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LabelPickerButton } from '@/components/ui/label-picker-button'
-import { ExpensesByCategoryReport } from './ExpensesByCategoryReport'
+import { AccountSelect } from '@/components/ui/account-select'
+import { CategoryExpensesByCategoryReport } from './CategoryExpensesByCategoryReport'
+import { CategoryIncomesByCategoryReport } from './CategoryIncomesByCategoryReport'
+import { LabelReport } from './LabelReport'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -106,14 +100,16 @@ function StatCard({
   currency: string
 }) {
   return (
-    <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-1">
-      <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
-      <p className={`text-xl font-bold ${color}`}>{formatCurrency(value, currency)}</p>
-      {delta !== undefined && (
-        <p className={`text-xs ${delta >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-          {delta >= 0 ? '+' : ''}{formatCurrency(delta, currency)} vs last month
-        </p>
-      )}
+    <div className="rounded-2xl border bg-white px-4 py-3 shadow-sm flex items-center justify-between gap-4">
+      <div className="min-w-0">
+        <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
+        {delta !== undefined && (
+          <p className={`text-xs mt-0.5 ${delta >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            {delta >= 0 ? '+' : ''}{formatCurrency(delta, currency)} vs last month
+          </p>
+        )}
+      </div>
+      <p className={`text-lg font-bold shrink-0 ${color}`}>{formatCurrency(value, currency)}</p>
     </div>
   )
 }
@@ -229,11 +225,6 @@ export default function ReportsPage() {
     [filteredTransactions, monthCount, effectiveAccount, visibleAccountIds],
   )
 
-  const incomeByCategory = useMemo(
-    () => computeCategoryBreakdown(filteredTransactions, categories, filters, 'income', visibleAccountIds),
-    [filteredTransactions, categories, filters, visibleAccountIds],
-  )
-
   const accountBalances = useMemo(
     () => computeAccountBalances(filteredTransactions, accounts, categories, filters),
     [filteredTransactions, accounts, categories, filters],
@@ -249,11 +240,6 @@ export default function ReportsPage() {
     [filteredTransactions, monthCount, effectiveAccount, visibleAccountIds],
   )
 
-  const labelBreakdown = useMemo(
-    () => computeLabelBreakdown(filteredTransactions, labels, filters, visibleAccountIds),
-    [filteredTransactions, labels, filters, visibleAccountIds],
-  )
-
   // ─── Render ─────────────────────────────────────────────────────────────
 
   return (
@@ -265,79 +251,6 @@ export default function ReportsPage() {
         </div>
       )}
       <h1 className="text-xl font-bold">{t('reports.title')}</h1>
-
-      {/* ── Period selector ─────────────────────────────────────────────── */}
-      <div className="space-y-3">
-        <div className="flex gap-1.5 flex-wrap">
-          {(['thisMonth', 'lastMonth', 'last3', 'last6', 'thisYear', 'custom'] as PresetKey[]).map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setPreset(k)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
-                preset === k
-                  ? 'bg-indigo-600 text-white border-indigo-600'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-400'
-              }`}
-            >
-              {t(`reports.presets.${PRESET_TRANSLATION_KEY[k]}`)}
-            </button>
-          ))}
-        </div>
-
-        {preset === 'custom' && (
-          <div className="flex gap-3 items-end">
-            <div className="space-y-1">
-              <Label className="text-xs">{t('reports.from')}</Label>
-              <Input type="date" className="h-8 text-xs" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">{t('reports.to')}</Label>
-              <Input type="date" className="h-8 text-xs" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
-            </div>
-          </div>
-        )}
-
-        <div className="flex items-center gap-2 flex-wrap">
-          <Select value={filterAccount} onValueChange={(value) => setFilterAccount(value ?? 'all')}>
-            <SelectTrigger className="h-8 text-xs w-44">
-              <SelectValue placeholder={t('reports.allAccounts')} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t('reports.allAccounts')}</SelectItem>
-              {visibleAccounts.map((a) => (
-                <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <LabelPickerButton labels={labels} selectedIds={filterLabelIds} onChange={setFilterLabelIds} />
-        </div>
-      </div>
-
-      {/* ── Summary cards ────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-2">
-        <StatCard
-          label="Income"
-          value={summary.income}
-          color="text-green-600"
-          delta={summary.income - lastMonthSummary.income}
-          currency={baseCurrency}
-        />
-        <StatCard
-          label="Expenses"
-          value={summary.expenses}
-          color="text-red-500"
-          delta={-(summary.expenses - lastMonthSummary.expenses)}
-          currency={baseCurrency}
-        />
-        <StatCard
-          label="Net"
-          value={summary.net}
-          color={summary.net >= 0 ? 'text-indigo-600' : 'text-orange-500'}
-          delta={summary.net - lastMonthSummary.net}
-          currency={baseCurrency}
-        />
-      </div>
 
       {/* ── Tab navigation ───────────────────────────────────────────────── */}
       <div className="flex gap-1 flex-wrap rounded-xl bg-gray-100 p-1">
@@ -357,7 +270,90 @@ export default function ReportsPage() {
 
       {/* ── Overview tab: monthly income vs expenses bar chart ───────────── */}
       {activeTab === 'overview' && (
+
         <div className="space-y-5">
+
+        {/* Filters  */}
+        <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-4">
+          <div className="flex gap-1.5 flex-wrap">
+          {(['thisMonth', 'lastMonth', 'last3', 'last6', 'thisYear', 'custom'] as PresetKey[]).map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setPreset(k)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
+                preset === k
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-400'
+              }`}
+            >
+              {t(`reports.presets.${PRESET_TRANSLATION_KEY[k]}`)}
+            </button>
+          ))}
+          </div>
+
+          {preset === 'custom' && (
+            <div className="flex gap-3 items-end">
+              <div className="space-y-1">
+                <Label className="text-xs">{t('reports.from')}</Label>
+                <Input type="date" className="h-8 text-xs" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t('reports.to')}</Label>
+                <Input type="date" className="h-8 text-xs" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1">
+              <div className="w-56">
+                <AccountSelect
+                  value={effectiveAccount === 'all' ? '' : effectiveAccount}
+                  onChange={(id) => setFilterAccount(id)}
+                  options={visibleAccounts}
+                  label=""
+                />
+              </div>
+              {effectiveAccount !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setFilterAccount('all')}
+                  className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                  title={t('reports.allAccounts')}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            <LabelPickerButton labels={labels} selectedIds={filterLabelIds} onChange={setFilterLabelIds} />
+          </div>
+        </div>
+
+        {/* ── Summary cards ────────────────────────────────────────────────── */}
+          <StatCard
+            label="Income"
+            value={summary.income}
+            color="text-green-600"
+            delta={summary.income - lastMonthSummary.income}
+            currency={baseCurrency}
+          />
+          <StatCard
+            label="Expenses"
+            value={summary.expenses}
+            color="text-red-500"
+            delta={-(summary.expenses - lastMonthSummary.expenses)}
+            currency={baseCurrency}
+          />
+          <StatCard
+            label="Net"
+            value={summary.net}
+            color={summary.net >= 0 ? 'text-indigo-600' : 'text-orange-500'}
+            delta={summary.net - lastMonthSummary.net}
+            currency={baseCurrency}
+          />
+
+
           <div className="rounded-2xl border bg-white p-4 shadow-sm">
             <SectionTitle>{t('reports.monthlyIncomeVsExpenses')}</SectionTitle>
             {!hasData ? <EmptyChart /> : (
@@ -400,7 +396,7 @@ export default function ReportsPage() {
       {activeTab === 'category' && (
         <div className="space-y-5">
           {/* Expenses by category — independent component with its own period filter */}
-          <ExpensesByCategoryReport
+          <CategoryExpensesByCategoryReport
             transactions={filteredTransactions}
             categories={categories}
             accounts={visibleAccounts}
@@ -409,25 +405,13 @@ export default function ReportsPage() {
           />
 
           {/* Income by category */}
-          <div className="rounded-2xl border bg-white p-4 shadow-sm">
-            <SectionTitle>{t('reports.incomeByCategory')}</SectionTitle>
-            {incomeByCategory.length === 0 ? <EmptyChart /> : (
-              <ul className="space-y-2">
-                {incomeByCategory.map((slice, i) => (
-                  <li key={slice.categoryId} className="flex items-center gap-3">
-                    <span
-                      className="w-3 h-3 rounded-full shrink-0"
-                      style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
-                    />
-                    <CategoryIcon name={slice.icon} size={14} className="text-gray-500 shrink-0" />
-                    <span className="flex-1 text-sm text-gray-700 truncate">{slice.name}</span>
-                    <span className="text-xs text-gray-400">{slice.percent}%</span>
-                    <span className="text-sm font-medium text-green-600">{formatCurrency(slice.amount, baseCurrency)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <CategoryIncomesByCategoryReport
+            transactions={filteredTransactions}
+            categories={categories}
+            accounts={visibleAccounts}
+            baseCurrency={baseCurrency}
+            visibleAccountIds={visibleAccountIds}
+          />
         </div>
       )}
 
@@ -505,57 +489,12 @@ export default function ReportsPage() {
 
       {/* ── Labels tab ───────────────────────────────────────────────────── */}
       {activeTab === 'labels' && (
-        <div className="space-y-5">
-          <div className="space-y-4">
-            {labelBreakdown.length === 0 ? (
-              <div className="rounded-2xl border bg-white p-6 text-center text-sm text-gray-400">
-                {t('reports.noTransactionsPeriod')}
-              </div>
-            ) : (
-              labelBreakdown.map((slice) => (
-                <div key={slice.labelId} className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
-                  {/* Label header */}
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-3 h-3 rounded-full shrink-0"
-                      style={{ background: slice.color }}
-                    />
-                    <span className="font-semibold text-sm text-gray-800">{slice.name}</span>
-                    <span className="ml-auto text-xs text-gray-400">{slice.txCount} transaction{slice.txCount !== 1 ? 's' : ''}</span>
-                  </div>
-                  {/* Income / Expenses / Net row */}
-                  <div className="grid grid-cols-3 divide-x rounded-xl bg-gray-50 overflow-hidden">
-                    {([
-                      { label: 'Income',   value: slice.income,   color: 'text-green-600' },
-                      { label: 'Expenses', value: slice.expenses, color: 'text-red-500' },
-                      { label: 'Net',      value: slice.net,      color: slice.net >= 0 ? 'text-indigo-600' : 'text-orange-500' },
-                    ] as const).map(({ label, value, color }) => (
-                      <div key={label} className="text-center py-3 px-2">
-                        <p className="text-[10px] uppercase tracking-wide text-gray-400">{label}</p>
-                        <p className={`text-sm font-bold mt-0.5 ${color}`}>{formatCurrency(value, baseCurrency)}</p>
-                      </div>
-                    ))}
-                  </div>
-                  {/* Expense share bar */}
-                  {slice.expenses > 0 && (
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] text-gray-400">
-                        <span>{t('reports.shareOfTotalExpenses')}</span>
-                        <span>{slice.percent}%</span>
-                      </div>
-                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{ width: `${slice.percent}%`, background: slice.color }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+        <LabelReport
+          transactions={transactions}
+          labels={labels}
+          visibleAccountIds={visibleAccountIds}
+          baseCurrency={baseCurrency}
+        />
       )}
 
       {/* ── Cash flow tab ─────────────────────────────────────────────────── */}

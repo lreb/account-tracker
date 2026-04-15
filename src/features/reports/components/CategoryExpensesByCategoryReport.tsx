@@ -83,7 +83,7 @@ export interface ExpensesByCategoryReportProps {
   visibleAccountIds: Set<string>
 }
 
-export function ExpensesByCategoryReport({
+export function CategoryExpensesByCategoryReport({
   transactions,
   categories,
   accounts,

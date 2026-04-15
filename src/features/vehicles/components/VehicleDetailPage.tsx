@@ -131,13 +131,16 @@ export default function VehicleDetailPage() {
   )
 
   const upcomingServices = useMemo((): UpcomingServiceItem[] => {
+    // Track the most recent service per type (regardless of scheduling info).
+    // If the latest record has no nextServiceKm / nextServiceDate the alert is dismissed.
     const byType = new Map<string, VehicleService>()
     for (const svc of [...services].sort((a, b) => a.date.localeCompare(b.date))) {
-      if (svc.nextServiceKm != null || svc.nextServiceDate) byType.set(svc.serviceType, svc)
+      byType.set(svc.serviceType, svc)
     }
     const today    = new Date()
     const soonDate = addDays(today, 30)
     return Array.from(byType.values())
+      .filter((svc) => svc.nextServiceKm != null || svc.nextServiceDate)
       .map((svc): UpcomingServiceItem => {
         const kmRemaining = svc.nextServiceKm != null ? svc.nextServiceKm - currentOdometer : null
         const dueDate     = svc.nextServiceDate ? parseISO(svc.nextServiceDate) : null

@@ -149,8 +149,9 @@ export default function BalanceSheetDetailPage() {
       .sort((left, right) => right.date.localeCompare(left.date))
     return all.filter((tx) => {
       if (q && !tx.description.toLowerCase().includes(q) && !(tx.notes ?? '').toLowerCase().includes(q)) return false
-      if (filters.status  && tx.status !== filters.status) return false
-      if (filters.labelId && !(tx.labels ?? []).includes(filters.labelId)) return false
+      if (filters.status     && tx.status !== filters.status) return false
+      if (filters.categoryId && tx.categoryId !== filters.categoryId) return false
+      if (filters.labelId    && !(tx.labels ?? []).includes(filters.labelId)) return false
       if (dateFromISO && tx.date < dateFromISO) return false
       if (dateToISO   && tx.date > dateToISO)   return false
       return true
@@ -227,15 +228,16 @@ export default function BalanceSheetDetailPage() {
   const overviewUrl = `/balance-sheet?period=${selectedPreset}`
   const returnTo = `/balance-sheet/${accountId}?period=${selectedPreset}`
 
-  const activeCount = [filters.search, filters.status, filters.labelId, filters.dateFrom, filters.dateTo].filter(Boolean).length
+  const activeCount = [filters.search, filters.status, filters.categoryId, filters.labelId, filters.dateFrom, filters.dateTo].filter(Boolean).length
 
   type FilterChip = { key: keyof DetailFilters; label: string }
   const chips: FilterChip[] = [
-    filters.search   ? { key: 'search',   label: `"${filters.search}"` }                              : null,
-    filters.status   ? { key: 'status',   label: t(`transactions.status.${filters.status}`) }         : null,
-    filters.labelId  ? { key: 'labelId',  label: labels.find((l) => l.id === filters.labelId)?.name ?? '' } : null,
-    filters.dateFrom ? { key: 'dateFrom', label: `${t('transactions.filters.dateFrom')} ${filters.dateFrom}` } : null,
-    filters.dateTo   ? { key: 'dateTo',   label: `${t('transactions.filters.dateTo')} ${filters.dateTo}` }   : null,
+    filters.search      ? { key: 'search',     label: `"${filters.search}"` }                              : null,
+    filters.status      ? { key: 'status',     label: t(`transactions.status.${filters.status}`) }         : null,
+    filters.categoryId  ? { key: 'categoryId', label: getTranslatedCategoryName(categoryMap.get(filters.categoryId), t) } : null,
+    filters.labelId     ? { key: 'labelId',    label: labels.find((l) => l.id === filters.labelId)?.name ?? '' } : null,
+    filters.dateFrom    ? { key: 'dateFrom',   label: `${t('transactions.filters.dateFrom')} ${filters.dateFrom}` } : null,
+    filters.dateTo      ? { key: 'dateTo',     label: `${t('transactions.filters.dateTo')} ${filters.dateTo}` }   : null,
   ].filter(Boolean) as FilterChip[]
 
   if (!account) {
@@ -394,6 +396,7 @@ export default function BalanceSheetDetailPage() {
         onDraftChange={setDraft}
         draftPeriod={draftPeriod}
         onDraftPeriodChange={setDraftPeriod}
+        categories={categories}
         labels={labels}
         onApply={applyFilters}
         onReset={resetFilters}

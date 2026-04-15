@@ -124,7 +124,7 @@ function MonthBar({ m, maxIncome, currency }: { m: MonthMetrics; maxIncome: numb
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function SavingCapacity() {
+export default function InsightsSavingCapacity() {
   const { t } = useTranslation()
   const { transactions } = useTransactionsStore()
   const { accounts } = useAccountsStore()
