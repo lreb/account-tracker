@@ -305,7 +305,9 @@
     "selectMonth": "Select month",
     "rolloverCarried": "+ {{amount}} carried over from last period",
     "allCategories": "All",
-    "noMatch": "No budgets match the selected categories."
+    "noMatch": "No budgets match the selected categories.",
+    "confirmDeleteTitle": "Delete budget?",
+    "confirmDeleteMessage": "This budget will be permanently deleted. This action cannot be undone."
   },
   "insights": {
     "title": "Insights",
@@ -406,7 +408,13 @@
     "inflow": "Inflow",
     "outflow": "Outflow",
     "cumulative": "Cumulative",
-    "total": "Total"
+    "total": "Total",
+    "labelExpenses": "Expenses by Label",
+    "filterByLabel": "Filter by label",
+    "allLabels": "All labels",
+    "noLabelExpenses": "No expense data for the selected period and labels.",
+    "txCount": "{{count}} transaction",
+    "txCountPlural": "{{count}} transactions"
   },
   "settings": {
     "title": "Settings",

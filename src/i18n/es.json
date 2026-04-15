@@ -303,7 +303,9 @@
     "selectMonth": "Seleccionar mes",
     "rolloverCarried": "+ {{amount}} arrastrado del período anterior",
     "allCategories": "Todos",
-    "noMatch": "No hay presupuestos para las categorías seleccionadas."
+    "noMatch": "No hay presupuestos para las categorías seleccionadas.",
+    "confirmDeleteTitle": "¿Eliminar presupuesto?",
+    "confirmDeleteMessage": "Este presupuesto se eliminará permanentemente. Esta acción no se puede deshacer."
   },
   "insights": {
     "title": "Análisis",
@@ -404,7 +406,13 @@
     "inflow": "Entradas",
     "outflow": "Salidas",
     "cumulative": "Acumulado",
-    "total": "Total"
+    "total": "Total",
+    "labelExpenses": "Gastos por Etiqueta",
+    "filterByLabel": "Filtrar por etiqueta",
+    "allLabels": "Todas las etiquetas",
+    "noLabelExpenses": "Sin datos de gastos para el período y etiquetas seleccionados.",
+    "txCount": "{{count}} transacción",
+    "txCountPlural": "{{count}} transacciones"
   },
   "settings": {
     "title": "Configuración",

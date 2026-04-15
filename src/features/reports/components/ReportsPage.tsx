@@ -27,7 +27,6 @@ import {
   computeMonthlyTrend,
   computeAccountBalances,
   computeCashFlow,
-  computeLabelBreakdown,
   type ReportFilters,
 } from '@/lib/reports'
 import { CategoryIcon } from '@/lib/icon-map'
@@ -38,6 +37,7 @@ import { LabelPickerButton } from '@/components/ui/label-picker-button'
 import { AccountSelect } from '@/components/ui/account-select'
 import { CategoryExpensesByCategoryReport } from './CategoryExpensesByCategoryReport'
 import { CategoryIncomesByCategoryReport } from './CategoryIncomesByCategoryReport'
+import { LabelReport } from './LabelReport'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -238,11 +238,6 @@ export default function ReportsPage() {
       visibleAccountIds,
     ),
     [filteredTransactions, monthCount, effectiveAccount, visibleAccountIds],
-  )
-
-  const labelBreakdown = useMemo(
-    () => computeLabelBreakdown(filteredTransactions, labels, filters, visibleAccountIds),
-    [filteredTransactions, labels, filters, visibleAccountIds],
   )
 
   // ─── Render ─────────────────────────────────────────────────────────────
@@ -494,57 +489,12 @@ export default function ReportsPage() {
 
       {/* ── Labels tab ───────────────────────────────────────────────────── */}
       {activeTab === 'labels' && (
-        <div className="space-y-5">
-          <div className="space-y-4">
-            {labelBreakdown.length === 0 ? (
-              <div className="rounded-2xl border bg-white p-6 text-center text-sm text-gray-400">
-                {t('reports.noTransactionsPeriod')}
-              </div>
-            ) : (
-              labelBreakdown.map((slice) => (
-                <div key={slice.labelId} className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
-                  {/* Label header */}
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-3 h-3 rounded-full shrink-0"
-                      style={{ background: slice.color }}
-                    />
-                    <span className="font-semibold text-sm text-gray-800">{slice.name}</span>
-                    <span className="ml-auto text-xs text-gray-400">{slice.txCount} transaction{slice.txCount !== 1 ? 's' : ''}</span>
-                  </div>
-                  {/* Income / Expenses / Net row */}
-                  <div className="grid grid-cols-3 divide-x rounded-xl bg-gray-50 overflow-hidden">
-                    {([
-                      { label: 'Income',   value: slice.income,   color: 'text-green-600' },
-                      { label: 'Expenses', value: slice.expenses, color: 'text-red-500' },
-                      { label: 'Net',      value: slice.net,      color: slice.net >= 0 ? 'text-indigo-600' : 'text-orange-500' },
-                    ] as const).map(({ label, value, color }) => (
-                      <div key={label} className="text-center py-3 px-2">
-                        <p className="text-[10px] uppercase tracking-wide text-gray-400">{label}</p>
-                        <p className={`text-sm font-bold mt-0.5 ${color}`}>{formatCurrency(value, baseCurrency)}</p>
-                      </div>
-                    ))}
-                  </div>
-                  {/* Expense share bar */}
-                  {slice.expenses > 0 && (
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] text-gray-400">
-                        <span>{t('reports.shareOfTotalExpenses')}</span>
-                        <span>{slice.percent}%</span>
-                      </div>
-                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{ width: `${slice.percent}%`, background: slice.color }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+        <LabelReport
+          transactions={transactions}
+          labels={labels}
+          visibleAccountIds={visibleAccountIds}
+          baseCurrency={baseCurrency}
+        />
       )}
 
       {/* ── Cash flow tab ─────────────────────────────────────────────────── */}
