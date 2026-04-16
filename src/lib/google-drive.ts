@@ -9,16 +9,23 @@
  *  5. Enable the Google Drive API for the project
  *  6. Set VITE_GOOGLE_CLIENT_ID=<your-client-id> in .env
  *
- * Scope used: drive.appdata — writes to a hidden app-specific folder,
- * never touches the user's My Drive files.
+ * Scope used:
+ *  - drive.file: read/write files created by this app
+ *  - drive.metadata.readonly: list folders so user can pick destination
  */
 
 const ENV_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ?? ''
 const ENV_REDIRECT_URI = (import.meta.env.VITE_GOOGLE_REDIRECT_URI as string | undefined)?.trim() ?? ''
-const SCOPE = 'https://www.googleapis.com/auth/drive.appdata'
-const BACKUP_FILENAME = 'expense-tracking-backup.json'
+const REQUIRED_SCOPES = [
+  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/drive.metadata.readonly',
+]
+const SCOPE = REQUIRED_SCOPES.join(' ')
+const BACKUP_FILE_PREFIX = 'expense-tracking'
+export const APP_BACKUP_FOLDER_NAME = 'ExpenseTracking Backups'
 const TOKEN_KEY = '__gd_token__'
 const RETURN_KEY = '__oauth_return__'
+const SCOPE_KEY = '__gd_scope__'
 
 function getOAuthRedirectUri(): string {
   return ENV_REDIRECT_URI || `${window.location.origin}/oauth-callback`
@@ -43,6 +50,7 @@ export function isSignedInToGoogle(): boolean {
 
 export function signOutOfGoogle(): void {
   sessionStorage.removeItem(TOKEN_KEY)
+  sessionStorage.removeItem(SCOPE_KEY)
 }
 
 // ── OAuth2 implicit flow ──────────────────────────────────────────────────────
@@ -85,6 +93,19 @@ export function handleOAuthCallback(hash: string): string {
   }
 
   const token = fragmentParams.get('access_token') || queryParams.get('access_token')
+  const grantedScopeRaw = fragmentParams.get('scope') || queryParams.get('scope') || ''
+  const grantedScopes = new Set(
+    grantedScopeRaw
+      .split(/[\s,]+/)
+      .map((s) => s.trim())
+      .filter(Boolean),
+  )
+
+  const missingScopes = REQUIRED_SCOPES.filter((scope) => !grantedScopes.has(scope))
+  if (missingScopes.length > 0) {
+    throw new Error('Google permissions are outdated. Please reconnect and grant Drive permissions.')
+  }
+
   if (!token) {
     const code = fragmentParams.get('code') || queryParams.get('code')
     if (code) {
@@ -94,6 +115,7 @@ export function handleOAuthCallback(hash: string): string {
   }
 
   sessionStorage.setItem(TOKEN_KEY, token)
+  sessionStorage.setItem(SCOPE_KEY, grantedScopeRaw)
   const returnTo = sessionStorage.getItem(RETURN_KEY) ?? '/settings'
   sessionStorage.removeItem(RETURN_KEY)
   return returnTo
@@ -143,6 +165,10 @@ async function driveRequest(path: string, options: Parameters<typeof fetch>[1] =
     }
 
     if (res.status === 403) {
+      if (details.toLowerCase().includes('insufficientscopes')) {
+        signOutOfGoogle()
+        throw new Error('Google permissions are outdated. Please reconnect Google Drive and try again.')
+      }
       throw new Error(`Drive access denied (403): ${details}. Ensure Google Drive API is enabled for this OAuth project and reconnect Google.`)
     }
 
@@ -156,58 +182,113 @@ async function driveRequest(path: string, options: Parameters<typeof fetch>[1] =
   return res
 }
 
-async function findBackupFileId(): Promise<string | null> {
-  const q = encodeURIComponent(`name='${BACKUP_FILENAME}'`)
+export interface DriveFolderOption {
+  id: string
+  name: string
+}
+
+function escapeDriveQueryValue(value: string): string {
+  return value.replace(/'/g, "\\'")
+}
+
+function formatFilenameTimestamp(date: Date): string {
+  const yyyy = String(date.getFullYear())
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  const hh = String(date.getHours()).padStart(2, '0')
+  const min = String(date.getMinutes()).padStart(2, '0')
+  const ss = String(date.getSeconds()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}_${hh}-${min}-${ss}`
+}
+
+function buildBackupFilename(): string {
+  return `${BACKUP_FILE_PREFIX}_${formatFilenameTimestamp(new Date())}.json`
+}
+
+async function findLatestBackupFileId(folderId: string): Promise<string | null> {
+  const q = encodeURIComponent(
+    `name contains '${escapeDriveQueryValue(`${BACKUP_FILE_PREFIX}_`)}' and trashed=false and '${escapeDriveQueryValue(folderId)}' in parents`,
+  )
   const res = await driveRequest(
-    `/files?spaces=appDataFolder&q=${q}&fields=files(id,name,modifiedTime)&pageSize=1`,
+    `/files?q=${q}&fields=files(id,name,modifiedTime)&pageSize=1&orderBy=modifiedTime desc`,
   )
   if (!res.ok) throw new Error(`Could not list Drive files: ${res.statusText}`)
   const json = await res.json() as { files: { id: string }[] }
   return json.files[0]?.id ?? null
 }
 
-/** Uploads (creates or overwrites) the backup file in the app's Drive appDataFolder. */
-export async function uploadBackupToDrive(content: string): Promise<void> {
+export async function listDriveFolders(): Promise<DriveFolderOption[]> {
+  const q = encodeURIComponent("mimeType='application/vnd.google-apps.folder' and trashed=false and 'root' in parents")
+  const res = await driveRequest(
+    `/files?q=${q}&fields=files(id,name)&pageSize=200&orderBy=name_natural`,
+  )
+  if (!res.ok) throw new Error(`Could not list Drive folders: ${res.statusText}`)
+  const json = await res.json() as { files: DriveFolderOption[] }
+  return json.files
+}
+
+async function findRootFolderByName(name: string): Promise<DriveFolderOption | null> {
+  const q = encodeURIComponent(
+    `mimeType='application/vnd.google-apps.folder' and trashed=false and 'root' in parents and name='${escapeDriveQueryValue(name)}'`,
+  )
+  const res = await driveRequest(`/files?q=${q}&fields=files(id,name)&pageSize=1`)
+  if (!res.ok) throw new Error(`Could not find Drive folder: ${res.statusText}`)
+  const json = await res.json() as { files: DriveFolderOption[] }
+  return json.files[0] ?? null
+}
+
+export async function createDriveFolder(name: string): Promise<DriveFolderOption> {
+  const trimmedName = name.trim()
+  if (!trimmedName) throw new Error('Folder name is required.')
+
+  const res = await driveRequest('/files?fields=id,name', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: trimmedName,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: ['root'],
+    }),
+  })
+
+  if (!res.ok) throw new Error(`Could not create Drive folder: ${res.statusText}`)
+  return await res.json() as DriveFolderOption
+}
+
+export async function ensureAppBackupFolder(): Promise<DriveFolderOption> {
+  const existing = await findRootFolderByName(APP_BACKUP_FOLDER_NAME)
+  if (existing) return existing
+  return createDriveFolder(APP_BACKUP_FOLDER_NAME)
+}
+
+/** Uploads (creates or overwrites) the backup file in the selected Drive folder. */
+export async function uploadBackupToDrive(content: string, folderId = 'root'): Promise<void> {
   const token = getGoogleToken()
   if (!token) throw new Error('Not connected to Google Drive.')
 
-  const existingId = await findBackupFileId()
   const blob = new Blob([content], { type: 'application/json' })
+  const backupFilename = buildBackupFilename()
 
-  if (existingId) {
-    // Overwrite existing file with media-only upload
-    const res = await fetch(
-      `https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=media`,
-      {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: blob,
-      },
-    )
-    if (res.status === 401) { signOutOfGoogle(); throw new Error('Google session expired — please reconnect.') }
-    if (!res.ok) throw new Error(`Drive upload failed: ${res.statusText}`)
-  } else {
-    // Create new file in appDataFolder via multipart upload
-    const metadata = JSON.stringify({ name: BACKUP_FILENAME, parents: ['appDataFolder'] })
-    const form = new FormData()
-    form.append('metadata', new Blob([metadata], { type: 'application/json' }))
-    form.append('file', blob)
-    const res = await fetch(
-      `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`,
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: form,
-      },
-    )
-    if (res.status === 401) { signOutOfGoogle(); throw new Error('Google session expired — please reconnect.') }
-    if (!res.ok) throw new Error(`Drive upload failed: ${res.statusText}`)
-  }
+  // Create a timestamped backup file in selected folder.
+  const metadata = JSON.stringify({ name: backupFilename, parents: [folderId] })
+  const form = new FormData()
+  form.append('metadata', new Blob([metadata], { type: 'application/json' }))
+  form.append('file', blob)
+  const res = await fetch(
+    `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    },
+  )
+  if (res.status === 401) { signOutOfGoogle(); throw new Error('Google session expired — please reconnect.') }
+  if (!res.ok) throw new Error(`Drive upload failed: ${res.statusText}`)
 }
 
-/** Downloads the latest backup file content from Drive. Throws if no backup exists. */
-export async function downloadBackupFromDrive(): Promise<string> {
-  const fileId = await findBackupFileId()
+/** Downloads backup content from the selected Drive folder. Throws if no backup exists. */
+export async function downloadBackupFromDrive(folderId = 'root'): Promise<string> {
+  const fileId = await findLatestBackupFileId(folderId)
   if (!fileId) throw new Error('No backup found on Google Drive.')
   const res = await driveRequest(`/files/${fileId}?alt=media`)
   if (!res.ok) throw new Error(`Drive download failed: ${res.statusText}`)

@@ -6,7 +6,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { v4 as uuid } from 'uuid'
 
-import { accountSchema, type AccountFormValues } from '../schemas/account.schema'
+import { accountSchema, type AccountFormValues } from '../../schemas/account.schema'
 import {
   ACCOUNT_SUBTYPE_OPTIONS_BY_TYPE,
   getOtherSubtypeLabelKey,

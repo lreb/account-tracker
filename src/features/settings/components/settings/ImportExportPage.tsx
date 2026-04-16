@@ -1,10 +1,11 @@
 import { useRef, useState, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import i18n from '@/i18n'
 import {
-  Download, Upload, Table2, FileJson,
+  Download, Upload, Table2, FileJson, CloudUpload,
 } from 'lucide-react'
 
 import { db } from '@/db'
@@ -38,6 +39,7 @@ import {
 
 export default function ImportExportPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { transactions, load: loadTransactions } = useTransactionsStore()
   const { accounts, load: loadAccounts } = useAccountsStore()
   const { categories, load: loadCategories } = useCategoriesStore()
@@ -255,6 +257,17 @@ export default function ImportExportPage() {
             <div className="flex-1 text-left">
               <p className="text-sm font-medium">{t('settings.jsonRestore')}</p>
               <p className="text-xs text-gray-400">{t('settings.jsonRestoreDesc')}</p>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/settings/google-drive')}
+            className="flex w-full items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+          >
+            <CloudUpload size={18} className="text-indigo-500 shrink-0" />
+            <div className="flex-1 text-left">
+              <p className="text-sm font-medium">{t('settings.googleDriveTitle')}</p>
+              <p className="text-xs text-gray-400">{t('settings.driveBackupDesc')}</p>
             </div>
           </button>
           <input ref={jsonImportRef} type="file" accept=".json,application/json" className="hidden" onChange={handleJsonImportChange} />
