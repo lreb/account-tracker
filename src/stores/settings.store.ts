@@ -8,6 +8,8 @@ interface SettingsState {
   language: string
   theme: AppTheme
   googleClientId: string
+  googleDriveFolderId: string
+  googleDriveFolderName: string
   load: () => Promise<void>
   saveSetting: (key: string, value: string) => Promise<void>
 }
@@ -17,6 +19,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   language: 'en',
   theme: 'system',
   googleClientId: '',
+  googleDriveFolderId: 'root',
+  googleDriveFolderName: '',
 
   load: async () => {
     try {
@@ -27,6 +31,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
         language: map['language'] ?? 'en',
         theme: (map['theme'] as AppTheme) ?? 'system',
         googleClientId: map['googleClientId'] ?? '',
+        googleDriveFolderId: map['googleDriveFolderId'] ?? 'root',
+        googleDriveFolderName: map['googleDriveFolderName'] ?? '',
       })
     } catch (err) {
       console.error(err)
@@ -41,6 +47,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       else if (key === 'language') set({ language: value })
       else if (key === 'theme') set({ theme: value as AppTheme })
       else if (key === 'googleClientId') set({ googleClientId: value })
+      else if (key === 'googleDriveFolderId') set({ googleDriveFolderId: value })
+      else if (key === 'googleDriveFolderName') set({ googleDriveFolderName: value })
     } catch (err) {
       console.error(err)
       toast.error('Failed to save setting')

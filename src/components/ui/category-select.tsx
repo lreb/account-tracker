@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDownIcon, SearchIcon } from 'lucide-react'
 import { getTranslatedCategoryName } from '@/lib/categories'
-import { ICON_MAP } from '@/lib/icon-map'
+import { ICON_MAP } from '@/lib/icon-map.constants'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import {

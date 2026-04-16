@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import {
-  CloudUpload, CloudDownload, LogOut, Info,
+  CloudUpload, CloudDownload, LogOut, Info, Folder,
 } from 'lucide-react'
 
 import { useTransactionsStore } from '@/stores/transactions.store'
@@ -18,9 +18,13 @@ import {
   parseBackupFile, restoreFromBackup,
 } from '@/lib/backup'
 import {
+  type DriveFolderOption,
+  APP_BACKUP_FOLDER_NAME,
+  createDriveFolder,
+  ensureAppBackupFolder,
   isGoogleDriveConfigured, isSignedInToGoogle,
   startGoogleSignIn, signOutOfGoogle,
-  uploadBackupToDrive, downloadBackupFromDrive,
+  uploadBackupToDrive, downloadBackupFromDrive, listDriveFolders,
 } from '@/lib/google-drive'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -36,16 +40,139 @@ export default function GoogleDriveSyncPage() {
   const { load: loadLabels } = useLabelsStore()
   const { load: loadBudgets } = useBudgetsStore()
   const { load: loadVehicles } = useVehiclesStore()
-  const { load: loadSettings, saveSetting, googleClientId } = useSettingsStore()
+  const {
+    load: loadSettings,
+    saveSetting,
+    googleClientId,
+    googleDriveFolderId,
+    googleDriveFolderName,
+  } = useSettingsStore()
   const { load: loadExchangeRates } = useExchangeRatesStore()
 
   const [isBusy, setIsBusy] = useState(false)
   const [confirmRestore, setConfirmRestore] = useState<null | (() => Promise<void>)>(null)
-  const [driveSignedIn, setDriveSignedIn] = useState(isSignedInToGoogle)
+  const [driveSignedIn, setDriveSignedIn] = useState(() => isSignedInToGoogle())
   const [editingDriveConfig, setEditingDriveConfig] = useState(false)
   const [tempClientId, setTempClientId] = useState(googleClientId)
+  const [folderOptions, setFolderOptions] = useState<DriveFolderOption[]>([])
+  const [isLoadingFolders, setIsLoadingFolders] = useState(false)
+  const [selectedFolderId, setSelectedFolderId] = useState(googleDriveFolderId || 'root')
+  const [newFolderName, setNewFolderName] = useState('')
 
   const driveConfigured = isGoogleDriveConfigured(googleClientId)
+
+  async function handleLoadFolders() {
+    if (isLoadingFolders) return
+    setIsLoadingFolders(true)
+    try {
+      const folders = await listDriveFolders()
+      setFolderOptions(folders)
+    } catch (err) {
+      console.error(err)
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg.toLowerCase().includes('outdated') || msg.toLowerCase().includes('insufficientscopes')) {
+        setDriveSignedIn(false)
+      }
+      toast.error(msg)
+    } finally {
+      setIsLoadingFolders(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!driveSignedIn) return
+
+    let cancelled = false
+
+    async function initializeDefaultFolder() {
+      setIsLoadingFolders(true)
+      try {
+        const folders = await listDriveFolders()
+        const selectedExists = !!googleDriveFolderId
+          && googleDriveFolderId !== 'root'
+          && folders.some((folder) => folder.id === googleDriveFolderId)
+
+        if (selectedExists) {
+          if (cancelled) return
+          setFolderOptions(folders)
+          setSelectedFolderId(googleDriveFolderId)
+          return
+        }
+
+        const appFolder = await ensureAppBackupFolder()
+        if (cancelled) return
+
+        const foldersWithApp = folders.some((folder) => folder.id === appFolder.id)
+          ? folders
+          : [...folders, appFolder].sort((a, b) => a.name.localeCompare(b.name))
+
+        setFolderOptions(foldersWithApp)
+        setSelectedFolderId(appFolder.id)
+        await saveSetting('googleDriveFolderId', appFolder.id)
+        await saveSetting('googleDriveFolderName', appFolder.name)
+      } catch (err) {
+        console.error(err)
+        const msg = err instanceof Error ? err.message : String(err)
+        if (msg.toLowerCase().includes('outdated') || msg.toLowerCase().includes('insufficientscopes')) {
+          setDriveSignedIn(false)
+        }
+        toast.error(msg)
+      } finally {
+        if (!cancelled) {
+          setIsLoadingFolders(false)
+        }
+      }
+    }
+
+    initializeDefaultFolder()
+
+    return () => {
+      cancelled = true
+    }
+  }, [driveSignedIn, googleDriveFolderId, saveSetting])
+
+  async function handleSaveDriveFolder() {
+    try {
+      const selectedName = selectedFolderId === 'root'
+        ? ''
+        : folderOptions.find((f) => f.id === selectedFolderId)?.name ?? googleDriveFolderName
+      await saveSetting('googleDriveFolderId', selectedFolderId)
+      await saveSetting('googleDriveFolderName', selectedName)
+      toast.success(t('common.saved'))
+    } catch (err) {
+      console.error(err)
+      toast.error(t('settings.saveError', 'Failed to save config'))
+    }
+  }
+
+  async function handleCreateFolder() {
+    const folderName = newFolderName.trim()
+    if (!folderName) {
+      toast.error(t('settings.driveFolderNameRequired'))
+      return
+    }
+
+    setIsBusy(true)
+    try {
+      const created = await createDriveFolder(folderName)
+      const nextFolders = [...folderOptions, created].sort((a, b) => a.name.localeCompare(b.name))
+      setFolderOptions(nextFolders)
+      setSelectedFolderId(created.id)
+      await saveSetting('googleDriveFolderId', created.id)
+      await saveSetting('googleDriveFolderName', created.name)
+      setNewFolderName('')
+      toast.success(t('settings.driveFolderCreated', { name: created.name }))
+    } catch (err) {
+      console.error(err)
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg.toLowerCase().includes('outdated') || msg.toLowerCase().includes('insufficientscopes')) {
+        setDriveSignedIn(false)
+      }
+      toast.error(msg)
+    } finally {
+      setIsBusy(false)
+    }
+  }
 
   async function reloadAll() {
     await Promise.all([
@@ -95,12 +222,12 @@ export default function GoogleDriveSyncPage() {
     setIsBusy(true)
     try {
       const backup = await buildFullBackup()
-      await uploadBackupToDrive(JSON.stringify(backup, null, 2))
+      await uploadBackupToDrive(JSON.stringify(backup, null, 2), googleDriveFolderId || 'root')
       toast.success(t('settings.driveBackupSuccess'))
     } catch (err) {
       console.error(err)
       const msg = err instanceof Error ? err.message : String(err)
-      if (msg.includes('expired')) setDriveSignedIn(false)
+      if (msg.includes('expired') || msg.toLowerCase().includes('outdated') || msg.toLowerCase().includes('insufficientscopes')) setDriveSignedIn(false)
       toast.error(msg)
     } finally {
       setIsBusy(false)
@@ -111,7 +238,7 @@ export default function GoogleDriveSyncPage() {
     setConfirmRestore(() => async () => {
       setIsBusy(true)
       try {
-        const text = await downloadBackupFromDrive()
+        const text = await downloadBackupFromDrive(googleDriveFolderId || 'root')
         const backup = parseBackupFile(text)
         await restoreFromBackup(backup)
         await reloadAll()
@@ -119,7 +246,7 @@ export default function GoogleDriveSyncPage() {
       } catch (err) {
         console.error(err)
         const msg = err instanceof Error ? err.message : String(err)
-        if (msg.includes('expired')) setDriveSignedIn(false)
+        if (msg.includes('expired') || msg.toLowerCase().includes('outdated') || msg.toLowerCase().includes('insufficientscopes')) setDriveSignedIn(false)
         toast.error(msg)
       } finally {
         setIsBusy(false)
@@ -188,6 +315,63 @@ export default function GoogleDriveSyncPage() {
                   {t('settings.driveDisconnect')}
                 </button>
               </div>
+
+              <div className="px-4 py-3 bg-gray-50/60 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <Folder size={16} className="text-gray-500" />
+                    <span>{t('settings.driveFolder')}</span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLoadFolders}
+                    disabled={isLoadingFolders || isBusy}
+                  >
+                    {isLoadingFolders ? t('settings.driveFolderLoading') : t('settings.driveFolderLoad')}
+                  </Button>
+                </div>
+                <select
+                  value={selectedFolderId}
+                  onChange={(e) => setSelectedFolderId(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+                  disabled={isBusy}
+                >
+                  <option value="root">{t('settings.driveFolderRoot')}</option>
+                  {folderOptions.map((folder) => (
+                    <option key={folder.id} value={folder.id}>{folder.name}</option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-gray-500">{t('settings.driveFolderHelp')}</p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    placeholder={t('settings.driveFolderNewPlaceholder', { defaultValue: APP_BACKUP_FOLDER_NAME })}
+                    className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+                    disabled={isBusy || isLoadingFolders}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCreateFolder}
+                    disabled={isBusy || isLoadingFolders}
+                  >
+                    {t('settings.driveFolderCreate')}
+                  </Button>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleSaveDriveFolder}
+                  disabled={isBusy}
+                >
+                  {t('common.save')}
+                </Button>
+              </div>
+
               <button type="button" onClick={handleDriveBackup} disabled={isBusy}
                 className="flex w-full items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors disabled:opacity-50">
                 <CloudUpload size={18} className="text-indigo-500 shrink-0" />

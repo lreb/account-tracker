@@ -413,7 +413,14 @@ Each Zustand store is a hook. All mutations write through to Dexie and surface e
 - `react-refresh/only-export-components: warning (treated as error)` — a `.tsx` file must export **only React components**. If a component file also needs to export types, interfaces, or constants that other files consume, move those exports into a companion `<name>.types.ts` file (e.g. `balance-sheet-detail-filters.types.ts`) and import from there in both the component and its consumers.
 - `npm run lint` — checks all of `src/` with zero warnings allowed
 - `npm run lint:fix` — auto-fixes what ESLint can
+- `npm run test` — runs unit tests once via Vitest
+- `npm run test:watch` — runs unit tests in watch mode during local development
 - A **Husky pre-commit hook** runs `lint-staged` before every `git commit`; only staged `src/**/*.{ts,tsx}` files are linted, so commits are blocked if any staged file has a lint error
+
+### Testing
+- Unit tests use **Vitest**
+- To run one file: `npm run test -- src/lib/categories.test.ts`
+- Keep regression tests when fixing bugs; for category naming behavior, maintain coverage in `src/lib/categories.test.ts` for custom categories, translated defaults, renamed defaults, and missing translation fallback
 
 ### Form Handling
 - All forms use `react-hook-form` with a `zod` schema via `zodResolver`

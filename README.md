@@ -41,6 +41,8 @@ The app will be available at **http://localhost:5173** (Vite may pick 5174+ if 5
 | `npm run dev` | Start Vite dev server with hot-reload |
 | `npm run build` | Type-check + production build → `dist/` |
 | `npm run preview` | Serve the production build locally |
+| `npm run test` | Run unit tests once (Vitest run mode) |
+| `npm run test:watch` | Run unit tests in watch mode during development |
 | `npm run lint` | Run ESLint across all of `src/` (zero warnings allowed) |
 | `npm run lint:fix` | Run ESLint and auto-fix what it can |
 | `npm run publish:intranet` | Build and expose PWA on local network (PowerShell helper) |
@@ -208,6 +210,25 @@ npm run lint:fix
 ```
 
 **Pre-commit gate:** [Husky](https://typicode.github.io/husky/) runs [`lint-staged`](https://github.com/lint-staged/lint-staged) automatically before every `git commit`. Only staged `src/**/*.{ts,tsx}` files are checked. If any file has a lint error (including unused imports), the commit is **blocked** until the issue is fixed.
+
+---
+
+## Testing
+
+Unit tests are powered by **Vitest**.
+
+```bash
+# Run all tests once
+npm run test
+
+# Keep tests running while you code
+npm run test:watch
+
+# Run a single file
+npm run test -- src/lib/categories.test.ts
+```
+
+Current regression coverage includes the category label resolver in [src/lib/categories.test.ts](src/lib/categories.test.ts), including the case where a built-in category is renamed and must show the stored name instead of the locale fallback.
 
 ---
 

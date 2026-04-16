@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { RouterProvider } from 'react-router-dom'
 import { router } from './router'
 import i18n from '@/i18n'
@@ -47,7 +47,7 @@ export default function App() {
   const saveSetting      = useSettingsStore((s) => s.saveSetting)
   const language         = useSettingsStore((s) => s.language)
 
-  async function loadAllStores() {
+  const loadAllStores = useCallback(async () => {
     await Promise.all([
       loadTransactions(),
       loadAccounts(),
@@ -56,7 +56,7 @@ export default function App() {
       loadVehicles(),
       loadSettings(),
     ])
-  }
+  }, [loadTransactions, loadAccounts, loadCategories, loadBudgets, loadVehicles, loadSettings])
 
   // Keep i18n in sync with the persisted language preference
   useEffect(() => { void i18n.changeLanguage(language) }, [language])
@@ -80,7 +80,7 @@ export default function App() {
       setRequiresInitialSetup(true)
       setAppReady(true)
     })()
-  }, [loadTransactions, loadAccounts, loadCategories, loadBudgets, loadVehicles, loadSettings])
+  }, [loadSettings, loadAllStores])
 
   async function handleInitialSetupSave() {
     setIsSavingSetup(true)
