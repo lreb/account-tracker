@@ -25,6 +25,9 @@ export const DEFAULT_CATEGORIES: Category[] = [
 ]
 
 const DEFAULT_CATEGORY_IDS = new Set(DEFAULT_CATEGORIES.map((category) => category.id))
+const DEFAULT_CATEGORY_BY_ID = Object.fromEntries(
+  DEFAULT_CATEGORIES.map((category) => [category.id, category]),
+) as Record<string, Category>
 const DEFAULT_CATEGORY_NAME_TO_ID = Object.fromEntries(
   DEFAULT_CATEGORIES.map((category) => [category.name, category.id]),
 ) as Record<string, string>
@@ -37,6 +40,12 @@ export function getTranslatedCategoryName(
 ): string {
   if (!category) return ''
   if (category.isCustom) return category.name
+
+  const defaultCategory = DEFAULT_CATEGORY_BY_ID[category.id]
+  // If a built-in category was renamed by the user, prefer the stored name.
+  if (defaultCategory && category.name !== defaultCategory.name) {
+    return category.name
+  }
 
   const keyById = `categories.names.${category.id}`
   const translatedById = t(keyById)

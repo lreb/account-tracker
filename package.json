@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint src --max-warnings 0",
     "lint:fix": "eslint src --fix",
     "generate-icons": "pwa-assets-generator --preset minimal public/icon.svg",
@@ -60,6 +62,7 @@
     "tailwindcss": "^4.0.0",
     "typescript": "~5.7.2",
     "vite": "^6.1.0",
+    "vitest": "^3.2.4",
     "vite-plugin-pwa": "^1.2.0"
   },
   "lint-staged": {
