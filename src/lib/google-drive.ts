@@ -28,7 +28,12 @@ const RETURN_KEY = '__oauth_return__'
 const SCOPE_KEY = '__gd_scope__'
 
 function getOAuthRedirectUri(): string {
-  return ENV_REDIRECT_URI || `${window.location.origin}/oauth-callback`
+  if (ENV_REDIRECT_URI) return ENV_REDIRECT_URI
+
+  const baseUrl = (import.meta.env.BASE_URL as string | undefined) ?? '/'
+  const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`
+  const callbackPath = `${normalizedBase}oauth-callback`
+  return new URL(callbackPath, window.location.origin).toString()
 }
 
 // ── Configuration ─────────────────────────────────────────────────────────────
