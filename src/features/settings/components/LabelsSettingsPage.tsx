@@ -47,34 +47,35 @@ function LabelDialog({
 }) {
   const { t } = useTranslation()
   const { add, update } = useLabelsStore()
-  const [selectedColor, setSelectedColor] = useState(PRESET_COLORS[5])
 
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<LabelFormValues>({
     resolver: zodResolver(labelSchema),
     defaultValues: { name: '', color: PRESET_COLORS[5] },
   })
 
+  const selectedColor = watch('color') ?? PRESET_COLORS[5]
+
   useEffect(() => {
     if (!open) return
     if (editing) {
       reset({ name: editing.name, color: editing.color ?? PRESET_COLORS[5] })
-      setSelectedColor(editing.color ?? PRESET_COLORS[5])
     } else {
       reset({ name: '', color: PRESET_COLORS[5] })
-      setSelectedColor(PRESET_COLORS[5])
     }
-  }, [open, editing])
+  }, [open, editing, reset])
 
   const onSubmit = async (values: LabelFormValues) => {
     const payload: Label = {
       id: editing?.id ?? uuid(),
       name: values.name,
-      color: selectedColor,
+      color: values.color ?? PRESET_COLORS[5],
     }
     if (editing) {
       await update(payload)
@@ -104,7 +105,7 @@ function LabelDialog({
                 <button
                   key={color}
                   type="button"
-                  onClick={() => setSelectedColor(color)}
+                  onClick={() => setValue('color', color)}
                   className={`h-7 w-7 rounded-full border-2 transition-transform ${
                     selectedColor === color
                       ? 'border-gray-900 scale-110'

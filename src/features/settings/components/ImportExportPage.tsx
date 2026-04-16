@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
@@ -73,7 +73,7 @@ export default function ImportExportPage() {
   }
 
   // ── CSV Import ─────────────────────────────────────────────────────────────
-  function handleImportChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleImportChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
@@ -134,7 +134,7 @@ export default function ImportExportPage() {
   }
 
   // ── JSON Backup Import ─────────────────────────────────────────────────────
-  function handleJsonImportChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleJsonImportChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()

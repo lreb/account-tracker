@@ -101,7 +101,7 @@ export function handleOAuthCallback(hash: string): string {
 
 // ── Drive API helpers ─────────────────────────────────────────────────────────
 
-async function driveRequest(path: string, options: RequestInit = {}): Promise<Response> {
+async function driveRequest(path: string, options: Parameters<typeof fetch>[1] = {}): Promise<Response> {
   const token = getGoogleToken()
   if (!token) throw new Error('Not connected to Google Drive.')
   const res = await fetch(`https://www.googleapis.com/drive/v3${path}`, {

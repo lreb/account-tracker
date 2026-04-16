@@ -6,7 +6,8 @@ import { v4 as uuid } from 'uuid'
 
 import { categorySchema, type CategoryFormValues } from '../../schemas/category.schema'
 import { useCategoriesStore } from '@/stores/categories.store'
-import { ICON_MAP, CategoryIcon } from '@/lib/icon-map'
+import { ICON_MAP } from '@/lib/icon-map.constants'
+import { CategoryIcon } from '@/lib/icon-map'
 import type { Category, CategoryType } from '@/types'
 
 import { Button } from '@/components/ui/button'
