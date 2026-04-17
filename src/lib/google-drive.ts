@@ -26,6 +26,13 @@ export const APP_BACKUP_FOLDER_NAME = 'ExpenseTracking Backups'
 const TOKEN_KEY = '__gd_token__'
 const RETURN_KEY = '__oauth_return__'
 const SCOPE_KEY = '__gd_scope__'
+const PROFILE_KEY = '__gd_profile__'
+
+export interface GoogleDriveAccountProfile {
+  name: string
+  email: string
+  pictureUrl: string
+}
 
 function isLocalHost(hostname: string): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1'
@@ -75,6 +82,28 @@ export function isSignedInToGoogle(): boolean {
 export function signOutOfGoogle(): void {
   sessionStorage.removeItem(TOKEN_KEY)
   sessionStorage.removeItem(SCOPE_KEY)
+  sessionStorage.removeItem(PROFILE_KEY)
+}
+
+function getCachedGoogleProfile(): GoogleDriveAccountProfile | null {
+  const raw = sessionStorage.getItem(PROFILE_KEY)
+  if (!raw) return null
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<GoogleDriveAccountProfile>
+    if (!parsed.name || !parsed.email || !parsed.pictureUrl) return null
+    return {
+      name: parsed.name,
+      email: parsed.email,
+      pictureUrl: parsed.pictureUrl,
+    }
+  } catch {
+    return null
+  }
+}
+
+function setCachedGoogleProfile(profile: GoogleDriveAccountProfile): void {
+  sessionStorage.setItem(PROFILE_KEY, JSON.stringify(profile))
 }
 
 // ── OAuth2 implicit flow ──────────────────────────────────────────────────────
@@ -317,4 +346,42 @@ export async function downloadBackupFromDrive(folderId = 'root'): Promise<string
   const res = await driveRequest(`/files/${fileId}?alt=media`)
   if (!res.ok) throw new Error(`Drive download failed: ${res.statusText}`)
   return res.text()
+}
+
+/** Returns the authenticated Google account profile used for Drive sync. */
+export async function getGoogleDriveAccountProfile(forceRefresh = false): Promise<GoogleDriveAccountProfile | null> {
+  if (!isSignedInToGoogle()) return null
+
+  if (!forceRefresh) {
+    const cached = getCachedGoogleProfile()
+    if (cached) return cached
+  }
+
+  const res = await driveRequest('/about?fields=user(displayName,emailAddress,photoLink)')
+  if (!res.ok) throw new Error(`Could not load Google account profile: ${res.statusText}`)
+
+  const payload = await res.json() as {
+    user?: {
+      displayName?: string
+      emailAddress?: string
+      photoLink?: string
+    }
+  }
+
+  const name = payload.user?.displayName?.trim() ?? ''
+  const email = payload.user?.emailAddress?.trim() ?? ''
+  const pictureUrl = payload.user?.photoLink?.trim() ?? ''
+
+  if (!name || !email || !pictureUrl) {
+    throw new Error('Google account profile is incomplete.')
+  }
+
+  const profile: GoogleDriveAccountProfile = {
+    name,
+    email,
+    pictureUrl,
+  }
+
+  setCachedGoogleProfile(profile)
+  return profile
 }
