@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react'
 import { useVehiclesStore } from '@/stores/vehicles.store'
+import SidebarGoogleAuthSection from './SidebarGoogleAuthSection'
 
 interface SidebarProps {
   open: boolean
@@ -88,6 +89,8 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
             <X size={20} />
           </button>
         </div>
+
+        <SidebarGoogleAuthSection onClose={onClose} />
 
         {/* Scrollable content */}
         <nav className="flex-1 overflow-y-auto py-2">

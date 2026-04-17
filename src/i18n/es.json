@@ -12,7 +12,14 @@
   "sidebar": {
     "main": "Principal",
     "quickCreate": "Creación Rápida",
-    "settings": "Configuración"
+    "settings": "Configuración",
+    "googleAuthTitle": "Google Drive",
+    "googleAuthLoginPrompt": "Inicia sesión aquí para conectar tu cuenta de Google Drive.",
+    "googleAuthLoginAction": "Iniciar sesión con Google",
+    "googleAuthConnected": "Cuenta conectada",
+    "googleAuthImageAlt": "Imagen de perfil de la cuenta de Google",
+    "googleAuthFallbackName": "Cuenta de Google",
+    "googleAuthFallbackEmail": "Correo no disponible"
   },
   "common": {
     "add": "Agregar",
