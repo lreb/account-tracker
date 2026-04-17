@@ -27,8 +27,27 @@ const TOKEN_KEY = '__gd_token__'
 const RETURN_KEY = '__oauth_return__'
 const SCOPE_KEY = '__gd_scope__'
 
+function isLocalHost(hostname: string): boolean {
+  return hostname === 'localhost' || hostname === '127.0.0.1'
+}
+
 function getOAuthRedirectUri(): string {
-  if (ENV_REDIRECT_URI) return ENV_REDIRECT_URI
+  if (ENV_REDIRECT_URI) {
+    try {
+      const configured = new URL(ENV_REDIRECT_URI)
+      const runtime = new URL(window.location.origin)
+
+      const configuredIsLocal = isLocalHost(configured.hostname)
+      const runtimeIsLocal = isLocalHost(runtime.hostname)
+
+      // Ignore localhost redirect URI when app is running on a non-local origin.
+      if (!(configuredIsLocal && !runtimeIsLocal)) {
+        return configured.toString()
+      }
+    } catch {
+      // Ignore invalid env value and fall back to computed runtime redirect URI.
+    }
+  }
 
   const baseUrl = (import.meta.env.BASE_URL as string | undefined) ?? '/'
   const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`
