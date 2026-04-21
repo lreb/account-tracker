@@ -11,6 +11,7 @@ export interface TxBalanceEntry {
 
 interface TransactionListItemProps {
   description: string
+  notes?: string
   status: string
   timeStr: string
   categoryName: string
@@ -26,6 +27,7 @@ interface TransactionListItemProps {
 
 export function TransactionListItem({
   description,
+  notes,
   status,
   timeStr,
   categoryName,
@@ -55,6 +57,9 @@ export function TransactionListItem({
           <div className="flex flex-col gap-0.5 mt-0.5">
             <p className="text-xs text-gray-400">{categoryName || '—'}</p>
             <p className="text-xs text-gray-400">{timeStr}</p>
+            {notes && (
+              <p className="text-xs text-gray-400 italic truncate">{notes}</p>
+            )}
           </div>
           {resolvedLabels.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">

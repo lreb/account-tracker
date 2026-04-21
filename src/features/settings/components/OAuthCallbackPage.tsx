@@ -18,16 +18,17 @@ export default function OAuthCallbackPage() {
     if (handledRef.current) return
     handledRef.current = true
 
-    let returnTo = '/settings'
-    try {
-      returnTo = handleOAuthCallback(window.location.hash)
-      toast.success(t('settings.driveConnectedSuccess'))
-    } catch (err) {
-      console.error('OAuth callback error:', err)
-      signOutOfGoogle()
-      toast.error(t('settings.driveConnectFailed'))
-    }
-    navigate(returnTo, { replace: true })
+    handleOAuthCallback()
+      .then((returnTo) => {
+        toast.success(t('settings.driveConnectedSuccess'))
+        navigate(returnTo, { replace: true })
+      })
+      .catch((err: unknown) => {
+        console.error('OAuth callback error:', err)
+        signOutOfGoogle()
+        toast.error(t('settings.driveConnectFailed'))
+        navigate('/settings', { replace: true })
+      })
   }, [navigate, t])
 
   return (

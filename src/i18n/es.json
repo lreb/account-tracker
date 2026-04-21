@@ -273,6 +273,7 @@
       "upcomingLabel": "Próximo",
       "dueAt": "Vence a {{km}} km",
       "kmLeft": "{{km}} km restantes",
+      "overdueByKm": "{{km}} km vencidos",
       "dueOn": "Vence el {{date}}",
       "drillTotal": "Total",
       "drillAvg": "Prom. / período activo"

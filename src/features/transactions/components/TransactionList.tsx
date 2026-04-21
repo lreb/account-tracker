@@ -343,6 +343,7 @@ export function TransactionList({
       <TransactionListItem
         key={tx.id}
         description={tx.description}
+        notes={tx.notes}
         status={tx.status}
         timeStr={timeStr}
         categoryName={getTranslatedCategoryName(cat, t)}

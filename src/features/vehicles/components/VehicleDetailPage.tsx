@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef, type ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { format, parseISO, addDays } from 'date-fns'
-import { ArrowLeft, Trash2, Pencil, Gauge, TrendingDown, Fuel, Wrench, AlertCircle, Clock, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Trash2, Pencil, Gauge, TrendingDown, Fuel, Wrench } from 'lucide-react'
 
 import {
   getVisibleAccountIds,
@@ -21,6 +21,7 @@ import {
   getServiceTypeLabel,
 } from '@/lib/vehicles'
 import type { FuelLog, VehicleService } from '@/types'
+import type { UpcomingServiceItem } from './upcoming-services-tab.types'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -28,17 +29,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
 import { AddFabMenu } from '@/components/ui/add-fab-menu'
 import { VehicleStats } from './VehicleStats'
+import UpcomingServicesTab from './UpcomingServicesTab'
 
 // ─── Page ───────────────────────────────────────────── (stats live in VehicleStats.tsx) ───
 
 type Tab = 'all' | 'fuel' | 'service' | 'stats' | 'upcoming'
-
-interface UpcomingServiceItem {
-  svc: VehicleService
-  urgency: 'overdue' | 'soon' | 'upcoming'
-  kmRemaining: number | null
-  dueDate: Date | null
-}
 
 type CombinedEntry =
   | { kind: 'fuel'; log: FuelLog; prevOdometer: number | null }
@@ -518,73 +513,7 @@ export default function VehicleDetailPage() {
 
       {/* Upcoming services tab */}
       {tab === 'upcoming' && (
-        upcomingServices.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center mt-8">{t('vehicles.noUpcoming')}</p>
-        ) : (
-          <div className="space-y-2">
-            {upcomingServices.map(({ svc, urgency, kmRemaining, dueDate }) => {
-              const bgClass =
-                urgency === 'overdue' ? 'bg-red-50 border-red-200'
-                : urgency === 'soon'  ? 'bg-amber-50 border-amber-200'
-                : 'bg-emerald-50 border-emerald-200'
-              const textClass =
-                urgency === 'overdue' ? 'text-red-700'
-                : urgency === 'soon'  ? 'text-amber-700'
-                : 'text-emerald-700'
-              const badgeBg =
-                urgency === 'overdue' ? 'bg-red-100 text-red-700'
-                : urgency === 'soon'  ? 'bg-amber-100 text-amber-700'
-                : 'bg-emerald-100 text-emerald-700'
-              const UrgencyIcon =
-                urgency === 'overdue' ? AlertCircle
-                : urgency === 'soon'  ? Clock
-                : CheckCircle2
-              const urgencyLabel =
-                urgency === 'overdue' ? t('vehicles.stats.overdue')
-                : urgency === 'soon'  ? t('vehicles.stats.dueSoon')
-                : t('vehicles.stats.upcomingLabel')
-
-              return (
-                <div key={svc.id} className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 ${bgClass}`}>
-                  <UrgencyIcon size={14} className={`${textClass} shrink-0 mt-0.5`} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className={`text-sm font-medium truncate ${textClass}`}>
-                        {getServiceTypeLabel(svc.serviceType, t)}
-                      </p>
-                      <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full shrink-0 ${badgeBg}`}>
-                        {urgencyLabel}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-                      {svc.nextServiceKm != null && (
-                        <p className={`text-xs ${textClass} opacity-80`}>
-                          {t('vehicles.stats.dueAt', { km: svc.nextServiceKm.toLocaleString() })}
-                          {kmRemaining !== null && kmRemaining > 0 && (
-                            <span className="ml-1 opacity-70">
-                              ({t('vehicles.stats.kmLeft', { km: kmRemaining.toLocaleString() })})
-                            </span>
-                          )}
-                        </p>
-                      )}
-                      {dueDate && (
-                        <p className={`text-xs ${textClass} opacity-80`}>
-                          {t('vehicles.stats.dueOn', { date: format(dueDate, 'MMM d, yyyy') })}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1 mt-2">
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-400 hover:text-gray-700"
-                        onClick={() => navigate(`/vehicles/${vehicle.id}/service/${svc.id}`)}>
-                        <Pencil size={13} />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )
+        <UpcomingServicesTab upcomingServices={upcomingServices} vehicleId={vehicle.id} />
       )}
 
       <ScrollToTopButton />
