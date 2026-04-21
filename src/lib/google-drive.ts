@@ -13,8 +13,9 @@
  *       personal/private apps. For a public app, proxy the token exchange via a backend.
  *
  * Scope used:
- *  - drive.file: read/write files created by this app
- *  - drive.metadata.readonly: list folders so user can pick destination
+ *  - drive.file (non-sensitive): read/write only files that this app itself created.
+ *    This is the minimum required scope. It avoids the Google "unverified app" warning
+ *    because drive.file does not require OAuth verification.
  */
 
 const ENV_CLIENT_ID     = (import.meta.env.VITE_GOOGLE_CLIENT_ID     as string | undefined) ?? ''
@@ -22,7 +23,6 @@ const ENV_CLIENT_SECRET = (import.meta.env.VITE_GOOGLE_CLIENT_SECRET as string |
 const ENV_REDIRECT_URI  = (import.meta.env.VITE_GOOGLE_REDIRECT_URI  as string | undefined)?.trim() ?? ''
 const REQUIRED_SCOPES = [
   'https://www.googleapis.com/auth/drive.file',
-  'https://www.googleapis.com/auth/drive.metadata.readonly',
 ]
 const SCOPE = REQUIRED_SCOPES.join(' ')
 const BACKUP_FILE_PREFIX = 'expense-tracking'
@@ -398,16 +398,6 @@ async function findLatestBackupFileId(folderId: string): Promise<string | null> 
   return json.files[0]?.id ?? null
 }
 
-export async function listDriveFolders(): Promise<DriveFolderOption[]> {
-  const q = encodeURIComponent("mimeType='application/vnd.google-apps.folder' and trashed=false and 'root' in parents")
-  const res = await driveRequest(
-    `/files?q=${q}&fields=files(id,name)&pageSize=200&orderBy=name_natural`,
-  )
-  if (!res.ok) throw new Error(`Could not list Drive folders: ${res.statusText}`)
-  const json = await res.json() as { files: DriveFolderOption[] }
-  return json.files
-}
-
 async function findRootFolderByName(name: string): Promise<DriveFolderOption | null> {
   const q = encodeURIComponent(
     `mimeType='application/vnd.google-apps.folder' and trashed=false and 'root' in parents and name='${escapeDriveQueryValue(name)}'`,
@@ -418,7 +408,7 @@ async function findRootFolderByName(name: string): Promise<DriveFolderOption | n
   return json.files[0] ?? null
 }
 
-export async function createDriveFolder(name: string): Promise<DriveFolderOption> {
+async function createDriveFolder(name: string): Promise<DriveFolderOption> {
   const trimmedName = name.trim()
   if (!trimmedName) throw new Error('Folder name is required.')
 
@@ -442,16 +432,17 @@ export async function ensureAppBackupFolder(): Promise<DriveFolderOption> {
   return createDriveFolder(APP_BACKUP_FOLDER_NAME)
 }
 
-/** Uploads (creates or overwrites) the backup file in the selected Drive folder. */
-export async function uploadBackupToDrive(content: string, folderId = 'root'): Promise<void> {
+/** Uploads a timestamped backup JSON to the app-owned Drive folder (creates it if needed). */
+export async function uploadBackupToDrive(content: string): Promise<void> {
   const token = await getGoogleToken()
   if (!token) throw new Error('Not connected to Google Drive.')
 
+  const appFolder = await ensureAppBackupFolder()
   const blob = new Blob([content], { type: 'application/json' })
   const backupFilename = buildBackupFilename()
 
-  // Create a timestamped backup file in selected folder.
-  const metadata = JSON.stringify({ name: backupFilename, parents: [folderId] })
+  // Create a timestamped backup file in the app folder.
+  const metadata = JSON.stringify({ name: backupFilename, parents: [appFolder.id] })
   const form = new FormData()
   form.append('metadata', new Blob([metadata], { type: 'application/json' }))
   form.append('file', blob)
@@ -467,9 +458,10 @@ export async function uploadBackupToDrive(content: string, folderId = 'root'): P
   if (!res.ok) throw new Error(`Drive upload failed: ${res.statusText}`)
 }
 
-/** Downloads backup content from the selected Drive folder. Throws if no backup exists. */
-export async function downloadBackupFromDrive(folderId = 'root'): Promise<string> {
-  const fileId = await findLatestBackupFileId(folderId)
+/** Downloads the latest backup JSON from the app-owned Drive folder. Throws if none exists. */
+export async function downloadBackupFromDrive(): Promise<string> {
+  const appFolder = await ensureAppBackupFolder()
+  const fileId = await findLatestBackupFileId(appFolder.id)
   if (!fileId) throw new Error('No backup found on Google Drive.')
   const res = await driveRequest(`/files/${fileId}?alt=media`)
   if (!res.ok) throw new Error(`Drive download failed: ${res.statusText}`)
