@@ -275,6 +275,7 @@
       "upcomingLabel": "Upcoming",
       "dueAt": "Due at {{km}} km",
       "kmLeft": "{{km}} km left",
+      "overdueByKm": "{{km}} km overdue",
       "dueOn": "Due on {{date}}",
       "drillTotal": "Total",
       "drillAvg": "Avg / active period"
