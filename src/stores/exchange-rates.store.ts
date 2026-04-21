@@ -9,6 +9,8 @@ interface ExchangeRatesState {
   isFetching: boolean
   load: () => Promise<void>
   fetchFromApi: (baseCurrency: string) => Promise<void>
+  /** Fetch a single currency pair from the API without persisting. Returns null on failure. */
+  fetchSinglePairRate: (fromCurrency: string, toCurrency: string) => Promise<number | null>
   addManual: (rate: Omit<ExchangeRate, 'id'>) => Promise<void>
   remove: (id: string) => Promise<void>
   /** Returns the most-recent cached rate for the given pair, or null. */
@@ -32,20 +34,22 @@ export const useExchangeRatesStore = create<ExchangeRatesState>((set, get) => ({
   fetchFromApi: async (baseCurrency: string) => {
     set({ isFetching: true })
     try {
+      // Frankfurter v2: returns Array<{ date, base, quote, rate }>
       const res = await fetch(
-        `https://api.frankfurter.app/latest?from=${encodeURIComponent(baseCurrency)}`,
+        `https://api.frankfurter.dev/v2/rates?base=${encodeURIComponent(baseCurrency)}`,
       )
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json: { base: string; date: string; rates: Record<string, number> } = await res.json()
+      const json: Array<{ date: string; base: string; quote: string; rate: number }> = await res.json()
 
-      // Upsert each pair: delete existing entry for same from/to/date, then add fresh one
-      const today = json.date
-      const newRows: ExchangeRate[] = Object.entries(json.rates).map(([toCurrency, rate]) => ({
+      if (!Array.isArray(json) || json.length === 0) throw new Error('No rates returned')
+      const today = json[0].date
+
+      const newRows: ExchangeRate[] = json.map(({ base, quote, rate, date }) => ({
         id: uuid(),
-        fromCurrency: json.base,
-        toCurrency,
+        fromCurrency: base,
+        toCurrency: quote,
         rate,
-        date: today,
+        date,
       }))
 
       await db.transaction('rw', db.exchangeRates, async () => {
@@ -62,12 +66,26 @@ export const useExchangeRatesStore = create<ExchangeRatesState>((set, get) => ({
 
       const updated = await db.exchangeRates.orderBy('date').reverse().toArray()
       set({ rates: updated })
-      toast.success(`Rates updated for ${json.date}`)
+      toast.success(`Rates updated for ${today}`)
     } catch (err) {
       console.error(err)
       toast.error('Failed to fetch rates — using cached values')
     } finally {
       set({ isFetching: false })
+    }
+  },
+
+  fetchSinglePairRate: async (fromCurrency: string, toCurrency: string) => {
+    try {
+      const res = await fetch(
+        `https://api.frankfurter.dev/v2/rate/${encodeURIComponent(fromCurrency)}/${encodeURIComponent(toCurrency)}`,
+      )
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const json: { date: string; base: string; quote: string; rate: number } = await res.json()
+      return json.rate
+    } catch (err) {
+      console.error(err)
+      return null
     }
   },
 

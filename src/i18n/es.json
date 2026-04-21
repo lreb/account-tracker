@@ -531,7 +531,24 @@
     "rate": "Tipo",
     "rateHint": "Ej. 1.085 significa 1 {{from}} = 1.085 {{to}}",
     "offlineWarning": "Sin conexión — mostrando datos en caché",
-    "autoFilled": "Completado automáticamente"
+    "autoFilled": "Completado automáticamente",
+    "rateUpdated": "Tipo actualizado desde Frankfurter",
+    "fetchFailed": "No se pudo obtener el tipo — verifica tu conexión"
+  },
+  "crossCurrency": {
+    "title": "Establecer Tipo de Cambio",
+    "sectionLabel": "Tipo de Cambio",
+    "source": "De (origen)",
+    "destination": "A (destino)",
+    "rateLabel": "1 {{from}} = ? {{to}}",
+    "rateHint": "Cuántos {{to}} recibes por 1 {{from}}.",
+    "fetchLatest": "Obtener tipo",
+    "useCached": "Usar caché ({{rate}})",
+    "rateUpdated": "Tipo obtenido de Frankfurter",
+    "fetchFailed": "No se pudo obtener el tipo — verifica tu conexión",
+    "notSet": "Toca para establecer tipo",
+    "requiredHint": "Establece el tipo de cambio para esta transferencia entre monedas.",
+    "enterAmountFirst": "Ingresa el monto primero"
   },
   "validation": {
     "nameRequired": "El nombre es obligatorio",

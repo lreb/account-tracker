@@ -407,6 +407,34 @@ Each Zustand store is a hook. All mutations write through to Dexie and surface e
 - Labels are stored as `string[]` on the transaction; the `labels` table is used only for managing available label definitions
 - All user-facing strings must go through `react-i18next` — no hardcoded English strings in JSX
 
+### Frankfurter Exchange Rate API
+
+The app uses the **Frankfurter v2 API** for live and cached exchange rates. No API key required.
+
+| Endpoint | Description |
+|---|---|
+| `GET https://api.frankfurter.dev/v2/rates?base={ISO}` | Latest rates for all currencies vs. `base`. Returns `Array<{date,base,quote,rate}>`. |
+| `GET https://api.frankfurter.dev/v2/rate/{FROM}/{TO}` | Single-pair rate. Returns `{date,base,quote,rate}`. Used by `CrossCurrencyDialog` for on-demand fetching. |
+| `GET https://api.frankfurter.dev/v2/currencies` | All supported currencies with names and symbols. |
+
+**Critical:** the old domain `api.frankfurter.app` now redirects to v1 (legacy). **Always use `api.frankfurter.dev/v2`.**
+
+The store method `fetchFromApi(baseCurrency)` persists all rates for the base currency into the `exchangeRates` Dexie table. The method `fetchSinglePairRate(from, to)` fetches a live rate without persisting — used transiently by `CrossCurrencyDialog`.
+
+### Cross-currency Transfer Flow
+
+When a transfer is created between two accounts whose `currency` fields differ:
+
+1. `TransactionForm` computes `isCrossCurrencyTransfer` from the selected source/destination accounts.
+2. An **Exchange Rate** row button is rendered below the destination account selector.
+3. Tapping it opens `CrossCurrencyDialog` (`src/features/transactions/components/CrossCurrencyDialog.tsx`).
+4. The dialog pre-fills the rate from `getRateForPair(from, to)` (DB cache). If unavailable, the field starts empty.
+5. The user can tap **Fetch rate** to call `fetchSinglePairRate` live from the API.
+6. On confirm, `setValue('exchangeRate', rate)` is called on the form, and `crossCurrencyDestAmountCents` state is set.
+7. On `onSubmit`, `originalAmount` = dest amount in dest currency cents and `originalCurrency` = dest currency are stored on the `Transaction`.
+
+
+
 ### Linting
 - ESLint is configured in `eslint.config.js` (flat config, ESLint 9+) with `@typescript-eslint`, `eslint-plugin-react-hooks`, and `eslint-plugin-react-refresh`
 - `@typescript-eslint/no-unused-vars: error` — **unused imports are a lint error and will block commits**
