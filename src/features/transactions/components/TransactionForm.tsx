@@ -8,6 +8,7 @@ import { v4 as uuid } from 'uuid'
 
 import { db } from '@/db'
 import { getAccountSelectOptions, getVisibleAccounts } from '@/lib/accounts'
+import { getAccountBalanceAtDate, isTransactionForAccount } from '@/lib/balance-sheet'
 import { getTranslatedCategoryName } from '@/lib/categories'
 import { transactionSchema, type TransactionFormValues } from '../schemas/transaction.schema'
 import { useTransactionsStore } from '@/stores/transactions.store'
@@ -216,28 +217,21 @@ export default function TransactionForm() {
   })
 
   useEffect(() => {
-    let cancelled = false
+    let stale = false
     async function computeBalances() {
-      const allTx = await db.transactions.toArray()
-      if (cancelled) return
+      const activeTx = await db.transactions
+        .filter((tx) => tx.status !== 'cancelled')
+        .toArray()
+      if (stale) return
       const map = new Map<string, number>()
-      for (const acct of accounts) map.set(acct.id, acct.openingBalance)
-      for (const tx of allTx) {
-        if (tx.type === 'income') {
-          map.set(tx.accountId, (map.get(tx.accountId) ?? 0) + tx.amount)
-        } else if (tx.type === 'expense') {
-          map.set(tx.accountId, (map.get(tx.accountId) ?? 0) - tx.amount)
-        } else if (tx.type === 'transfer') {
-          map.set(tx.accountId, (map.get(tx.accountId) ?? 0) - tx.amount)
-          if (tx.toAccountId) {
-            map.set(tx.toAccountId, (map.get(tx.toAccountId) ?? 0) + tx.amount)
-          }
-        }
+      for (const acct of accounts) {
+        const acctTxs = activeTx.filter((tx) => isTransactionForAccount(tx, acct.id))
+        map.set(acct.id, getAccountBalanceAtDate(acct, acctTxs, new Date()))
       }
       setAccountBalances(map)
     }
     computeBalances()
-    return () => { cancelled = true }
+    return () => { stale = true }
   }, [accounts])
 
   // Description auto-suggest: deduplicated map of description → most recent tx
