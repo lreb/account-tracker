@@ -1,21 +1,25 @@
 /**
- * Google Drive backup integration — OAuth2 implicit flow (public client, no client secret).
+ * Google Drive backup integration — OAuth2 Authorization Code + PKCE flow.
  *
  * Setup (one-time):
  *  1. Go to https://console.cloud.google.com → APIs & Services → Credentials
- *  2. Create an OAuth 2.0 Client ID (Web application type)
- *  3. Add your app's origin to "Authorized JavaScript origins"
- *  4. Add <origin>/oauth-callback to "Authorized redirect URIs"
+ *  2. Create an OAuth 2.0 Client ID  →  Application type: Web application
+ *  3. Authorized JavaScript origins:  http://localhost:5173  (and your prod URL)
+ *  4. Authorized redirect URIs:       http://localhost:5173/oauth-callback
+ *                                     https://<your-prod-domain>/oauth-callback
  *  5. Enable the Google Drive API for the project
- *  6. Set VITE_GOOGLE_CLIENT_ID=<your-client-id> in .env
+ *  6. Set VITE_GOOGLE_CLIENT_ID and VITE_GOOGLE_CLIENT_SECRET in .env
+ *     ⚠ The client secret is bundled in the JS bundle. This is acceptable for
+ *       personal/private apps. For a public app, proxy the token exchange via a backend.
  *
  * Scope used:
  *  - drive.file: read/write files created by this app
  *  - drive.metadata.readonly: list folders so user can pick destination
  */
 
-const ENV_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ?? ''
-const ENV_REDIRECT_URI = (import.meta.env.VITE_GOOGLE_REDIRECT_URI as string | undefined)?.trim() ?? ''
+const ENV_CLIENT_ID     = (import.meta.env.VITE_GOOGLE_CLIENT_ID     as string | undefined) ?? ''
+const ENV_CLIENT_SECRET = (import.meta.env.VITE_GOOGLE_CLIENT_SECRET as string | undefined) ?? ''
+const ENV_REDIRECT_URI  = (import.meta.env.VITE_GOOGLE_REDIRECT_URI  as string | undefined)?.trim() ?? ''
 const REQUIRED_SCOPES = [
   'https://www.googleapis.com/auth/drive.file',
   'https://www.googleapis.com/auth/drive.metadata.readonly',
@@ -23,10 +27,17 @@ const REQUIRED_SCOPES = [
 const SCOPE = REQUIRED_SCOPES.join(' ')
 const BACKUP_FILE_PREFIX = 'expense-tracking'
 export const APP_BACKUP_FOLDER_NAME = 'ExpenseTracking Backups'
-const TOKEN_KEY = '__gd_token__'
-const RETURN_KEY = '__oauth_return__'
-const SCOPE_KEY = '__gd_scope__'
-const PROFILE_KEY = '__gd_profile__'
+
+// ── Storage keys ──────────────────────────────────────────────────────────────
+// Tokens go in localStorage to survive page reloads and browser restarts.
+// Transient OAuth state (verifier, return path) uses sessionStorage — cleared after use.
+const ACCESS_TOKEN_KEY  = '__gd_access_token__'
+const REFRESH_TOKEN_KEY = '__gd_refresh_token__'
+const TOKEN_EXPIRY_KEY  = '__gd_token_expiry__'   // Unix timestamp ms
+const RETURN_KEY        = '__oauth_return__'       // sessionStorage
+const CODE_VERIFIER_KEY = '__oauth_cv__'           // sessionStorage
+const SCOPE_KEY         = '__gd_scope__'
+const PROFILE_KEY       = '__gd_profile__'
 
 export interface GoogleDriveAccountProfile {
   name: string
@@ -69,106 +80,223 @@ export function isGoogleDriveConfigured(clientId?: string): boolean {
   return (clientId || ENV_CLIENT_ID).length > 0
 }
 
-// ── Token management ──────────────────────────────────────────────────────────
+// ── PKCE helpers ──────────────────────────────────────────────────────────────
 
-export function getGoogleToken(): string | null {
-  return sessionStorage.getItem(TOKEN_KEY)
+function base64UrlEncode(buffer: Uint8Array): string {
+  let str = ''
+  for (const byte of buffer) str += String.fromCharCode(byte)
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
 }
 
+function generateCodeVerifier(): string {
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  return base64UrlEncode(bytes)
+}
+
+async function generateCodeChallenge(verifier: string): Promise<string> {
+  const encoded = new TextEncoder().encode(verifier)
+  const digest  = await crypto.subtle.digest('SHA-256', encoded)
+  return base64UrlEncode(new Uint8Array(digest))
+}
+
+// ── Token management ──────────────────────────────────────────────────────────
+
+function storeTokens(accessToken: string, refreshToken: string | null, expiresIn: number): void {
+  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken)
+  localStorage.setItem(TOKEN_EXPIRY_KEY, String(Date.now() + expiresIn * 1000))
+  if (refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken)
+}
+
+function isAccessTokenExpired(): boolean {
+  const expiry = parseInt(localStorage.getItem(TOKEN_EXPIRY_KEY) ?? '0', 10)
+  if (!expiry) return true
+  return Date.now() >= expiry - 60_000 // 60 s buffer so we refresh before actual expiry
+}
+
+/**
+ * Returns true when a valid session exists: either a refresh token is persisted
+ * (allows silent renewal at any time) or a non-expired access token is available.
+ */
 export function isSignedInToGoogle(): boolean {
-  return !!getGoogleToken()
+  return (
+    !!localStorage.getItem(REFRESH_TOKEN_KEY) ||
+    (!!localStorage.getItem(ACCESS_TOKEN_KEY) && !isAccessTokenExpired())
+  )
 }
 
 export function signOutOfGoogle(): void {
-  sessionStorage.removeItem(TOKEN_KEY)
-  sessionStorage.removeItem(SCOPE_KEY)
-  sessionStorage.removeItem(PROFILE_KEY)
+  localStorage.removeItem(ACCESS_TOKEN_KEY)
+  localStorage.removeItem(REFRESH_TOKEN_KEY)
+  localStorage.removeItem(TOKEN_EXPIRY_KEY)
+  localStorage.removeItem(SCOPE_KEY)
+  localStorage.removeItem(PROFILE_KEY)
+}
+
+async function refreshAccessToken(): Promise<string> {
+  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY)
+  if (!refreshToken) throw new Error('No refresh token — please reconnect Google Drive.')
+
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type:    'refresh_token',
+      refresh_token: refreshToken,
+      client_id:     ENV_CLIENT_ID,
+      client_secret: ENV_CLIENT_SECRET,
+    }),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { error?: string; error_description?: string }
+    if (err.error === 'invalid_grant') {
+      signOutOfGoogle()
+      throw new Error('Google session expired — please reconnect.')
+    }
+    throw new Error(err.error_description ?? err.error ?? `Token refresh failed (${res.status})`)
+  }
+
+  const data = await res.json() as {
+    access_token:   string
+    expires_in:     number
+    refresh_token?: string
+    scope?:         string
+  }
+
+  storeTokens(data.access_token, data.refresh_token ?? null, data.expires_in)
+  if (data.scope) localStorage.setItem(SCOPE_KEY, data.scope)
+  return data.access_token
+}
+
+/**
+ * Returns a valid access token. Auto-refreshes using the stored refresh token when
+ * the current access token is expired. Returns null if not signed in.
+ */
+export async function getGoogleToken(): Promise<string | null> {
+  if (!localStorage.getItem(REFRESH_TOKEN_KEY) && !localStorage.getItem(ACCESS_TOKEN_KEY)) return null
+  if (!isAccessTokenExpired()) return localStorage.getItem(ACCESS_TOKEN_KEY)
+  try {
+    return await refreshAccessToken()
+  } catch {
+    return null
+  }
 }
 
 function getCachedGoogleProfile(): GoogleDriveAccountProfile | null {
-  const raw = sessionStorage.getItem(PROFILE_KEY)
+  const raw = localStorage.getItem(PROFILE_KEY)
   if (!raw) return null
-
   try {
     const parsed = JSON.parse(raw) as Partial<GoogleDriveAccountProfile>
     if (!parsed.name || !parsed.email || !parsed.pictureUrl) return null
-    return {
-      name: parsed.name,
-      email: parsed.email,
-      pictureUrl: parsed.pictureUrl,
-    }
+    return { name: parsed.name, email: parsed.email, pictureUrl: parsed.pictureUrl }
   } catch {
     return null
   }
 }
 
 function setCachedGoogleProfile(profile: GoogleDriveAccountProfile): void {
-  sessionStorage.setItem(PROFILE_KEY, JSON.stringify(profile))
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile))
 }
 
-// ── OAuth2 implicit flow ──────────────────────────────────────────────────────
+// ── OAuth2 Authorization Code + PKCE flow ─────────────────────────────────────
 
 /**
- * Redirects the main window to Google's OAuth consent screen.
- * After the user grants permission, Google redirects to /oauth-callback,
- * which captures the token and navigates back to `returnTo`.
+ * Redirects to Google's OAuth consent screen using Authorization Code + PKCE.
+ * `access_type=offline` + `prompt=consent` ensure a refresh token is always issued.
  */
-export function startGoogleSignIn(clientId: string, returnTo = '/settings'): void {
+export async function startGoogleSignIn(clientId: string, returnTo = '/settings'): Promise<void> {
   const activeClientId = clientId || ENV_CLIENT_ID
   if (!activeClientId) throw new Error('Missing Google Client ID')
 
+  const verifier  = generateCodeVerifier()
+  const challenge = await generateCodeChallenge(verifier)
+  sessionStorage.setItem(CODE_VERIFIER_KEY, verifier)
   sessionStorage.setItem(RETURN_KEY, returnTo)
+
   const params = new URLSearchParams({
-    client_id: activeClientId,
-    redirect_uri: getOAuthRedirectUri(),
-    response_type: 'token',
-    response_mode: 'fragment',
-    scope: SCOPE,
+    client_id:              activeClientId,
+    redirect_uri:           getOAuthRedirectUri(),
+    response_type:          'code',
+    scope:                  SCOPE,
+    access_type:            'offline',
+    prompt:                 'consent',
+    code_challenge:         challenge,
+    code_challenge_method:  'S256',
     include_granted_scopes: 'true',
-    // Force consent so Drive appDataFolder scope is explicitly granted.
-    prompt: 'consent select_account',
   })
   window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`
 }
 
 /**
- * Called by OAuthCallbackPage. Parses the access token from the URL hash,
- * stores it in sessionStorage, and returns the path to navigate back to.
+ * Called by OAuthCallbackPage. Exchanges the authorization code for an access token
+ * and refresh token, stores both persistently, and returns the path to navigate to.
  */
-export function handleOAuthCallback(hash: string): string {
-  const fragmentParams = new URLSearchParams(hash.replace(/^#/, ''))
-  const queryParams = new URLSearchParams(window.location.search)
+export async function handleOAuthCallback(): Promise<string> {
+  const queryParams    = new URLSearchParams(window.location.search)
+  const fragmentParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
 
-  const oauthError = fragmentParams.get('error') || queryParams.get('error')
+  const oauthError = queryParams.get('error') ?? fragmentParams.get('error')
   if (oauthError) {
-    const description = fragmentParams.get('error_description') || queryParams.get('error_description') || ''
+    const description = queryParams.get('error_description') ?? fragmentParams.get('error_description') ?? ''
     throw new Error(description || oauthError)
   }
 
-  const token = fragmentParams.get('access_token') || queryParams.get('access_token')
-  const grantedScopeRaw = fragmentParams.get('scope') || queryParams.get('scope') || ''
-  const grantedScopes = new Set(
-    grantedScopeRaw
-      .split(/[\s,]+/)
-      .map((s) => s.trim())
-      .filter(Boolean),
-  )
+  const code = queryParams.get('code') ?? fragmentParams.get('code')
+  if (!code) throw new Error('No authorization code found in OAuth redirect.')
 
-  const missingScopes = REQUIRED_SCOPES.filter((scope) => !grantedScopes.has(scope))
-  if (missingScopes.length > 0) {
-    throw new Error('Google permissions are outdated. Please reconnect and grant Drive permissions.')
+  const verifier = sessionStorage.getItem(CODE_VERIFIER_KEY)
+  sessionStorage.removeItem(CODE_VERIFIER_KEY)
+  if (!verifier) throw new Error('PKCE code verifier missing — the sign-in flow may have been interrupted.')
+
+  if (!ENV_CLIENT_ID || !ENV_CLIENT_SECRET) {
+    throw new Error('Missing VITE_GOOGLE_CLIENT_ID or VITE_GOOGLE_CLIENT_SECRET in environment.')
   }
 
-  if (!token) {
-    const code = fragmentParams.get('code') || queryParams.get('code')
-    if (code) {
-      throw new Error('OAuth returned an authorization code instead of an access token.')
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type:    'authorization_code',
+      code,
+      redirect_uri:  getOAuthRedirectUri(),
+      client_id:     ENV_CLIENT_ID,
+      client_secret: ENV_CLIENT_SECRET,
+      code_verifier: verifier,
+    }),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { error?: string; error_description?: string }
+    throw new Error(err.error_description ?? err.error ?? `Token exchange failed (${res.status})`)
+  }
+
+  const data = await res.json() as {
+    access_token:   string
+    refresh_token?: string
+    expires_in:     number
+    scope?:         string
+  }
+
+  if (!data.access_token) throw new Error('Token exchange did not return an access_token.')
+  if (!data.refresh_token) {
+    throw new Error(
+      'Google did not return a refresh token. Ensure prompt=consent is set, then try reconnecting.',
+    )
+  }
+
+  storeTokens(data.access_token, data.refresh_token, data.expires_in)
+
+  if (data.scope) {
+    const granted = new Set(data.scope.split(/[\s,]+/).filter(Boolean))
+    const missing = REQUIRED_SCOPES.filter((s) => !granted.has(s))
+    if (missing.length > 0) {
+      signOutOfGoogle()
+      throw new Error('Google permissions are outdated. Please reconnect and grant Drive permissions.')
     }
-    throw new Error('No access_token found in OAuth redirect.')
+    localStorage.setItem(SCOPE_KEY, data.scope)
   }
 
-  sessionStorage.setItem(TOKEN_KEY, token)
-  sessionStorage.setItem(SCOPE_KEY, grantedScopeRaw)
   const returnTo = sessionStorage.getItem(RETURN_KEY) ?? '/settings'
   sessionStorage.removeItem(RETURN_KEY)
   return returnTo
@@ -177,7 +305,7 @@ export function handleOAuthCallback(hash: string): string {
 // ── Drive API helpers ─────────────────────────────────────────────────────────
 
 async function driveRequest(path: string, options: Parameters<typeof fetch>[1] = {}): Promise<Response> {
-  const token = getGoogleToken()
+  const token = await getGoogleToken()
   if (!token) throw new Error('Not connected to Google Drive.')
   const res = await fetch(`https://www.googleapis.com/drive/v3${path}`, {
     ...options,
@@ -316,7 +444,7 @@ export async function ensureAppBackupFolder(): Promise<DriveFolderOption> {
 
 /** Uploads (creates or overwrites) the backup file in the selected Drive folder. */
 export async function uploadBackupToDrive(content: string, folderId = 'root'): Promise<void> {
-  const token = getGoogleToken()
+  const token = await getGoogleToken()
   if (!token) throw new Error('Not connected to Google Drive.')
 
   const blob = new Blob([content], { type: 'application/json' })

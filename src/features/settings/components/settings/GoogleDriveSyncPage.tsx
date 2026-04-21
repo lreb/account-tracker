@@ -182,9 +182,9 @@ export default function GoogleDriveSyncPage() {
     ])
   }
 
-  function handleDriveConnect() {
+  async function handleDriveConnect() {
     try {
-      startGoogleSignIn(googleClientId, '/settings/google-drive')
+      await startGoogleSignIn(googleClientId, '/settings/google-drive')
     } catch (err) {
       console.error(err)
       toast.error(t('settings.driveNotConfigured'))
@@ -209,7 +209,7 @@ export default function GoogleDriveSyncPage() {
       await saveSetting('googleClientId', clientId)
       setEditingDriveConfig(false)
       toast.success(t('common.saved'))
-      startGoogleSignIn(clientId, '/settings/google-drive')
+      await startGoogleSignIn(clientId, '/settings/google-drive')
     } catch {
       toast.error(t('settings.saveError', 'Failed to save config'))
     } finally {
