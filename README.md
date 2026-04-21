@@ -140,6 +140,32 @@ Every structural change to the Dexie schema **must** add a new `.version(n)` blo
 
 ---
 
+## Exchange Rates — Frankfurter API
+
+The app uses the **Frankfurter v2 API** (`https://api.frankfurter.dev`) for fetching exchange rates. No API key is required.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /v2/rates?base={ISO}` | Latest rates for all currencies relative to `base` |
+| `GET /v2/rate/{FROM}/{TO}` | Single-pair rate (used by `CrossCurrencyDialog`) |
+| `GET /v2/currencies` | List of all supported currencies |
+
+Rates are cached in the local `exchangeRates` Dexie table. All API calls are made client-side only. The app works fully offline using cached rates; the user triggers a refresh manually from **Settings → Exchange Rates**.
+
+**Important:** the old domain `api.frankfurter.app` redirects to v1. Always use `api.frankfurter.dev/v2`.
+
+### Cross-currency transfers
+
+When a transfer is created between two accounts with different currencies:
+
+1. The `TransactionForm` detects the currency mismatch automatically.
+2. An **Exchange Rate** button appears, opening `CrossCurrencyDialog`.
+3. The dialog pre-fills the rate from the DB cache (`getRateForPair`).
+4. The user can tap **Fetch rate** to pull the live rate for that specific pair from `GET /v2/rate/{FROM}/{TO}`.
+5. On confirm, `exchangeRate` (FROM→TO) and `originalAmount`/`originalCurrency` (destination side) are stored on the transaction.
+
+
+
 ## Internationalization
 
 The app ships with English (`en`) and Spanish (`es`) locales in `src/i18n/`. All user-facing strings go through `react-i18next` — no hardcoded strings in JSX.

@@ -31,6 +31,9 @@ import type { FuelLog, VehicleService } from '@/types'
 import VehicleLinkSection from './VehicleLinkSection'
 import { VEHICLE_LINK_INITIAL_STATE } from './vehicle-link-section.types'
 import type { VehicleLinkState } from './vehicle-link-section.types'
+import CrossCurrencyDialog from './CrossCurrencyDialog'
+import type { CrossCurrencyResult } from './CrossCurrencyDialog'
+import { formatCurrency } from '@/lib/currency'
 
 const TYPE_OPTIONS = [
   { value: 'expense',  label: 'transactions.expense' },
@@ -53,6 +56,9 @@ export default function TransactionForm() {
   const { categories } = useCategoriesStore()
   const { labels, load: loadLabels } = useLabelsStore()
   const { getRateForPair, load: loadRates } = useExchangeRatesStore()
+
+  // ─── Cross-currency transfer state ────────────────────────────────────────
+  const [crossCurrencyDialogOpen, setCrossCurrencyDialogOpen] = useState(false)
   const { baseCurrency, load: loadSettings } = useSettingsStore()
   const { addFuelLog, updateFuelLog, addService, updateService, load: loadVehicles } = useVehiclesStore()
   const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
@@ -71,6 +77,10 @@ export default function TransactionForm() {
 
   const existing = isEdit ? transactions.find((tx) => tx.id === id) : undefined
   const defaultAccount = accounts.find((account) => account.id === accountContextId) ?? visibleAccounts[0] ?? accounts[0]
+
+  const [crossCurrencyDestAmountCents, setCrossCurrencyDestAmountCents] = useState<number | null>(
+    () => existing?.originalAmount ?? null,
+  )
 
   // local label selection — ids of chosen labels
   const [selectedLabels, setSelectedLabels] = useState<string[]>(
@@ -291,6 +301,31 @@ export default function TransactionForm() {
   const watchStatus      = watch('status')
   const watchCurrency    = watch('currency')
   const watchRate        = watch('exchangeRate')
+  const watchAmount      = watch('amount')
+
+  const sourceAccount = useMemo(
+    () => accounts.find((a) => a.id === watchAccountId),
+    [accounts, watchAccountId],
+  )
+  const destAccount = useMemo(
+    () => accounts.find((a) => a.id === watchToAccountId),
+    [accounts, watchToAccountId],
+  )
+  const isCrossCurrencyTransfer = useMemo(
+    () =>
+      watchType === 'transfer' &&
+      !!sourceAccount &&
+      !!destAccount &&
+      sourceAccount.currency !== destAccount.currency,
+    [watchType, sourceAccount, destAccount],
+  )
+
+  // Reset dest amount when accounts change and currencies no longer differ
+  useEffect(() => {
+    if (!isCrossCurrencyTransfer) {
+      setCrossCurrencyDestAmountCents(null)
+    }
+  }, [isCrossCurrencyTransfer])
 
   // Auto-select vehicle link type when category matches fuel-gas or vehicle-maintenance
   useEffect(() => {
@@ -332,34 +367,52 @@ export default function TransactionForm() {
     if (acct) setValue('currency', acct.currency)
   }, [watchAccountId, accounts, setValue])
 
-  // Auto-fill exchange rate when currency differs from base
+  // Auto-fill exchange rate when account currency differs from base currency
+  // For cross-currency transfers the rate is managed via CrossCurrencyDialog
   useEffect(() => {
+    if (isCrossCurrencyTransfer) return
     if (!watchCurrency || watchCurrency === baseCurrency) {
       setValue('exchangeRate', '')
       return
     }
     const cached = getRateForPair(watchCurrency, baseCurrency)
     if (cached !== null) setValue('exchangeRate', cached.toFixed(6))
-  }, [watchCurrency, baseCurrency, getRateForPair, setValue])
+  }, [watchCurrency, baseCurrency, getRateForPair, setValue, isCrossCurrencyTransfer])
 
   const onSubmit = async (values: TransactionFormValues) => {
     const amountCents = Math.round(parseFloat(values.amount) * 100)
     const rateValue = values.exchangeRate ? parseFloat(values.exchangeRate) : undefined
     const isoDate = new Date(`${values.date}T${values.time}:00`).toISOString()
     const txId = isEdit && existing ? existing.id : uuid()
+
+    // Cross-currency transfer: record destination amount and currency
+    const toAcct = accounts.find((a) => a.id === values.toAccountId)
+    const srcAcct = accounts.find((a) => a.id === values.accountId)
+    const isCrossTransfer =
+      values.type === 'transfer' &&
+      !!toAcct && !!srcAcct &&
+      toAcct.currency !== srcAcct.currency
+
+    const originalAmount = isCrossTransfer
+      ? (crossCurrencyDestAmountCents ?? (rateValue ? Math.round(amountCents * rateValue) : undefined))
+      : undefined
+    const originalCurrency = isCrossTransfer ? toAcct!.currency : undefined
+
     const base = {
-      type:         values.type,
-      amount:       amountCents,
-      date:         isoDate,
-      categoryId:   values.categoryId,
-      accountId:    values.accountId,
-      toAccountId:  values.toAccountId || undefined,
-      description:  values.description,
-      notes:        values.notes || undefined,
-      status:       values.status,
-      currency:     values.currency,
-      exchangeRate: rateValue,
-      labels:       selectedLabels,
+      type:             values.type,
+      amount:           amountCents,
+      date:             isoDate,
+      categoryId:       values.categoryId,
+      accountId:        values.accountId,
+      toAccountId:      values.toAccountId || undefined,
+      description:      values.description,
+      notes:            values.notes || undefined,
+      status:           values.status,
+      currency:         values.currency,
+      exchangeRate:     rateValue,
+      labels:           selectedLabels,
+      originalAmount,
+      originalCurrency,
     }
 
     if (isEdit && existing) {
@@ -557,11 +610,60 @@ export default function TransactionForm() {
         />
       )}
 
+      {/* Cross-currency exchange rate button — transfers with mismatched currencies */}
+      {isCrossCurrencyTransfer && sourceAccount && destAccount && (
+        <div className="space-y-1">
+          <Label>{t('crossCurrency.sectionLabel')}</Label>
+          <button
+            type="button"
+            onClick={() => setCrossCurrencyDialogOpen(true)}
+            className="w-full flex items-center justify-between rounded-lg border px-4 py-3 text-sm hover:bg-accent transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <span className="font-mono bg-muted rounded px-1.5 py-0.5 text-xs">{sourceAccount.currency}</span>
+              <span className="text-muted-foreground">→</span>
+              <span className="font-mono bg-muted rounded px-1.5 py-0.5 text-xs">{destAccount.currency}</span>
+            </span>
+            {watchRate && parseFloat(watchRate) > 0 ? (
+              <span className="text-right">
+                <span className="font-medium tabular-nums">
+                  1 {sourceAccount.currency} = {parseFloat(watchRate).toFixed(4)} {destAccount.currency}
+                </span>
+                {crossCurrencyDestAmountCents !== null && (
+                  <span className="block text-xs text-muted-foreground">
+                    ≈ {formatCurrency(crossCurrencyDestAmountCents, destAccount.currency)}
+                  </span>
+                )}
+              </span>
+            ) : (
+              <span className="text-muted-foreground italic text-xs">{t('crossCurrency.notSet')}</span>
+            )}
+          </button>
+          {!watchRate && (
+            <p className="text-xs text-amber-600">{t('crossCurrency.requiredHint')}</p>
+          )}
+
+          <CrossCurrencyDialog
+            open={crossCurrencyDialogOpen}
+            onOpenChange={setCrossCurrencyDialogOpen}
+            fromCurrency={sourceAccount.currency}
+            toCurrency={destAccount.currency}
+            sourceAmountCents={Math.round(parseFloat(watchAmount || '0') * 100)}
+            initialRate={watchRate ? parseFloat(watchRate) : undefined}
+            onConfirm={({ rate, destAmountCents }: CrossCurrencyResult) => {
+              setValue('exchangeRate', rate.toFixed(6))
+              setCrossCurrencyDestAmountCents(destAmountCents)
+              setCrossCurrencyDialogOpen(false)
+            }}
+          />
+        </div>
+      )}
+
       {/* Status */}
       <StatusSelect value={watchStatus || 'cleared'} onChange={(v) => setValue('status', v)} />
 
-      {/* Exchange rate — only when account currency differs from base currency */}
-      {watchCurrency && watchCurrency !== baseCurrency && (
+      {/* Exchange rate — only when account currency differs from base currency (non-cross-currency-transfer) */}
+      {!isCrossCurrencyTransfer && watchCurrency && watchCurrency !== baseCurrency && (
         <div className="space-y-1">
           <Label>{t('transactions.exchangeRate', 'Exchange Rate')}</Label>
           <Input

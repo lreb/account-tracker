@@ -533,7 +533,24 @@
     "rate": "Rate",
     "rateHint": "e.g. 1.085 means 1 {{from}} = 1.085 {{to}}",
     "offlineWarning": "Offline — showing cached rates",
-    "autoFilled": "Auto-filled from cache"
+    "autoFilled": "Auto-filled from cache",
+    "rateUpdated": "Rate updated from Frankfurter",
+    "fetchFailed": "Could not fetch rate — check your connection"
+  },
+  "crossCurrency": {
+    "title": "Set Exchange Rate",
+    "sectionLabel": "Exchange Rate",
+    "source": "From (source)",
+    "destination": "To (destination)",
+    "rateLabel": "1 {{from}} = ? {{to}}",
+    "rateHint": "How many {{to}} you get for 1 {{from}}.",
+    "fetchLatest": "Fetch rate",
+    "useCached": "Use cached ({{rate}})",
+    "rateUpdated": "Rate fetched from Frankfurter",
+    "fetchFailed": "Could not fetch rate — check your connection",
+    "notSet": "Tap to set rate",
+    "requiredHint": "Set the exchange rate for this cross-currency transfer.",
+    "enterAmountFirst": "Enter amount first"
   },
   "validation": {
     "nameRequired": "Name is required",

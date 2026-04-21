@@ -438,7 +438,7 @@ export default function BalanceSheetPage() {
                                     </p>
                                     <div className="text-right shrink-0">
                                       <p className={`text-sm font-semibold ${snapshot.currentBalance < 0 ? 'text-red-500' : 'text-gray-900'}`}>
-                                        {formatCurrency(snapshot.currentBalance, snapshot.account.currency)}XX
+                                        {formatCurrency(snapshot.currentBalance, snapshot.account.currency)}
                                       </p>
                                       {balDelta !== 0 && (
                                         <span className={`inline-flex items-center gap-0.5 text-[11px] font-medium ${nwDelta > 0 ? 'text-green-600' : 'text-red-500'}`}>
