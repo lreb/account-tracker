@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
 import { v4 as uuid } from 'uuid'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, Tag } from 'lucide-react'
+import { Plus, Pencil, Trash2, Tag, AlertTriangle } from 'lucide-react'
 
 import { useLabelsStore } from '@/stores/labels.store'
+import { useTransactionsStore } from '@/stores/transactions.store'
 import type { Label } from '@/types'
 
 import { Button } from '@/components/ui/button'
@@ -19,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog'
 
 // ─── Preset colors ────────────────────────────────────────────────────────────
@@ -131,14 +133,57 @@ function LabelDialog({
 export default function LabelsSettingsPage() {
   const { t } = useTranslation()
   const { labels, load, remove } = useLabelsStore()
+  const transactions = useTransactionsStore((s) => s.transactions)
+  const removeLabelFromTransactions = useTransactionsStore((s) => s.removeLabelFromTransactions)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Label | null>(null)
+  const [confirmOrphanId, setConfirmOrphanId] = useState<string | null>(null)
 
   useEffect(() => { load() }, [load])
+
+  // Label IDs referenced in transactions but not present in the labels table
+  const orphanLabels = useMemo<Label[]>(() => {
+    const knownIds = new Set(labels.map((l) => l.id))
+    const orphanIds = new Set<string>()
+    for (const tx of transactions) {
+      for (const id of tx.labels ?? []) {
+        if (!knownIds.has(id)) orphanIds.add(id)
+      }
+    }
+    return Array.from(orphanIds).map((id) => ({ id, name: id, color: '#6b7280' }))
+  }, [transactions, labels])
+
+  const orphanIds = useMemo(() => new Set(orphanLabels.map((l) => l.id)), [orphanLabels])
+
+  const orphanTxCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const tx of transactions) {
+      for (const id of tx.labels ?? []) {
+        if (orphanIds.has(id)) counts.set(id, (counts.get(id) ?? 0) + 1)
+      }
+    }
+    return counts
+  }, [transactions, orphanIds])
+
+  const allLabels = useMemo(
+    () => [...labels, ...orphanLabels].sort((a, b) => a.name.localeCompare(b.name)),
+    [labels, orphanLabels],
+  )
 
   const openAdd = () => { setEditing(null); setDialogOpen(true) }
   const openEdit = (l: Label) => { setEditing(l); setDialogOpen(true) }
   const closeDialog = () => { setDialogOpen(false); setEditing(null) }
+
+  const handleDelete = async (id: string) => {
+    await remove(id)
+    await removeLabelFromTransactions(id)
+  }
+
+  const handleOrphanCleanup = async () => {
+    if (!confirmOrphanId) return
+    await removeLabelFromTransactions(confirmOrphanId)
+    setConfirmOrphanId(null)
+  }
 
   return (
     <div className="p-4 pb-24">
@@ -150,7 +195,7 @@ export default function LabelsSettingsPage() {
         </Button>
       </div>
 
-      {labels.length === 0 ? (
+      {allLabels.length === 0 ? (
         <div className="text-center mt-16 space-y-2">
           <Tag size={40} className="mx-auto text-gray-300" />
           <p className="text-sm text-gray-400">No labels yet.</p>
@@ -160,7 +205,7 @@ export default function LabelsSettingsPage() {
         </div>
       ) : (
         <ul className="space-y-2">
-          {[...labels].sort((a, b) => a.name.localeCompare(b.name)).map((label) => (
+          {allLabels.map((label) => (
             <li
               key={label.id}
               className="flex items-center gap-3 rounded-2xl border bg-white px-4 py-3"
@@ -177,8 +222,19 @@ export default function LabelsSettingsPage() {
                   color: label.color ?? '#6b7280',
                 }}
               >
-                {label.name}
+                {orphanIds.has(label.id)
+                  ? <span className="italic max-w-[14ch] truncate inline-block">{label.name}</span>
+                  : label.name}
               </span>
+              {orphanIds.has(label.id) && (
+                <span
+                  title={t('settings.labelsOrphanHint')}
+                  className="flex items-center gap-1 shrink-0 rounded-full bg-amber-50 border border-amber-300 px-2 py-0.5"
+                >
+                  <AlertTriangle size={11} className="text-amber-500" />
+                  <span className="text-[10px] font-medium text-amber-600">{t('settings.labelsOrphanBadge')}</span>
+                </span>
+              )}
               <div className="flex gap-1 ml-auto shrink-0">
                 <Button
                   variant="ghost"
@@ -192,7 +248,7 @@ export default function LabelsSettingsPage() {
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 text-red-500 hover:text-red-600"
-                  onClick={() => remove(label.id)}
+                  onClick={() => orphanIds.has(label.id) ? setConfirmOrphanId(label.id) : handleDelete(label.id)}
                 >
                   <Trash2 size={15} />
                 </Button>
@@ -203,6 +259,29 @@ export default function LabelsSettingsPage() {
       )}
 
       <LabelDialog open={dialogOpen} editing={editing} onClose={closeDialog} />
+
+      {/* ── Orphan cleanup confirmation ──────────────────────────────── */}
+      <Dialog open={confirmOrphanId !== null} onOpenChange={(v) => { if (!v) setConfirmOrphanId(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t('settings.labelsOrphanCleanupTitle')}</DialogTitle>
+            <DialogDescription>
+              {t('settings.labelsOrphanCleanupDesc', {
+                count: orphanTxCounts.get(confirmOrphanId ?? '') ?? 0,
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 pt-2">
+            <Button variant="outline" onClick={() => setConfirmOrphanId(null)}>
+              {t('common.cancel')}
+            </Button>
+            <Button variant="destructive" onClick={handleOrphanCleanup}>
+              {t('settings.labelsOrphanCleanupAction')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <ScrollToTopButton />
     </div>
   )

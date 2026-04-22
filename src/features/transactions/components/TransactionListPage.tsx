@@ -13,6 +13,7 @@ import { getAccountBalanceAtDate } from '@/lib/balance-sheet'
 import type { Transaction } from '@/types'
 import { db } from '@/db'
 import { TransactionList } from './TransactionList'
+import DueRemindersSection from '@/features/reminders/components/DueRemindersSection'
 import {
   EMPTY_TX_LIST_FILTERS,
   DEFAULT_TX_LIST_QUICK_RANGE,
@@ -166,18 +167,21 @@ export default function TransactionListPage() {
   }, [visibleAccounts, allTxByAccount, accountMap])
 
   return (
-    <TransactionList
-      transactions={visibleTransactions}
-      loading={loading}
-      returnTo={listReturnTo}
-      balanceMap={balanceAfterTx}
-      layout="page"
-      showQuickRangePicker
-      initialFilters={initialFilters}
-      initialQuickRange={initialQuickRange}
-      onFiltersChange={(f) => { persistedFilters = f }}
-      onQuickRangeChange={(qr) => { persistedQuickRange = qr }}
-      onLoadRange={(since) => loadTx(since)}
-    />
+    <>
+      <DueRemindersSection />
+      <TransactionList
+        transactions={visibleTransactions}
+        loading={loading}
+        returnTo={listReturnTo}
+        balanceMap={balanceAfterTx}
+        layout="page"
+        showQuickRangePicker
+        initialFilters={initialFilters}
+        initialQuickRange={initialQuickRange}
+        onFiltersChange={(f) => { persistedFilters = f }}
+        onQuickRangeChange={(qr) => { persistedQuickRange = qr }}
+        onLoadRange={(since) => loadTx(since)}
+      />
+    </>
   )
 }

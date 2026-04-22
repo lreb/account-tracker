@@ -14,6 +14,7 @@ import {
   Tag,
   RefreshCw,
   X,
+  Bell,
 } from 'lucide-react'
 import { useVehiclesStore } from '@/stores/vehicles.store'
 import SidebarGoogleAuthSection from './SidebarGoogleAuthSection'
@@ -30,7 +31,8 @@ const mainItems = [
   { to: '/balance-sheet', icon: Scale,           labelKey: 'nav.balanceSheet', end: false },
   { to: '/reports',       icon: BarChart3,       labelKey: 'nav.reports',      end: false },
   { to: '/budgets',       icon: PiggyBank,       labelKey: 'nav.budgets',      end: false },
-  { to: '/insights',      icon: Lightbulb,       labelKey: 'nav.insights',     end: true },
+  { to: '/insights',      icon: Lightbulb,       labelKey: 'nav.insights',     end: false },
+  { to: '/reminders',     icon: Bell,            labelKey: 'nav.reminders',    end: false },
 ] as const
 
 const settingsItems = [

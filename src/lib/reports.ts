@@ -321,6 +321,7 @@ export function computeLabelBreakdown(
   labels: Label[],
   filters: ReportFilters,
   visibleAccountIds?: Set<string>,
+  untaggedLabel = 'Untagged',
 ): LabelSlice[] {
   const fromISO = filters.from.toISOString()
   const toISO   = filters.to.toISOString()
@@ -359,7 +360,7 @@ export function computeLabelBreakdown(
       const label = labelMap.get(labelId)
       return {
         labelId,
-        name:    labelId === '_none' ? 'Untagged' : (label?.name ?? labelId),
+        name:    labelId === '_none' ? untaggedLabel : (label?.name ?? labelId),
         color:   labelId === '_none' ? '#9ca3af'  : (label?.color ?? '#6366f1'),
         income:   acc.income,
         expenses: acc.expenses,
