@@ -13,10 +13,10 @@ import { getTranslatedCategoryName } from '@/lib/categories'
 import { transactionSchema, type TransactionFormValues } from '../schemas/transaction.schema'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useAccountsStore } from '@/stores/accounts.store'
-import { useCategoriesStore } from '@/stores/categories.store'
 import { useLabelsStore } from '@/stores/labels.store'
 import { useExchangeRatesStore } from '@/stores/exchange-rates.store'
 import { useSettingsStore } from '@/stores/settings.store'
+import { useTransactionCoreFields } from '@/hooks/useTransactionCoreFields'
 
 import { Button } from '@/components/ui/button'
 import { AmountCalculatorButton } from '@/components/ui/amount-calculator-button'
@@ -54,15 +54,13 @@ export default function TransactionForm() {
 
   const { transactions, loading, load: loadTransactions, add, update } = useTransactionsStore()
   const { accounts } = useAccountsStore()
-  const { categories } = useCategoriesStore()
   const { labels, load: loadLabels } = useLabelsStore()
-  const { getRateForPair, load: loadRates } = useExchangeRatesStore()
+  const { load: loadRates } = useExchangeRatesStore()
 
   // ─── Cross-currency transfer state ────────────────────────────────────────
   const [crossCurrencyDialogOpen, setCrossCurrencyDialogOpen] = useState(false)
   const { baseCurrency, load: loadSettings } = useSettingsStore()
   const { addFuelLog, updateFuelLog, addService, updateService, load: loadVehicles } = useVehiclesStore()
-  const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
 
   // Ensure the store is hydrated before we try to find the transaction.
   // On a hard refresh to /transactions/:id the store starts empty.
@@ -77,7 +75,7 @@ export default function TransactionForm() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const existing = isEdit ? transactions.find((tx) => tx.id === id) : undefined
-  const defaultAccount = accounts.find((account) => account.id === accountContextId) ?? visibleAccounts[0] ?? accounts[0]
+  const defaultAccount = accounts.find((account) => account.id === accountContextId) ?? getVisibleAccounts(accounts)[0] ?? accounts[0]
 
   const [crossCurrencyDestAmountCents, setCrossCurrencyDestAmountCents] = useState<number | null>(
     () => existing?.originalAmount ?? null,
@@ -297,22 +295,21 @@ export default function TransactionForm() {
   const watchRate        = watch('exchangeRate')
   const watchAmount      = watch('amount')
 
-  const sourceAccount = useMemo(
-    () => accounts.find((a) => a.id === watchAccountId),
-    [accounts, watchAccountId],
-  )
-  const destAccount = useMemo(
-    () => accounts.find((a) => a.id === watchToAccountId),
-    [accounts, watchToAccountId],
-  )
-  const isCrossCurrencyTransfer = useMemo(
-    () =>
-      watchType === 'transfer' &&
-      !!sourceAccount &&
-      !!destAccount &&
-      sourceAccount.currency !== destAccount.currency,
-    [watchType, sourceAccount, destAccount],
-  )
+  const {
+    categories,
+    sourceAccount,
+    destAccount,
+    isCrossCurrencyTransfer,
+    filteredCategories,
+  } = useTransactionCoreFields({
+    watchType,
+    watchAccountId,
+    watchToAccountId,
+    watchCurrency,
+    setValue,
+    existingCategoryId: existing?.categoryId,
+    isEdit,
+  })
 
   // Reset dest amount when accounts change and currencies no longer differ
   useEffect(() => {
@@ -339,39 +336,6 @@ export default function TransactionForm() {
     return getAccountSelectOptions(accounts, [watchToAccountId ?? '', existing?.toAccountId ?? ''])
       .filter((account) => account.id !== watchAccountId)
   }, [accounts, watchAccountId, watchToAccountId, existing])
-
-  // Filter categories by selected transaction type and exclude soft-deleted
-  const filteredCategories = useMemo(() => {
-    const active = categories.filter((c) => {
-      if (c.deletedAt) return false
-      if (watchType === 'transfer') return true
-      return c.type === watchType || c.type === 'any'
-    })
-    // Keep the currently-assigned category visible even if deleted/mismatched
-    if (isEdit && existing && !active.find((c) => c.id === existing.categoryId)) {
-      const assigned = categories.find((c) => c.id === existing.categoryId)
-      if (assigned) active.unshift(assigned)
-    }
-    return active
-  }, [categories, watchType, isEdit, existing])
-
-  // Keep currency in sync with selected account
-  useEffect(() => {
-    const acct = accounts.find((a) => a.id === watchAccountId)
-    if (acct) setValue('currency', acct.currency)
-  }, [watchAccountId, accounts, setValue])
-
-  // Auto-fill exchange rate when account currency differs from base currency
-  // For cross-currency transfers the rate is managed via CrossCurrencyDialog
-  useEffect(() => {
-    if (isCrossCurrencyTransfer) return
-    if (!watchCurrency || watchCurrency === baseCurrency) {
-      setValue('exchangeRate', '')
-      return
-    }
-    const cached = getRateForPair(watchCurrency, baseCurrency)
-    if (cached !== null) setValue('exchangeRate', cached.toFixed(6))
-  }, [watchCurrency, baseCurrency, getRateForPair, setValue, isCrossCurrencyTransfer])
 
   const onSubmit = async (values: TransactionFormValues) => {
     const amountCents = Math.round(parseFloat(values.amount) * 100)

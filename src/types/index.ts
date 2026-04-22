@@ -6,6 +6,7 @@ export type AccountType = 'asset' | 'liability'
 export type CategoryType = 'income' | 'expense' | 'any'
 export type BudgetPeriod = 'weekly' | 'monthly' | 'yearly'
 export type AppTheme = 'light' | 'dark' | 'system'
+export type RecurringInterval = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'yearly'
 
 // ─── Core domain types ───────────────────────────────────────────────────────
 
@@ -110,4 +111,32 @@ export interface VehicleService {
   nextServiceKm?: number
   nextServiceDate?: string    // ISO 8601
   transactionId?: string      // linked expense transaction
+}
+
+// ─── Recurring Transactions (Reminders) ─────────────────────────────────────
+
+export interface RecurringTransaction {
+  id: string
+  // ─── Transaction template ─────────────────────────────────────────────────
+  type: TransactionType
+  amount: number              // integer cents in account's currency
+  categoryId: string
+  accountId: string
+  toAccountId?: string        // transfers only
+  description: string
+  notes?: string
+  status: TransactionStatus   // status applied to generated transactions
+  labels?: string[]           // label ids
+  currency: string            // ISO 4217
+  exchangeRate?: number
+  // ─── Schedule ─────────────────────────────────────────────────────────────
+  interval: RecurringInterval
+  startDate: string           // ISO 8601 date of first occurrence
+  time: string                // HH:mm — time of day for generated transactions
+  totalOccurrences: number    // expected total payment count
+  occurrencesFired: number    // how many have been applied so far
+  nextDueDate: string         // ISO 8601 date — next scheduled occurrence
+  // ─── Metadata ─────────────────────────────────────────────────────────────
+  createdAt: string           // ISO 8601
+  active: boolean             // false when paused or all occurrences completed
 }

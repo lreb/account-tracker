@@ -38,7 +38,14 @@ export const useLabelsStore = create<LabelsState>((set) => ({
   update: async (label) => {
     try {
       await db.labels.put(label)
-      set((s) => ({ labels: s.labels.map((l) => (l.id === label.id ? label : l)) }))
+      set((s) => {
+        const exists = s.labels.some((l) => l.id === label.id)
+        return {
+          labels: exists
+            ? s.labels.map((l) => (l.id === label.id ? label : l))
+            : [...s.labels, label],
+        }
+      })
       toast.success('Label updated')
     } catch (err) {
       console.error(err)

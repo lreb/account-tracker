@@ -23,6 +23,8 @@ import GoogleDriveSyncPage from '@/features/settings/components/settings/GoogleD
 import DataRetentionPage from '@/features/settings/components/settings/DataRetentionPage'
 import PreferencesPage from '@/features/settings/components/settings/PreferencesPage'
 import OAuthCallbackPage from '@/features/settings/components/OAuthCallbackPage'
+import RemindersPage from '@/features/reminders/components/RemindersPage'
+import RecurringTransactionFormPage from '@/features/reminders/components/RecurringTransactionFormPage'
 
 export const router = createBrowserRouter([
   // OAuth callback — outside Shell so there's no nav chrome during the redirect
@@ -46,6 +48,9 @@ export const router = createBrowserRouter([
       { path: 'reports', element: <ReportsPage /> },
       { path: 'budgets', element: <BudgetsPage /> },
       { path: 'insights', element: <InsightsPage /> },
+      { path: 'reminders', element: <RemindersPage /> },
+      { path: 'reminders/new', element: <RecurringTransactionFormPage /> },
+      { path: 'reminders/:id', element: <RecurringTransactionFormPage /> },
       {
         path: 'settings',
         children: [

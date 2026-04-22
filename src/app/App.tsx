@@ -11,6 +11,7 @@ import { useCategoriesStore } from '@/stores/categories.store'
 import { useBudgetsStore } from '@/stores/budgets.store'
 import { useVehiclesStore } from '@/stores/vehicles.store'
 import { useSettingsStore } from '@/stores/settings.store'
+import { useLabelsStore } from '@/stores/labels.store'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -44,6 +45,7 @@ export default function App() {
   const loadBudgets      = useBudgetsStore((s) => s.load)
   const loadVehicles     = useVehiclesStore((s) => s.load)
   const loadSettings     = useSettingsStore((s) => s.load)
+  const loadLabels       = useLabelsStore((s) => s.load)
   const saveSetting      = useSettingsStore((s) => s.saveSetting)
   const language         = useSettingsStore((s) => s.language)
 
@@ -55,8 +57,9 @@ export default function App() {
       loadBudgets(),
       loadVehicles(),
       loadSettings(),
+      loadLabels(),
     ])
-  }, [loadTransactions, loadAccounts, loadCategories, loadBudgets, loadVehicles, loadSettings])
+  }, [loadTransactions, loadAccounts, loadCategories, loadBudgets, loadVehicles, loadSettings, loadLabels])
 
   // Keep i18n in sync with the persisted language preference
   useEffect(() => { void i18n.changeLanguage(language) }, [language])

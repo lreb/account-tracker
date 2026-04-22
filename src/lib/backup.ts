@@ -1,7 +1,7 @@
 import { db } from '@/db'
 import type {
   Account, Budget, Category, ExchangeRate,
-  FuelLog, Label, Setting, Transaction,
+  FuelLog, Label, RecurringTransaction, Setting, Transaction,
   Vehicle, VehicleService,
 } from '@/types'
 
@@ -21,6 +21,7 @@ export interface FullBackup {
     vehicles: Vehicle[]
     fuelLogs: FuelLog[]
     vehicleServices: VehicleService[]
+    recurringTransactions: RecurringTransaction[]
   }
 }
 
@@ -29,7 +30,7 @@ export async function buildFullBackup(): Promise<FullBackup> {
   const [
     transactions, accounts, categories, labels,
     exchangeRates, settings, budgets, vehicles,
-    fuelLogs, vehicleServices,
+    fuelLogs, vehicleServices, recurringTransactions,
   ] = await Promise.all([
     db.transactions.toArray(),
     db.accounts.toArray(),
@@ -41,6 +42,7 @@ export async function buildFullBackup(): Promise<FullBackup> {
     db.vehicles.toArray(),
     db.fuelLogs.toArray(),
     db.vehicleServices.toArray(),
+    db.recurringTransactions.toArray(),
   ])
 
   return {
@@ -49,7 +51,7 @@ export async function buildFullBackup(): Promise<FullBackup> {
     data: {
       transactions, accounts, categories, labels,
       exchangeRates, settings, budgets, vehicles,
-      fuelLogs, vehicleServices,
+      fuelLogs, vehicleServices, recurringTransactions,
     },
   }
 }
@@ -95,7 +97,7 @@ export async function restoreFromBackup(backup: FullBackup): Promise<void> {
     db.transactions.clear(), db.accounts.clear(), db.categories.clear(),
     db.labels.clear(), db.exchangeRates.clear(), db.settings.clear(),
     db.budgets.clear(), db.vehicles.clear(), db.fuelLogs.clear(),
-    db.vehicleServices.clear(),
+    db.vehicleServices.clear(), db.recurringTransactions.clear(),
   ])
 
   // Re-populate with backup data
@@ -110,6 +112,7 @@ export async function restoreFromBackup(backup: FullBackup): Promise<void> {
     data.vehicles.length > 0 ? db.vehicles.bulkPut(data.vehicles) : Promise.resolve(),
     data.fuelLogs.length > 0 ? db.fuelLogs.bulkPut(data.fuelLogs) : Promise.resolve(),
     data.vehicleServices.length > 0 ? db.vehicleServices.bulkPut(data.vehicleServices) : Promise.resolve(),
+    data.recurringTransactions?.length > 0 ? db.recurringTransactions.bulkPut(data.recurringTransactions) : Promise.resolve(),
   ])
 }
 
@@ -122,6 +125,6 @@ export async function resetApp(): Promise<void> {
     db.transactions.clear(), db.accounts.clear(), db.categories.clear(),
     db.labels.clear(), db.exchangeRates.clear(), db.settings.clear(),
     db.budgets.clear(), db.vehicles.clear(), db.fuelLogs.clear(),
-    db.vehicleServices.clear(),
+    db.vehicleServices.clear(), db.recurringTransactions.clear(),
   ])
 }

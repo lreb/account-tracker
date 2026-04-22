@@ -11,6 +11,7 @@ interface TransactionsState {
   update: (t: Transaction) => Promise<void>
   remove: (id: string) => Promise<void>
   removeMany: (ids: string[]) => void  // sync in-memory removal (DB already deleted by caller)
+  removeLabelFromTransactions: (labelId: string) => Promise<void>
 }
 
 export const useTransactionsStore = create<TransactionsState>((set) => ({
@@ -72,5 +73,24 @@ export const useTransactionsStore = create<TransactionsState>((set) => ({
   removeMany: (ids) => {
     const set_ = new Set(ids)
     set((s) => ({ transactions: s.transactions.filter((t) => !set_.has(t.id)) }))
+  },
+
+  removeLabelFromTransactions: async (labelId) => {
+    try {
+      const allTx = await db.transactions.toArray()
+      const affected = allTx.filter((t) => t.labels?.includes(labelId))
+      if (affected.length === 0) return
+      const updated = affected.map((t) => ({ ...t, labels: t.labels!.filter((l) => l !== labelId) }))
+      await db.transactions.bulkPut(updated)
+      set((s) => ({
+        transactions: s.transactions.map((t) =>
+          t.labels?.includes(labelId)
+            ? { ...t, labels: t.labels.filter((l) => l !== labelId) }
+            : t,
+        ),
+      }))
+    } catch (err) {
+      console.error(err)
+    }
   },
 }))

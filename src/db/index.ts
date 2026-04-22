@@ -1,4 +1,4 @@
-// Current DB version: 7
+// Current DB version: 8
 import Dexie, { type Table } from 'dexie'
 import type {
   Account,
@@ -7,6 +7,7 @@ import type {
   ExchangeRate,
   FuelLog,
   Label,
+  RecurringTransaction,
   Setting,
   Transaction,
   Vehicle,
@@ -24,6 +25,7 @@ class ExpenseTrackingDB extends Dexie {
   vehicles!: Table<Vehicle, string>
   fuelLogs!: Table<FuelLog, string>
   vehicleServices!: Table<VehicleService, string>
+  recurringTransactions!: Table<RecurringTransaction, string>
 
   constructor() {
     super('ExpenseTracking')
@@ -78,6 +80,10 @@ class ExpenseTrackingDB extends Dexie {
       return tx.table('accounts').toCollection().modify((account) => {
         if (account.cancelled == null) account.cancelled = false
       })
+    })
+    // Version 8: add recurringTransactions table for scheduled/reminder transactions
+    this.version(8).stores({
+      recurringTransactions: 'id, nextDueDate, accountId, categoryId, active',
     })
   }
 }

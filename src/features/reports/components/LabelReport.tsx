@@ -77,9 +77,10 @@ export function LabelReport({
   }, [preset, customFrom, customTo])
 
   // Full breakdown (computeLabelBreakdown already sorts descending by expenses)
+  const untaggedLabel = t('reports.untagged')
   const breakdown = useMemo(
-    () => computeLabelBreakdown(transactions, labels, filters, visibleAccountIds),
-    [transactions, labels, filters, visibleAccountIds],
+    () => computeLabelBreakdown(transactions, labels, filters, visibleAccountIds, untaggedLabel),
+    [transactions, labels, filters, visibleAccountIds, untaggedLabel],
   )
 
   // Apply label chip filter — only expense-bearing slices, re-sorted descending
@@ -214,7 +215,7 @@ export function LabelReport({
                     style={{ background: slice.color }}
                   />
                   <span className="text-sm font-medium text-gray-800 flex-1 truncate">
-                    {slice.name}
+                    {slice.name} 
                   </span>
                   <span className="text-xs text-gray-400 shrink-0">
                     {slice.txCount === 1
