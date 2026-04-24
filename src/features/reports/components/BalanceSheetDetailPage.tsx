@@ -75,7 +75,14 @@ export default function BalanceSheetDetailPage() {
   const { categories } = useCategoriesStore()
   const { labels } = useLabelsStore()
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [filters, setFilters] = useState<DetailFilters>(EMPTY_FILTERS)
+  const [filters, setFilters] = useState<DetailFilters>(() => ({
+    search:     searchParams.get('search')     ?? '',
+    status:     (searchParams.get('status')     ?? '') as DetailFilters['status'],
+    categoryId: searchParams.get('categoryId') ?? '',
+    labelId:    searchParams.get('labelId')    ?? '',
+    dateFrom:   searchParams.get('dateFrom')   ?? '',
+    dateTo:     searchParams.get('dateTo')     ?? '',
+  }))
   const [draft, setDraft] = useState<DetailFilters>(EMPTY_FILTERS)
   const [draftPeriod, setDraftPeriod] = useState<BalanceSheetPreset>('endLastMonth')
   const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
@@ -115,6 +122,12 @@ export default function BalanceSheetDetailPage() {
     setFilters(draft)
     const next = new URLSearchParams(searchParams)
     next.set('period', draftPeriod)
+    if (draft.search)     { next.set('search',     draft.search)     } else { next.delete('search') }
+    if (draft.status)     { next.set('status',     draft.status)     } else { next.delete('status') }
+    if (draft.categoryId) { next.set('categoryId', draft.categoryId) } else { next.delete('categoryId') }
+    if (draft.labelId)    { next.set('labelId',    draft.labelId)    } else { next.delete('labelId') }
+    if (draft.dateFrom)   { next.set('dateFrom',   draft.dateFrom)   } else { next.delete('dateFrom') }
+    if (draft.dateTo)     { next.set('dateTo',     draft.dateTo)     } else { next.delete('dateTo') }
     setSearchParams(next)
     setFiltersOpen(false)
   }
@@ -122,12 +135,17 @@ export default function BalanceSheetDetailPage() {
     setDraft(EMPTY_FILTERS)
     setDraftPeriod('endLastMonth')
     setFilters(EMPTY_FILTERS)
-    const next = new URLSearchParams(searchParams)
+    const next = new URLSearchParams()
     next.set('period', 'endLastMonth')
     setSearchParams(next)
     setFiltersOpen(false)
   }
-  const removeChip = (key: keyof DetailFilters) => setFilters((prev) => ({ ...prev, [key]: '' }))
+  const removeChip = (key: keyof DetailFilters) => {
+    setFilters((prev) => ({ ...prev, [key]: '' }))
+    const next = new URLSearchParams(searchParams)
+    next.delete(key)
+    setSearchParams(next, { replace: true })
+  }
 
   const account = visibleAccounts.find((item) => item.id === accountId) ?? null
 
@@ -254,7 +272,7 @@ export default function BalanceSheetDetailPage() {
   }, [])
 
   const overviewUrl = `/balance-sheet?period=${selectedPreset}`
-  const returnTo = `/balance-sheet/${accountId}?period=${selectedPreset}`
+  const returnTo = `/balance-sheet/${accountId}?${searchParams.toString()}`
 
   const activeCount = [filters.search, filters.status, filters.categoryId, filters.labelId, filters.dateFrom, filters.dateTo].filter(Boolean).length
 

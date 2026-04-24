@@ -10,7 +10,7 @@ import { useCategoriesStore } from '@/stores/categories.store'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { useLabelsStore } from '@/stores/labels.store'
-import { getTranslatedCategoryName } from '@/lib/categories'
+import { getTranslatedCategoryName, sortCategories } from '@/lib/categories'
 import { getVisibleAccounts } from '@/lib/accounts'
 import type { Transaction } from '@/types'
 
@@ -525,7 +525,7 @@ export function TransactionList({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">{t('transactions.filters.allCategories')}</SelectItem>
-                  {categories.filter((cat) => !cat.deletedAt).map((cat) => (
+                  {sortCategories(categories.filter((cat) => !cat.deletedAt), t).map((cat) => (
                     <SelectItem key={cat.id} value={cat.id}>{getTranslatedCategoryName(cat, t)}</SelectItem>
                   ))}
                 </SelectContent>

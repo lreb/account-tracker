@@ -60,3 +60,17 @@ export function getTranslatedCategoryName(
 
   return category.name
 }
+
+/**
+ * Returns a new array of categories sorted alphabetically by their translated
+ * display name. Use this everywhere categories are listed in the UI to ensure
+ * consistent ordering across all sections.
+ */
+export function sortCategories<T extends Pick<Category, 'id' | 'name' | 'isCustom'>>(
+  categories: T[],
+  t: (key: string) => string,
+): T[] {
+  return [...categories].sort((a, b) =>
+    getTranslatedCategoryName(a, t).localeCompare(getTranslatedCategoryName(b, t)),
+  )
+}

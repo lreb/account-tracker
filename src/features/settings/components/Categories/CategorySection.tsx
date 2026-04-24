@@ -1,6 +1,6 @@
 import { Pencil, Trash2, RotateCcw } from 'lucide-react'
 
-import { getTranslatedCategoryName } from '@/lib/categories'
+import { getTranslatedCategoryName, sortCategories } from '@/lib/categories'
 import { CategoryIcon } from '@/lib/icon-map'
 import type { Category, CategoryType } from '@/types'
 
@@ -24,11 +24,8 @@ export default function CategorySection({
   onRestore,
   t,
 }: CategorySectionProps) {
-  const sortByName = (a: Category, b: Category) =>
-    getTranslatedCategoryName(a, t).localeCompare(getTranslatedCategoryName(b, t))
-
-  const active = items.filter((c) => !c.deletedAt).sort(sortByName)
-  const archived = items.filter((c) => !!c.deletedAt).sort(sortByName)
+  const active = sortCategories(items.filter((c) => !c.deletedAt), t)
+  const archived = sortCategories(items.filter((c) => !!c.deletedAt), t)
 
   if (active.length === 0 && archived.length === 0) return null
 

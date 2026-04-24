@@ -16,7 +16,7 @@ import {
   getAccountSelectOptions,
   getVisibleAccounts,
 } from '@/lib/accounts'
-import { getTranslatedCategoryName } from '@/lib/categories'
+import { getTranslatedCategoryName, sortCategories } from '@/lib/categories'
 import {
   getOdometerNeighbors,
   getServiceTypeLabel,
@@ -306,7 +306,10 @@ export default function ServiceFormPage() {
     navigate(returnToPath)
   }
 
-  const filteredCategories = categories.filter((c) => !c.deletedAt && (c.type === 'expense' || c.type === 'any'))
+  const filteredCategories = sortCategories(
+    categories.filter((c) => !c.deletedAt && (c.type === 'expense' || c.type === 'any')),
+    t,
+  )
 
   return (
     <div className="p-4 pb-24 max-w-xl mx-auto space-y-4">

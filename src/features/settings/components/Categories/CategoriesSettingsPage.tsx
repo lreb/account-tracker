@@ -5,7 +5,7 @@ import { Plus } from 'lucide-react'
 import { useCategoriesStore } from '@/stores/categories.store'
 import type { Category, CategoryType } from '@/types'
 
-import { Button } from '@/components/ui/button'
+import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
 import CategoryDialog from './CategoryDialog'
 import CategorySection from './CategorySection'
 
@@ -42,13 +42,9 @@ export default function CategoriesSettingsPage() {
   }
 
   return (
-    <div className="p-4">
-      <div className="flex items-center justify-between mb-4">
+    <div className="p-4 pb-24">
+      <div className="mb-4">
         <h1 className="text-xl font-bold">{t('settings.categories')}</h1>
-        <Button size="sm" onClick={openCreate} className="gap-1">
-          <Plus size={16} />
-          {t('common.add')}
-        </Button>
       </div>
 
       {CATEGORY_TYPES.map((type) => (
@@ -64,6 +60,19 @@ export default function CategoriesSettingsPage() {
       ))}
 
       <CategoryDialog open={dialogOpen} onClose={closeDialog} editing={editing} />
+
+      {/* Floating add button */}
+      <button
+        type="button"
+        onClick={openCreate}
+        aria-label={t('common.add')}
+        title={t('common.add')}
+        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg hover:bg-emerald-600 active:scale-95 transition-all"
+      >
+        <Plus size={24} strokeWidth={2.5} />
+      </button>
+
+      <ScrollToTopButton />
     </div>
   )
 }
