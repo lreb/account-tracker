@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ChevronDown, ChevronRight, Info, SlidersHorizontal, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
@@ -42,6 +42,8 @@ const DEFAULT_PRESET: BalanceSheetPreset = 'endLastMonth'
 
 // Persists selected preset across navigation within the session
 let persistedBalancePreset: BalanceSheetPreset = DEFAULT_PRESET
+// Persists scroll position across navigation (e.g. account detail → back).
+let persistedScrollOffset: number = 0
 
 interface AccountSnapshot {
   account: Account
@@ -113,12 +115,26 @@ export default function BalanceSheetPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [draftPreset, setDraftPreset] = useState<BalanceSheetPreset>(DEFAULT_PRESET)
 
+  // Capture persisted offset at mount time — before any StrictMode cleanup can run.
+  const savedScrollOffset = useRef(persistedScrollOffset)
+  const scrollRestoredRef = useRef(false)
+
   const presetParam = searchParams.get('period')
   const selectedPreset = BALANCE_SHEET_PRESETS.includes(presetParam as BalanceSheetPreset)
     ? (presetParam as BalanceSheetPreset)
     : persistedBalancePreset
 
   useEffect(() => { void loadTransactions() }, [loadTransactions])
+
+  // Persist scroll offset via event listener — immune to StrictMode fake-unmount
+  // cleanup (which would zero-out a module variable before restoration runs).
+  useEffect(() => {
+    const el = document.getElementById('main-scroll')
+    if (!el) return
+    const onScroll = () => { persistedScrollOffset = el.scrollTop }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [])
 
   useEffect(() => {
     void loadRates()
@@ -229,6 +245,20 @@ export default function BalanceSheetPage() {
       }]
     })
   }, [snapshots, totalAbsoluteNetWorth])
+
+  // Restore scroll after content is available, using rAF so the DOM is painted.
+  useEffect(() => {
+    if (scrollRestoredRef.current) return
+    if (typeSections.length === 0) return
+    if (!savedScrollOffset.current) return
+    const el = document.getElementById('main-scroll')
+    if (!el) return
+    const frame = requestAnimationFrame(() => {
+      el.scrollTop = savedScrollOffset.current
+      scrollRestoredRef.current = true
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [typeSections.length])
 
   function openSheet() {
     setDraftPreset(selectedPreset)

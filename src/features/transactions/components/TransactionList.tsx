@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, type ReactNode } from 'react'
+import { useState, useMemo, useRef, useEffect, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SlidersHorizontal, X } from 'lucide-react'
 import { format, subMonths, subYears } from 'date-fns'
@@ -153,6 +153,18 @@ export interface TransactionListProps {
   layout?: 'page' | 'embedded'
 
   /**
+   * Seed the scroll position on first mount (session persistence).
+   * Only used when layout='page'.
+   */
+  initialScrollOffset?: number
+
+  /**
+   * Fired on every scroll event — use to persist the offset for restoration.
+   * Only relevant when layout='page'.
+   */
+  onScrollChange?: (offset: number) => void
+
+  /**
    * Extra content rendered at the very top of the filter sheet, before the standard controls.
    * Use for context-specific filters (e.g., a balance-sheet period picker).
    */
@@ -180,6 +192,8 @@ export function TransactionList({
   layout = 'embedded',
   filterSheetExtraSection,
   emptyMessage,
+  initialScrollOffset,
+  onScrollChange,
 }: TransactionListProps) {
   const { t } = useTranslation()
   const { categories } = useCategoriesStore()
@@ -370,6 +384,23 @@ export function TransactionList({
   // ── Virtual list (page layout) ─────────────────────────────────────────────
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const scrollRestoredRef = useRef(false)
+
+  // Restore persisted scroll offset once the list has content.
+  // Uses requestAnimationFrame so the virtualizer's own scroll listener is
+  // guaranteed to be attached before we set scrollTop.
+  useEffect(() => {
+    if (layout !== 'page' || scrollRestoredRef.current) return
+    if (!initialScrollOffset || flatItems.length === 0) return
+    const el = scrollContainerRef.current
+    if (!el) return
+    const frame = requestAnimationFrame(() => {
+      el.scrollTop = initialScrollOffset
+      scrollRestoredRef.current = true
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [layout, initialScrollOffset, flatItems.length])
+
   const rowVirtualizer = useVirtualizer({
     count: layout === 'page' ? flatItems.length : 0,
     getScrollElement: () => scrollContainerRef.current,
@@ -688,7 +719,11 @@ export function TransactionList({
         </div>
 
         {/* Scrollable virtual list */}
-        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto px-4 pb-24">
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 min-h-0 overflow-y-auto px-4 pb-24"
+          onScroll={onScrollChange ? (e) => onScrollChange(e.currentTarget.scrollTop) : undefined}
+        >
           {loading && transactions.length === 0 ? (
             <div className="space-y-3 mt-2" aria-label="Loading transactions">
               {[...Array(6)].map((_, i) => (

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, SlidersHorizontal, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -29,6 +29,9 @@ import { useGroupedTransactions } from '@/features/transactions/hooks/useGrouped
 import { BalanceSheetDetailFiltersSheet } from './BalanceSheetDetailFiltersSheet'
 import { EMPTY_FILTERS, type DetailFilters } from './balance-sheet-detail-filters.types'
 
+// Persists scroll position across navigation (e.g. edit → back).
+let persistedScrollOffset: number = 0
+
 function getTransactionPresentation(transaction: Transaction, account: Account) {
   const signedAmount = getAccountTransactionAmount(transaction, account)
   const absoluteAmount = Math.abs(signedAmount)
@@ -54,6 +57,11 @@ function getTransactionPresentation(transaction: Transaction, account: Account) 
 export default function BalanceSheetDetailPage() {
   const { t } = useTranslation()
   const { accountId } = useParams<{ accountId: string }>()
+
+  // Capture the persisted offset at mount time — before StrictMode's first-pass
+  // cleanup can overwrite the module variable with 0.
+  const savedScrollOffset = useRef(persistedScrollOffset)
+  const scrollRestoredRef = useRef(false)
   const [searchParams, setSearchParams] = useSearchParams()
   const { accounts } = useAccountsStore()
   // Reload full transaction history on every mount — TransactionListPage loads a
@@ -93,10 +101,6 @@ export default function BalanceSheetDetailPage() {
       .then(setAllTx)
       .catch(console.error)
   }, [transactions])
-
-  useEffect(() => {
-    document.getElementById('main-scroll')?.scrollTo({ top: 0, behavior: 'instant' })
-  }, [])
 
   useEffect(() => {
     if (searchParams.get('period') !== selectedPreset) {
@@ -224,6 +228,30 @@ export default function BalanceSheetDetailPage() {
   }, [account, accountTransactions, allTx, currentBalance, accountMap])
 
   const flatItems = useGroupedTransactions(filteredAccountTransactions)
+
+  // Restore scroll after content loads, using rAF so the DOM is fully painted.
+  useEffect(() => {
+    if (scrollRestoredRef.current) return
+    if (flatItems.length === 0) return
+    if (!savedScrollOffset.current) return
+    const el = document.getElementById('main-scroll')
+    if (!el) return
+    const frame = requestAnimationFrame(() => {
+      el.scrollTop = savedScrollOffset.current
+      scrollRestoredRef.current = true
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [flatItems.length])
+
+  // Persist scroll offset via event listener — immune to StrictMode fake-unmount
+  // cleanup (which would zero-out a module variable before restoration runs).
+  useEffect(() => {
+    const el = document.getElementById('main-scroll')
+    if (!el) return
+    const onScroll = () => { persistedScrollOffset = el.scrollTop }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [])
 
   const overviewUrl = `/balance-sheet?period=${selectedPreset}`
   const returnTo = `/balance-sheet/${accountId}?period=${selectedPreset}`
@@ -363,6 +391,7 @@ export default function BalanceSheetDetailPage() {
                   <TransactionListItem
                     key={tx.id + String(i)}
                     description={tx.description}
+                    notes={tx.notes}
                     status={tx.status}
                     timeStr={timeStr}
                     categoryName={getTranslatedCategoryName(cat, t)}
