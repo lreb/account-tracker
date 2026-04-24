@@ -25,6 +25,7 @@ import PreferencesPage from '@/features/settings/components/settings/Preferences
 import OAuthCallbackPage from '@/features/settings/components/OAuthCallbackPage'
 import RemindersPage from '@/features/reminders/components/RemindersPage'
 import RecurringTransactionFormPage from '@/features/reminders/components/RecurringTransactionFormPage'
+import CompoundInterestPage from '@/features/tools/components/CompoundInterestPage'
 
 export const router = createBrowserRouter([
   // OAuth callback — outside Shell so there's no nav chrome during the redirect
@@ -51,6 +52,7 @@ export const router = createBrowserRouter([
       { path: 'reminders', element: <RemindersPage /> },
       { path: 'reminders/new', element: <RecurringTransactionFormPage /> },
       { path: 'reminders/:id', element: <RecurringTransactionFormPage /> },
+      { path: 'tools/compound-interest', element: <CompoundInterestPage /> },
       {
         path: 'settings',
         children: [

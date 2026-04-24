@@ -34,10 +34,11 @@ function getQuickRangeSince(range: TxListQuickRange): string | undefined {
   return undefined
 }
 
-// Persists filter and quick-range selection across component mounts (same session).
+// Persists filter, quick-range, and scroll position across component mounts (same session).
 // undefined means "no saved state" — TransactionList will use its own default.
 let persistedFilters: TransactionListFilters | undefined = undefined
 let persistedQuickRange: TxListQuickRange = DEFAULT_TX_LIST_QUICK_RANGE
+let persistedScrollOffset: number = 0
 
 export default function TransactionListPage() {
   const { transactions, loading, load: loadTx } = useTransactionsStore()
@@ -181,6 +182,8 @@ export default function TransactionListPage() {
         onFiltersChange={(f) => { persistedFilters = f }}
         onQuickRangeChange={(qr) => { persistedQuickRange = qr }}
         onLoadRange={(since) => loadTx(since)}
+        initialScrollOffset={persistedScrollOffset}
+        onScrollChange={(off) => { persistedScrollOffset = off }}
       />
     </>
   )

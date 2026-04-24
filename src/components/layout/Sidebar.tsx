@@ -15,6 +15,7 @@ import {
   RefreshCw,
   X,
   Bell,
+  TrendingUp,
 } from 'lucide-react'
 import { useVehiclesStore } from '@/stores/vehicles.store'
 import SidebarGoogleAuthSection from './SidebarGoogleAuthSection'
@@ -32,7 +33,8 @@ const mainItems = [
   { to: '/reports',       icon: BarChart3,       labelKey: 'nav.reports',      end: false },
   { to: '/budgets',       icon: PiggyBank,       labelKey: 'nav.budgets',      end: false },
   { to: '/insights',      icon: Lightbulb,       labelKey: 'nav.insights',     end: false },
-  { to: '/reminders',     icon: Bell,            labelKey: 'nav.reminders',    end: false },
+  { to: '/reminders',               icon: Bell,        labelKey: 'nav.reminders',        end: false },
+  { to: '/tools/compound-interest', icon: TrendingUp,  labelKey: 'nav.compoundInterest', end: false },
 ] as const
 
 const settingsItems = [
