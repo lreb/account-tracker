@@ -12,7 +12,7 @@ import {
   getAccountSelectOptions,
   getVisibleAccounts,
 } from '@/lib/accounts'
-import { getTranslatedCategoryName } from '@/lib/categories'
+import { getTranslatedCategoryName, sortCategories } from '@/lib/categories'
 import { getOdometerNeighbors, type OdometerEntry } from '@/lib/vehicles'
 import { useVehiclesStore } from '@/stores/vehicles.store'
 import { useTransactionsStore } from '@/stores/transactions.store'
@@ -307,7 +307,10 @@ export default function FuelLogFormPage() {
     navigate(returnToPath)
   }
 
-  const filteredCategories = categories.filter((c) => !c.deletedAt && (c.type === 'expense' || c.type === 'any'))
+  const filteredCategories = sortCategories(
+    categories.filter((c) => !c.deletedAt && (c.type === 'expense' || c.type === 'any')),
+    t,
+  )
 
   return (
     <div className="p-4 pb-24 max-w-xl mx-auto space-y-4">

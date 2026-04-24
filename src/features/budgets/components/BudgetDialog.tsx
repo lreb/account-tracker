@@ -9,7 +9,7 @@ import { budgetSchema, type BudgetFormValues } from '../schemas/budget.schema'
 import { useBudgetsStore } from '@/stores/budgets.store'
 import { useCategoriesStore } from '@/stores/categories.store'
 import { useSettingsStore } from '@/stores/settings.store'
-import { getTranslatedCategoryName } from '@/lib/categories'
+import { getTranslatedCategoryName, sortCategories } from '@/lib/categories'
 import type { Budget } from '@/types'
 
 import { Button } from '@/components/ui/button'
@@ -131,7 +131,7 @@ export function BudgetDialog({
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {categories.map((cat) => (
+                {sortCategories(categories, t).map((cat) => (
                   <SelectItem key={cat.id} value={cat.id}>
                     {getTranslatedCategoryName(cat, t)}
                   </SelectItem>

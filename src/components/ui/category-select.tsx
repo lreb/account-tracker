@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDownIcon, SearchIcon } from 'lucide-react'
-import { getTranslatedCategoryName } from '@/lib/categories'
+import { getTranslatedCategoryName, sortCategories } from '@/lib/categories'
 import { ICON_MAP } from '@/lib/icon-map.constants'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -33,11 +33,10 @@ export function CategorySelect({ value, onChange, options, error }: CategorySele
 
   const sorted = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return [...options]
-      .filter((c) => !q || getTranslatedCategoryName(c, t).toLowerCase().includes(q))
-      .sort((a, b) =>
-        getTranslatedCategoryName(a, t).localeCompare(getTranslatedCategoryName(b, t)),
-      )
+    return sortCategories(
+      [...options].filter((c) => !q || getTranslatedCategoryName(c, t).toLowerCase().includes(q)),
+      t,
+    )
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options, search])
 

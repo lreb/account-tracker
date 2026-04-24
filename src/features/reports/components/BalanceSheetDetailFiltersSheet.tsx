@@ -21,7 +21,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 
-import { getTranslatedCategoryName } from '@/lib/categories'
+import { getTranslatedCategoryName, sortCategories } from '@/lib/categories'
 import { CategoryIcon } from '@/lib/icon-map'
 
 import type { DetailFilters, TxStatus } from './balance-sheet-detail-filters.types'
@@ -157,7 +157,7 @@ export function BalanceSheetDetailFiltersSheet({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">{t('transactions.filters.allCategories')}</SelectItem>
-                  {categories.map((cat) => (
+                  {sortCategories(categories, t).map((cat) => (
                     <SelectItem key={cat.id} value={cat.id}>
                       <span className="flex items-center gap-2">
                         <CategoryIcon name={cat.icon} size={14} className="text-gray-500 shrink-0" />

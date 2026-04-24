@@ -80,6 +80,7 @@ export function computePeriodSummary(
   const fromISO = filters.from.toISOString()
   const toISO   = filters.to.toISOString()
   const filtered = transactions.filter((t) => {
+    if (t.status === 'cancelled') return false
     if (!txInRange(t, fromISO, toISO)) return false
     if (visibleAccountIds && !isTransactionForVisiblePrimaryAccount(t, visibleAccountIds)) return false
     if (filters.accountId && t.accountId !== filters.accountId) return false
@@ -117,6 +118,7 @@ export function computeMonthlyTrend(
     const mStartISO = mStart.toISOString()
     const mEndISO   = mEnd.toISOString()
     const relevant = transactions.filter((t) => {
+      if (t.status === 'cancelled') return false
       if (!txInRange(t, mStartISO, mEndISO)) return false
       if (visibleAccountIds && !isTransactionForVisiblePrimaryAccount(t, visibleAccountIds)) return false
       if (accountId && t.accountId !== accountId) return false
@@ -152,6 +154,7 @@ export function computeCategoryBreakdown(
   const fromISO = filters.from.toISOString()
   const toISO   = filters.to.toISOString()
   const filtered = transactions.filter((t) => {
+    if (t.status === 'cancelled') return false
     if (t.type !== type) return false
     if (!txInRange(t, fromISO, toISO)) return false
     if (visibleAccountIds && !isTransactionForVisiblePrimaryAccount(t, visibleAccountIds)) return false
@@ -198,10 +201,14 @@ export function computeAccountBalances(
   return visibleAccounts.map((account) => {
     // All transactions for this account ever up to end of period.
     // Transfers appear from BOTH sides: as source (accountId) and destination (toAccountId).
+    // Cancelled transactions are excluded from all balance calculations.
     const allForAccount = transactions.filter(
       (t) =>
-        t.accountId === account.id ||
-        (t.type === 'transfer' && t.toAccountId === account.id),
+        t.status !== 'cancelled' &&
+        (
+          t.accountId === account.id ||
+          (t.type === 'transfer' && t.toAccountId === account.id)
+        ),
     )
 
     // Transactions in current period
@@ -326,6 +333,7 @@ export function computeLabelBreakdown(
   const fromISO = filters.from.toISOString()
   const toISO   = filters.to.toISOString()
   const filtered = transactions.filter((t) => {
+    if (t.status === 'cancelled') return false
     if (!txInRange(t, fromISO, toISO)) return false
     if (visibleAccountIds && !isTransactionForVisiblePrimaryAccount(t, visibleAccountIds)) return false
     if (filters.accountId && t.accountId !== filters.accountId) return false
