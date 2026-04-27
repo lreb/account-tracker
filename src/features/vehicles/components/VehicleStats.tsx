@@ -63,7 +63,7 @@ export function VehicleStats({
   const { t } = useTranslation()
   const [drill, setDrill]                                   = useState<DrillKey | null>(null)
   const [drillRange, setDrillRange]                         = useState<DrillRange>('1y')
-  const [activeServiceTypeIndex, setActiveServiceTypeIndex] = useState<number | null>(null)
+  const [activeServiceTypeName, setActiveServiceTypeName] = useState<string | null>(null)
   const [pieRange, setPieRange]                             = useState<PieRange>('all')
 
   // ── Current month stats ─────────────────────────────────────────────────
@@ -594,7 +594,7 @@ export function VehicleStats({
                 <button
                   key={value}
                   type="button"
-                  onClick={() => { setPieRange(value); setActiveServiceTypeIndex(null) }}
+                  onClick={() => { setPieRange(value); setActiveServiceTypeName(null) }}
                   className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                     pieRange === value
                       ? 'bg-indigo-600 text-white'
@@ -619,18 +619,19 @@ export function VehicleStats({
                   cx="50%"
                   cy="50%"
                   outerRadius={85}
-                  onClick={(_: unknown, index: number) =>
-                    setActiveServiceTypeIndex(activeServiceTypeIndex === index ? null : index)
-                  }
+                  onClick={(_: unknown, index: number) => {
+                    const name = serviceCostByType[index]?.name ?? null
+                    setActiveServiceTypeName(activeServiceTypeName === name ? null : name)
+                  }}
                   style={{ cursor: 'pointer' }}
                 >
-                  {serviceCostByType.map((_, i) => (
+                  {serviceCostByType.map((entry, i) => (
                     <Cell
-                      key={i}
+                      key={entry.name}
                       fill={CHART_COLORS[i % CHART_COLORS.length]}
-                      opacity={activeServiceTypeIndex === null || activeServiceTypeIndex === i ? 1 : 0.3}
-                      stroke={activeServiceTypeIndex === i ? '#fff' : 'none'}
-                      strokeWidth={activeServiceTypeIndex === i ? 2 : 0}
+                      opacity={activeServiceTypeName === null || activeServiceTypeName === entry.name ? 1 : 0.3}
+                      stroke={activeServiceTypeName === entry.name ? '#fff' : 'none'}
+                      strokeWidth={activeServiceTypeName === entry.name ? 2 : 0}
                     />
                   ))}
                 </Pie>
@@ -644,14 +645,14 @@ export function VehicleStats({
                 const total = serviceCostByType.reduce((s, e) => s + e.value, 0)
                 return serviceCostByType.map((entry, i) => {
                   const pct      = total > 0 ? ((entry.value / total) * 100).toFixed(1) : '0.0'
-                  const isActive = activeServiceTypeIndex === i
+                  const isActive = activeServiceTypeName === entry.name
                   return (
                     <li
-                      key={i}
+                      key={entry.name}
                       className={`flex items-center gap-2 rounded-lg px-2 py-1.5 cursor-pointer select-none transition-colors ${
                         isActive ? 'bg-gray-100 ring-1 ring-inset ring-gray-200' : 'hover:bg-gray-50'
                       }`}
-                      onClick={() => setActiveServiceTypeIndex(isActive ? null : i)}
+                      onClick={() => setActiveServiceTypeName(isActive ? null : entry.name)}
                     >
                       <span
                         className="h-2.5 w-2.5 rounded-full shrink-0"

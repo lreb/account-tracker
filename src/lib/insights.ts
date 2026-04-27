@@ -13,7 +13,7 @@ import type { Transaction, FuelLog } from '@/types'
 
 /** Convert a transaction to base-currency cents. */
 function toBase(tx: Transaction): number {
-  return convertToBase(tx.amount, tx.exchangeRate)
+  return convertToBase(tx.amount, tx.exchangeRate ?? 1)
 }
 
 /** Group an array by a key function. */
