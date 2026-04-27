@@ -483,7 +483,7 @@ When a transfer is created between two accounts whose `currency` fields differ:
 
 | # | Area | Item | Status |
 |---|---|---|---|
-| 1 | Insights | `InsightsPage` is a stub ("coming soon"). Implement: recurring-pattern detection, category-vs-average alerts, savings suggestions, current-month projection. | ❌ Not started |
+| 1 | Insights | `InsightsPage` is a stub ("coming soon"). Implement: recurring-pattern detection, category-vs-average alerts, savings suggestions, current-month projection. | ✅ Done |
 | 2 | Settings | JSON full-data **export** (all tables → single `.json` file download). | ✅ Done |
 | 3 | Settings | JSON full-data **import / restore** (parse backup file, wipe DB, bulk-insert all tables). | ✅ Done |
 | 4 | Error handling | `ErrorBoundary` React component wrapping each feature route in `router.tsx` — prevents a single-page crash from white-screening the whole app. | ✅ Done |
@@ -498,6 +498,29 @@ When a transfer is created between two accounts whose `currency` fields differ:
 | 8 | Cloud sync | Google Drive sync (OAuth2 PKCE flow, no client secrets). | ✅ Done |
 | 9 | Cloud sync | Dropbox sync (OAuth2 PKCE flow). | Same as above |
 | 10 | i18n | Spanish (`es`) translation completeness pass — verify all new keys added after initial build are present in `es.json`. | ✅ Done |
+
+### v1.2 — AI / Smart Insights
+
+> Strategy: Tier 1 (offline statistical logic) ships in v1.0 as part of InsightsPage. Tier 2 (user-supplied API key) ships as an opt-in feature in v1.2. Tier 3 (on-device LLM) is deferred indefinitely due to PWA bundle-size constraints.
+
+#### Tier 1 — Offline statistical engine (`src/lib/insights.ts`) — ships in v1.0 InsightsPage
+
+| # | Feature | Technique | Status |
+|---|---|---|---|
+| T1-1 | Recurring transaction detection | Group by `categoryId` + amount tolerance (±5%), check day-of-month regularity | ✅ Done |
+| T1-2 | Category-vs-average alert | Rolling 3-month average per category; flag if current month > avg + 1 std dev | ✅ Done |
+| T1-3 | Current-month spending projection | Linear regression on last 12 months' category totals | ✅ Done |
+| T1-5 | Fuel efficiency trend alert | Moving average over last N fill-ups; flag degradation > 10% | ✅ Done |
+
+#### Tier 2 — Opt-in cloud AI analysis (user-supplied API key) — v1.2
+
+| # | Feature | Implementation notes | Status |
+|---|---|---|---|
+| T2-1 | AI API key setting | Add `aiApiKey` to `settings` table + `useSettingsStore`; input in Settings UI (same pattern as `googleClientId`) | ❌ Not started |
+| T2-2 | Financial summary builder | `buildFinancialSummary()` in `src/lib/ai-insights.ts` — aggregates last 90 days into compact JSON (totals per category, no raw descriptions) | ❌ Not started |
+| T2-3 | "Analyze with AI" button | In InsightsPage; disabled when no key set; calls OpenAI `gpt-4o-mini` with summary payload; displays plain-language response | ❌ Not started |
+| T2-4 | Security guard | Only aggregated totals sent — never raw transaction descriptions, account names, or amounts | ❌ Not started |
+| T2-5 | Budget overrun prediction | (spent so far / days elapsed) × days in month vs budget limit | ❌ Not started |
 
 ### Completed (shipped)
 

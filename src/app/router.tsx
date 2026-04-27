@@ -12,6 +12,10 @@ import BalanceSheetPage from '@/features/reports/components/BalanceSheetPage'
 import BalanceSheetDetailPage from '@/features/reports/components/BalanceSheetDetailPage'
 import BudgetsPage from '@/features/budgets/components/BudgetsPage'
 import InsightsPage from '@/features/insights/components/InsightsPage'
+import RecurringInsightsPage from '@/features/insights/components/RecurringInsightsPage'
+import CategoryAlertsPage from '@/features/insights/components/CategoryAlertsPage'
+import SavingsSuggestionsPage from '@/features/insights/components/SavingsSuggestionsPage'
+import SpendingProjectionPage from '@/features/insights/components/SpendingProjectionPage'
 import SettingsPage from '@/features/settings/components/settings/SettingsPage'
 import AccountsSettingsPage from '@/features/settings/components/accounts/AccountsSettingsPage'
 import AccountFormPage from '@/features/settings/components/accounts/AccountFormPage'
@@ -48,7 +52,16 @@ export const router = createBrowserRouter([
       { path: 'vehicles/:vehicleId/service/:serviceId', element: <ServiceFormPage /> },
       { path: 'reports', element: <ReportsPage /> },
       { path: 'budgets', element: <BudgetsPage /> },
-      { path: 'insights', element: <InsightsPage /> },
+      {
+        path: 'insights',
+        children: [
+          { index: true, element: <InsightsPage /> },
+          { path: 'recurring', element: <RecurringInsightsPage /> },
+          { path: 'category-alerts', element: <CategoryAlertsPage /> },
+          { path: 'savings', element: <SavingsSuggestionsPage /> },
+          { path: 'projection', element: <SpendingProjectionPage /> },
+        ],
+      },
       { path: 'reminders', element: <RemindersPage /> },
       { path: 'reminders/new', element: <RecurringTransactionFormPage /> },
       { path: 'reminders/:id', element: <RecurringTransactionFormPage /> },

@@ -309,6 +309,14 @@
       "kmBetweenFillsByMonth": "Avg km Between Fills",
       "fuelCostByYear": "Fuel Cost by Year",
       "serviceCostByYear": "Service Cost by Year",
+      "distanceByMonth": "Distance by Month",
+      "distanceByYear": "Distance by Year",
+      "avgKmPerLByMonth": "Avg km/L by Month",
+      "avgKmPerLByYear": "Avg km/L by Year",
+      "totalLitersByMonth": "Liters by Month",
+      "totalLitersByYear": "Liters by Year",
+      "serviceCountByMonth": "Services by Month",
+      "serviceCountByYear": "Services by Year",
       "upcomingServices": "Upcoming Services",
       "overdue": "Overdue",
       "dueSoon": "Due soon",
@@ -318,7 +326,9 @@
       "overdueByKm": "{{km}} km overdue",
       "dueOn": "Due on {{date}}",
       "drillTotal": "Total",
-      "drillAvg": "Avg / active period"
+      "drillAvg": "Avg / active period",
+      "efficiencyAlertTitle": "Fuel efficiency dropping",
+      "efficiencyAlertBody": "Down {{pct}}% over the last {{n}} fill-ups — recent avg: {{recent}} km/L vs. baseline: {{baseline}} km/L"
     },
     "totalCost": "Total Cost",
     "unarchive": "Unarchive",
@@ -380,7 +390,52 @@
     "tipAutomate": "Automate transfers to a savings account right after payday.",
     "tipBudget": "Set monthly budgets per category to stay on track.",
     "avgLabel": "{{months}}-month avg",
-    "monthlyBreakdown": "Month-by-month"
+    "monthlyBreakdown": "Month-by-month",
+    "analysisTitle": "Spending Analysis",
+    "recurring": {
+      "title": "Recurring Patterns",
+      "description": "Expenses that repeat regularly each month.",
+      "hint": "Detected transactions that appear in at least 2 months with similar amounts and dates.",
+      "aroundDay": "Around day {{day}}",
+      "occurrences": "{{count}} months detected",
+      "perMonth": "/ month",
+      "empty": "No recurring patterns detected yet. Add more transactions over time."
+    },
+    "categoryAlerts": {
+      "title": "Category Alerts",
+      "description": "Categories spending more than your 3-month average.",
+      "hint": "Categories where this month's spending exceeds the rolling 3-month average by more than 1 standard deviation.",
+      "percentAbove": "+{{pct}}% above average",
+      "avg": "3m avg: {{avg}}",
+      "avg3m": "3-month avg",
+      "thisMonth": "This month",
+      "empty": "All categories are within normal spending ranges."
+    },
+    "savings": {
+      "title": "Savings Suggestions",
+      "description": "Opportunities to reduce spending this month.",
+      "hint": "Categories where reducing spending to your historical average would free up money.",
+      "couldSave": "Save up to {{amount}} this month",
+      "target": "Target: {{avg}}",
+      "targetLabel": "Target (avg)",
+      "currentLabel": "Current",
+      "priority": {
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low"
+      },
+      "empty": "Great job! No savings opportunities identified this month."
+    },
+    "projection": {
+      "title": "Spending Projection",
+      "description": "Projected month-end total based on current pace.",
+      "projectedLabel": "Day {{count}} of {{total}}",
+      "hint": "Based on {{elapsed}} days elapsed out of {{total}} days this month.",
+      "spentSoFar": "Spent so far",
+      "projectedTotal": "Projected total",
+      "daysElapsed": "Day {{elapsed}} / {{total}}",
+      "byCategory": "By Category"
+    }
   },
   "reports": {
     "title": "Reports",
