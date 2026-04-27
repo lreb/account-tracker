@@ -6,13 +6,14 @@ import {
   subMonths,
   getDate,
 } from 'date-fns'
+import { convertToBase } from '@/lib/currency'
 import type { Transaction, FuelLog } from '@/types'
 
 // ─── Shared helpers ──────────────────────────────────────────────────────────
 
 /** Convert a transaction to base-currency cents. */
 function toBase(tx: Transaction): number {
-  return tx.exchangeRate ? Math.round(tx.amount * tx.exchangeRate) : tx.amount
+  return convertToBase(tx.amount, tx.exchangeRate)
 }
 
 /** Group an array by a key function. */
