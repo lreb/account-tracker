@@ -175,25 +175,30 @@ export function getCategoryAlerts(
   const currentStart = startOfMonth(now).toISOString()
   const currentEnd = endOfMonth(now).toISOString()
 
-  // Build last 12 monthly totals per category (not including current month)
+  const expenseTransactions = transactions.filter(
+    (tx) => tx.type === 'expense' && tx.status !== 'cancelled',
+  )
+  const categoryIds = Array.from(new Set(expenseTransactions.map((tx) => tx.categoryId)))
+
+  // Build last 12 monthly totals per category (not including current month),
+  // preserving calendar months with explicit 0 totals when a category has no spend.
   const monthlyTotals: Record<string, number[]> = {}
+  for (const catId of categoryIds) {
+    monthlyTotals[catId] = []
+  }
+
   for (let i = 1; i <= 12; i++) {
     const monthDate = subMonths(now, i)
     const mStart = startOfMonth(monthDate).toISOString()
     const mEnd = endOfMonth(monthDate).toISOString()
 
-    const txs = transactions.filter(
-      (tx) =>
-        tx.type === 'expense' &&
-        tx.status !== 'cancelled' &&
-        tx.date >= mStart &&
-        tx.date <= mEnd,
-    )
-
+    const txs = expenseTransactions.filter((tx) => tx.date >= mStart && tx.date <= mEnd)
     const byCat = groupBy(txs, (tx) => tx.categoryId)
-    for (const [catId, catTxs] of Object.entries(byCat)) {
+
+    for (const catId of categoryIds) {
+      const catTxs = byCat[catId] ?? []
       const total = catTxs.reduce((s, tx) => s + toBase(tx), 0)
-      ;(monthlyTotals[catId] ??= []).push(total)
+      monthlyTotals[catId].push(total)
     }
   }
 
