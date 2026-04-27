@@ -49,11 +49,11 @@ export default function RecurringInsightsPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {patterns.map((pattern, idx) => {
+          {patterns.map((pattern) => {
             const category = getCategoryById(pattern.categoryId)
             return (
               <div
-                key={`${pattern.categoryId}-${idx}`}
+                key={pattern.categoryId}
                 className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600">

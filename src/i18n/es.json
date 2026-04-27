@@ -326,7 +326,14 @@
       "drillTotal": "Total",
       "drillAvg": "Prom. / período activo",
       "efficiencyAlertTitle": "Eficiencia de combustible en caída",
-      "efficiencyAlertBody": "Bajó {{pct}}% en las últimas {{n}} cargas — prom. reciente: {{recent}} km/L vs. base: {{baseline}} km/L"
+      "efficiencyAlertBody": "Bajó {{pct}}% en las últimas {{n}} cargas — prom. reciente: {{recent}} km/L vs. base: {{baseline}} km/L",
+      "range": {
+        "1m": "1M",
+        "6m": "6M",
+        "1y": "1A",
+        "2y": "2A",
+        "all": "Todo"
+      }
     },
     "totalCost": "Costo Total",
     "unarchive": "Desarchivar",

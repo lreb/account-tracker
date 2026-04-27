@@ -328,7 +328,14 @@
       "drillTotal": "Total",
       "drillAvg": "Avg / active period",
       "efficiencyAlertTitle": "Fuel efficiency dropping",
-      "efficiencyAlertBody": "Down {{pct}}% over the last {{n}} fill-ups — recent avg: {{recent}} km/L vs. baseline: {{baseline}} km/L"
+      "efficiencyAlertBody": "Down {{pct}}% over the last {{n}} fill-ups — recent avg: {{recent}} km/L vs. baseline: {{baseline}} km/L",
+      "range": {
+        "1m": "1M",
+        "6m": "6M",
+        "1y": "1Y",
+        "2y": "2Y",
+        "all": "All"
+      }
     },
     "totalCost": "Total Cost",
     "unarchive": "Unarchive",

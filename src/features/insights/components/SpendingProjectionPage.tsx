@@ -94,14 +94,14 @@ export default function SpendingProjectionPage() {
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide px-1">
             {t('insights.projection.byCategory')}
           </h2>
-          {projection.byCategory.map((item, idx) => {
+          {projection.byCategory.map((item) => {
             const category = getCategoryById(item.categoryId)
             const catBarFill = projection.totalProjectedCents > 0
               ? Math.min(100, Math.round((item.projectedCents / projection.totalProjectedCents) * 100))
               : 0
             return (
               <div
-                key={`${item.categoryId}-${idx}`}
+                key={item.categoryId}
                 className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-sm"
               >
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">

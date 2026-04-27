@@ -5,6 +5,8 @@ import {
   differenceInCalendarDays,
   subMonths,
   getDate,
+  format,
+  parseISO,
 } from 'date-fns'
 import { convertToBase } from '@/lib/currency'
 import type { Transaction, FuelLog } from '@/types'
@@ -137,8 +139,8 @@ export function detectRecurringPatterns(
     for (const cluster of clusters) {
       if (cluster.length < minOccurrences) continue
 
-      // Count distinct months
-      const months = new Set(cluster.map((tx) => tx.date.slice(0, 7)))
+      // Count distinct months (use local date to avoid UTC midnight crossings)
+      const months = new Set(cluster.map((tx) => format(parseISO(tx.date), 'yyyy-MM')))
       if (months.size < minOccurrences) continue
 
       // Check day-of-month regularity (std dev ≤ 7 days counts as regular)
@@ -329,6 +331,8 @@ export interface FuelEfficiencyTrend {
   isDegrading: boolean
   /** How many consecutive fill-up pairs were analysed in total */
   sampleSize: number
+  /** Size of the recent and baseline windows used for the comparison */
+  windowSize: number
 }
 
 /**
@@ -379,5 +383,6 @@ export function getFuelEfficiencyTrend(
     degradationPercent,
     isDegrading:       degradationPercent > 10,
     sampleSize:        efficiencies.length,
+    windowSize,
   }
 }

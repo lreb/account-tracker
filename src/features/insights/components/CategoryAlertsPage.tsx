@@ -49,14 +49,14 @@ export default function CategoryAlertsPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {alerts.map((alert, idx) => {
+          {alerts.map((alert) => {
             const category = getCategoryById(alert.categoryId)
             const severity = alert.percentAbove >= 50 ? 'red' : 'amber'
             const barFill = Math.min(100, Math.round((alert.currentMonthCents / (alert.avgCents + alert.stdDevCents * 2)) * 100))
 
             return (
               <div
-                key={`${alert.categoryId}-${idx}`}
+                key={alert.categoryId}
                 className="rounded-xl border bg-card p-4 shadow-sm space-y-3"
               >
                 <div className="flex items-center gap-3">

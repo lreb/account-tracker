@@ -56,7 +56,7 @@ export default function SavingsSuggestionsPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {suggestions.map((suggestion, idx) => {
+          {suggestions.map((suggestion) => {
             const category = getCategoryById(suggestion.categoryId)
             const styles = PRIORITY_STYLES[suggestion.priority]
             const barFill = suggestion.currentMonthCents > 0
@@ -65,7 +65,7 @@ export default function SavingsSuggestionsPage() {
 
             return (
               <div
-                key={`${suggestion.categoryId}-${idx}`}
+                key={suggestion.categoryId}
                 className="rounded-xl border bg-card p-4 shadow-sm space-y-3"
               >
                 <div className="flex items-center gap-3">
