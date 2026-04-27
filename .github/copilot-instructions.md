@@ -509,7 +509,7 @@ When a transfer is created between two accounts whose `currency` fields differ:
 |---|---|---|---|
 | T1-1 | Recurring transaction detection | Group by `categoryId` + amount tolerance (±5%), check day-of-month regularity | ✅ Done |
 | T1-2 | Category-vs-average alert | Rolling 3-month average per category; flag if current month > avg + 1 std dev | ✅ Done |
-| T1-3 | Current-month spending projection | Linear regression on last 12 months' category totals | ✅ Done |
+| T1-3 | Current-month spending projection | Current-month daily run-rate extrapolation | ✅ Done |
 | T1-5 | Fuel efficiency trend alert | Moving average over last N fill-ups; flag degradation > 10% | ✅ Done |
 
 #### Tier 2 — Opt-in cloud AI analysis (user-supplied API key) — v1.2
