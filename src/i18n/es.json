@@ -119,7 +119,8 @@
     "trendPeriod": {
       "3m": "3M",
       "6m": "6M",
-      "1y": "1A"
+      "1y": "1A",
+      "2y": "2A"
     }
   },
   "transactions": {

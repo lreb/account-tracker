@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>
@@ -12,6 +12,13 @@ export interface UsePWAInstallReturn {
   install: () => Promise<void>
 }
 
+function detectIOS(): boolean {
+  const ua = navigator.userAgent.toLowerCase()
+  if (/iphone|ipad|ipod/.test(ua)) return true
+  // iPadOS 13+ reports "MacIntel" with touch support
+  return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
+}
+
 export function usePWAInstall(): UsePWAInstallReturn {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [isInstalled, setIsInstalled] = useState(() => {
@@ -22,8 +29,9 @@ export function usePWAInstall(): UsePWAInstallReturn {
         (navigator as Navigator & { standalone?: boolean }).standalone === true)
     )
   })
+  const isInstallingRef = useRef(false)
 
-  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent.toLowerCase())
+  const isIOS = detectIOS()
 
   useEffect(() => {
     const onBeforeInstall = (e: Event) => {
@@ -46,13 +54,23 @@ export function usePWAInstall(): UsePWAInstallReturn {
   }, [])
 
   const install = async () => {
-    if (!deferredPrompt) return
-    await deferredPrompt.prompt()
-    const { outcome } = await deferredPrompt.userChoice
-    if (outcome === 'accepted') {
-      setIsInstalled(true)
-    }
+    if (!deferredPrompt || isInstallingRef.current) return
+    isInstallingRef.current = true
+    // Clear prompt state before awaiting so a concurrent call cannot reach prompt()
+    const prompt = deferredPrompt
     setDeferredPrompt(null)
+    try {
+      await prompt.prompt()
+      // Outcome is informational only — definitive "installed" signal comes from the
+      // appinstalled event listener above; do not set isInstalled here.
+      await prompt.userChoice
+    } catch (err) {
+      // Restore prompt so the user can retry if the browser rejects the call
+      setDeferredPrompt(prompt)
+      console.error('[usePWAInstall] install() failed:', err)
+    } finally {
+      isInstallingRef.current = false
+    }
   }
 
   return {

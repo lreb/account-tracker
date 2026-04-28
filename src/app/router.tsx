@@ -1,6 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom'
 import Shell from '@/components/layout/Shell'
-import DashboardPage from '@/features/reports/components/DashboardPage'
+import DashboardPage from '@/features/home/components/DashboardPage'
 import TransactionListPage from '@/features/transactions/components/TransactionListPage'
 import TransactionFormPage from '@/features/transactions/components/TransactionFormPage'
 import VehicleListPage from '@/features/vehicles/components/VehicleListPage'

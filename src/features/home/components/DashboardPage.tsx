@@ -17,10 +17,10 @@ import {
 import { formatCurrency } from '@/lib/currency'
 import { db } from '@/db'
 import { computePeriodSummary, computeMonthlyTrend, type ReportFilters } from '@/lib/reports'
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from 'recharts'
 import { Button } from '@/components/ui/button'
+import { DashboardTrendChart, type TrendPeriod } from './DashboardTrendChart'
+import { DashboardBudgetHealth } from './DashboardBudgetHealth'
+import { DashboardRecentTransactions } from './DashboardRecentTransactions'
 import {
   Select,
   SelectContent,
@@ -62,7 +62,6 @@ export default function DashboardPage() {
 
   // ── Period pickers ───────────────────────────────────────────────────────
   type SummaryPeriod = 'this_month' | 'last_month' | 'last_quarter' | 'last_6m' | 'last_year' | 'all'
-  type TrendPeriod   = '3m' | '6m' | '1y'
 
   const [summaryPeriod, setSummaryPeriod] = useState<SummaryPeriod>('this_month')
   const [trendPeriod,   setTrendPeriod]   = useState<TrendPeriod>('6m')
@@ -119,7 +118,7 @@ export default function DashboardPage() {
     }
   }, [summaryPeriod, now])
 
-  const trendMonths = trendPeriod === '3m' ? 3 : trendPeriod === '1y' ? 12 : 6
+  const trendMonths = trendPeriod === '3m' ? 3 : trendPeriod === '6m' ? 6 : trendPeriod === '1y' ? 12 : 24
 
   const summary = useMemo(
     () => computePeriodSummary(transactions, summaryFilters, activeAccountIds),
@@ -268,110 +267,29 @@ export default function DashboardPage() {
 
       {/* ── Trend chart with its own period picker ───────────────────── */}
       {visibleTransactions.length > 0 && (
-        <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider">{t('dashboard.trendTitle')}</p>
-            <div className="flex gap-1">
-              {(['3m', '6m', '1y'] as TrendPeriod[]).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setTrendPeriod(p)}
-                  className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
-                    trendPeriod === p
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                  }`}
-                >
-                  {t(`dashboard.trendPeriod.${p}`)}
-                </button>
-              ))}
-            </div>
-          </div>
-          <ResponsiveContainer width="100%" height={120}>
-            <BarChart data={trend} margin={{ top: 2, right: 2, left: -30, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="month" tick={{ fontSize: 9 }} />
-              <YAxis tick={{ fontSize: 9 }} />
-              <Tooltip
-                formatter={(value, name) => {
-                  if (typeof value !== 'number') {
-                    return ['', name]
-                  }
-
-                  return [formatCurrency(value, baseCurrency), name]
-                }}
-                contentStyle={{ fontSize: 11, borderRadius: 8 }}
-              />
-              <Bar dataKey="income" fill="#10b981" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="expenses" fill="#ef4444" radius={[2, 2, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <DashboardTrendChart
+          trend={trend}
+          trendPeriod={trendPeriod}
+          baseCurrency={baseCurrency}
+          onPeriodChange={setTrendPeriod}
+        />
       )}
 
       {/* ── Budget health ─────────────────────────────────────────────── */}
       {topBudgets.length > 0 && (
-        <div className="rounded-2xl border bg-white p-4 shadow-sm space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider">{t('dashboard.budgetHealth')}</p>
-            <Link to="/budgets" className="text-xs text-indigo-600 hover:underline">{t('dashboard.viewAll')}</Link>
-          </div>
-          {topBudgets.map(({ budget, spent, percent, catName }) => (
-            <div key={budget.id} className="space-y-1">
-              <div className="flex justify-between text-xs text-gray-700">
-                <span className="truncate">{catName}</span>
-                <span className={percent >= 100 ? 'text-red-500 font-semibold' : percent >= 75 ? 'text-amber-500' : 'text-gray-500'}>
-                  {percent}%
-                </span>
-              </div>
-              <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${
-                    percent >= 100 ? 'bg-red-500' : percent >= 75 ? 'bg-amber-400' : 'bg-green-500'
-                  }`}
-                  style={{ width: `${Math.min(percent, 100)}%` }}
-                />
-              </div>
-              <p className="text-[10px] text-gray-400">
-                {formatCurrency(spent, baseCurrency)} / {formatCurrency(budget.amount, baseCurrency)}
-              </p>
-            </div>
-          ))}
-        </div>
+        <DashboardBudgetHealth
+          topBudgets={topBudgets}
+          baseCurrency={baseCurrency}
+        />
       )}
 
       {/* ── Recent transactions ───────────────────────────────────────── */}
       {recent.length > 0 && (
-        <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b">
-            <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider">{t('dashboard.recent')}</p>
-            <Link to="/transactions" className="text-xs text-indigo-600 hover:underline flex items-center gap-1">
-              {t('dashboard.viewAll')} <ArrowRight size={11} />
-            </Link>
-          </div>
-          <ul className="divide-y">
-            {recent.map((tx) => {
-              const cat = categories.find((c) => c.id === tx.categoryId)
-              const acc = accounts.find((a) => a.id === tx.accountId)
-              return (
-                <li key={tx.id} className="flex items-center gap-3 px-4 py-2.5">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate text-gray-800">{tx.description}</p>
-                    <p className="text-xs text-gray-400 truncate">
-                      {cat?.name ?? '—'} · {acc?.name ?? '—'} · {format(new Date(tx.date), 'MMM d')}
-                    </p>
-                  </div>
-                  <p className={`text-sm font-semibold shrink-0 ${
-                    tx.type === 'income' ? 'text-green-600' : tx.type === 'expense' ? 'text-red-500' : 'text-gray-500'
-                  }`}>
-                    {tx.type === 'expense' ? '-' : tx.type === 'income' ? '+' : ''}
-                    {formatCurrency(tx.amount, tx.currency)}
-                  </p>
-                </li>
-              )
-            })}
-          </ul>
-        </div>
+        <DashboardRecentTransactions
+          recent={recent}
+          accounts={accounts}
+          categories={categories}
+        />
       )}
 
       {visibleTransactions.length === 0 && (
