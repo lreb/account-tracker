@@ -307,6 +307,14 @@
       "kmBetweenFillsByMonth": "km prom. entre cargas",
       "fuelCostByYear": "Costo comb. por año",
       "serviceCostByYear": "Costo serv. por año",
+      "distanceByMonth": "Distancia por mes",
+      "distanceByYear": "Distancia por año",
+      "avgKmPerLByMonth": "Km/L prom. por mes",
+      "avgKmPerLByYear": "Km/L prom. por año",
+      "totalLitersByMonth": "Litros por mes",
+      "totalLitersByYear": "Litros por año",
+      "serviceCountByMonth": "Servicios por mes",
+      "serviceCountByYear": "Servicios por año",
       "upcomingServices": "Servicios próximos",
       "overdue": "Vencido",
       "dueSoon": "Próximamente",
@@ -316,7 +324,16 @@
       "overdueByKm": "{{km}} km vencidos",
       "dueOn": "Vence el {{date}}",
       "drillTotal": "Total",
-      "drillAvg": "Prom. / período activo"
+      "drillAvg": "Prom. / período activo",
+      "efficiencyAlertTitle": "Eficiencia de combustible en caída",
+      "efficiencyAlertBody": "Bajó {{pct}}% en las últimas {{n}} cargas — prom. reciente: {{recent}} km/L vs. base: {{baseline}} km/L",
+      "range": {
+        "1m": "1M",
+        "6m": "6M",
+        "1y": "1A",
+        "2y": "2A",
+        "all": "Todo"
+      }
     },
     "totalCost": "Costo Total",
     "unarchive": "Desarchivar",
@@ -378,7 +395,52 @@
     "tipAutomate": "Automatiza transferencias a una cuenta de ahorro justo después de cobrar.",
     "tipBudget": "Define presupuestos mensuales por categoría para mantenerte en control.",
     "avgLabel": "Prom. {{months}} meses",
-    "monthlyBreakdown": "Mes a mes"
+    "monthlyBreakdown": "Mes a mes",
+    "analysisTitle": "Análisis de gastos",
+    "recurring": {
+      "title": "Patrones recurrentes",
+      "description": "Gastos que se repiten regularmente cada mes.",
+      "hint": "Transacciones detectadas que aparecen en al menos 2 meses con montos y fechas similares.",
+      "aroundDay": "Alrededor del día {{day}}",
+      "occurrences": "{{count}} meses detectados",
+      "perMonth": "/ mes",
+      "empty": "No se detectaron patrones recurrentes aún. Agrega más transacciones con el tiempo."
+    },
+    "categoryAlerts": {
+      "title": "Alertas por categoría",
+      "description": "Categorías que gastan más de tu promedio de 3 meses.",
+      "hint": "Categorías donde el gasto de este mes supera el promedio móvil de 3 meses en más de 1 desviación estándar.",
+      "percentAbove": "+{{pct}}% sobre el promedio",
+      "avg": "Prom. 3m: {{avg}}",
+      "avg3m": "Prom. 3 meses",
+      "thisMonth": "Este mes",
+      "empty": "Todas las categorías están dentro de rangos normales de gasto."
+    },
+    "savings": {
+      "title": "Sugerencias de ahorro",
+      "description": "Oportunidades para reducir el gasto este mes.",
+      "hint": "Categorías donde reducir el gasto al promedio histórico liberaría dinero.",
+      "couldSave": "Ahorra hasta {{amount}} este mes",
+      "target": "Meta: {{avg}}",
+      "targetLabel": "Meta (prom.)",
+      "currentLabel": "Actual",
+      "priority": {
+        "high": "Alta",
+        "medium": "Media",
+        "low": "Baja"
+      },
+      "empty": "¡Excelente! No se identificaron oportunidades de ahorro este mes."
+    },
+    "projection": {
+      "title": "Proyección de gastos",
+      "description": "Total proyectado a fin de mes según el ritmo actual.",
+      "projectedLabel": "Día {{count}} de {{total}}",
+      "hint": "Basado en {{elapsed}} días transcurridos de {{total}} días de este mes.",
+      "spentSoFar": "Gastado hasta hoy",
+      "projectedTotal": "Total proyectado",
+      "daysElapsed": "Día {{elapsed}} / {{total}}",
+      "byCategory": "Por categoría"
+    }
   },
   "reports": {
     "title": "Reportes",

@@ -7,19 +7,20 @@ import {
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
-  PieChart, Pie, Cell, Legend,
+  PieChart, Pie, Cell,
 } from 'recharts'
-import { Info, ChevronRight } from 'lucide-react'
+import { Info, ChevronRight, TrendingDown } from 'lucide-react'
 
 import { formatCurrency } from '@/lib/currency'
 import { calcKmSinceLastFill, getServiceTypeLabel } from '@/lib/vehicles'
+import { getFuelEfficiencyTrend } from '@/lib/insights'
 import type { FuelLog, VehicleService } from '@/types'
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 
 const CHART_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316']
 
-type DrillKey = 'fuel-cost' | 'service-cost' | 'fill-ups' | 'km-per-fill'
+type DrillKey = 'fuel-cost' | 'service-cost' | 'fill-ups' | 'km-per-fill' | 'total-distance' | 'avg-km-per-l' | 'total-liters' | 'service-count'
 type DrillRange = '3m' | '6m' | '1y' | '2y' | 'all'
 
 const DRILL_RANGES: { value: DrillRange; label: string }[] = [
@@ -29,6 +30,10 @@ const DRILL_RANGES: { value: DrillRange; label: string }[] = [
   { value: '2y',  label: '2Y' },
   { value: 'all', label: 'All' },
 ]
+
+type PieRange = '1m' | '6m' | '1y' | '2y' | 'all'
+
+const PIE_RANGES: PieRange[] = ['1m', '6m', '1y', '2y', 'all']
 
 interface DrillPoint { label: string; value: number }
 
@@ -50,8 +55,10 @@ export function VehicleStats({
   overrideAvgKmPerL?: number
 }) {
   const { t } = useTranslation()
-  const [drill, setDrill]           = useState<DrillKey | null>(null)
-  const [drillRange, setDrillRange] = useState<DrillRange>('1y')
+  const [drill, setDrill]                                   = useState<DrillKey | null>(null)
+  const [drillRange, setDrillRange]                         = useState<DrillRange>('1y')
+  const [activeServiceTypeId, setActiveServiceTypeId] = useState<string | null>(null)
+  const [pieRange, setPieRange]                             = useState<PieRange>('all')
 
   // ── Current month stats ─────────────────────────────────────────────────
   const currentMonthStats = useMemo(() => {
@@ -144,16 +151,147 @@ export function VehicleStats({
 
   // ── Service cost by type (pie) ──────────────────────────────────────────
   const serviceCostByType = useMemo(() => {
+    const now = new Date()
+    let filtered = services
+    if (pieRange !== 'all') {
+      const nMonths = pieRange === '1m' ? 1 : pieRange === '6m' ? 6 : pieRange === '1y' ? 12 : 24
+      const cutoff  = subMonths(startOfMonth(now), nMonths - 1)
+      filtered = services.filter((s) => parseISO(s.date) >= cutoff)
+    }
     const map = new Map<string, number>()
-    for (const s of services) map.set(s.serviceType, (map.get(s.serviceType) ?? 0) + s.cost)
+    for (const s of filtered) map.set(s.serviceType, (map.get(s.serviceType) ?? 0) + s.cost)
     return Array.from(map.entries())
-      .map(([name, value]) => ({ name: getServiceTypeLabel(name, t), value: value / 100 }))
+      .map(([serviceType, value]) => ({
+        id: serviceType,
+        name: getServiceTypeLabel(serviceType, t),
+        value: value / 100,
+      }))
+      .filter((e) => e.value > 0)
       .sort((a, b) => b.value - a.value)
-  }, [services, t])
+  }, [services, t, pieRange])
+
+  // ── Fuel efficiency trend alert ─────────────────────────────────────────
+  const efficiencyTrend = useMemo(() => getFuelEfficiencyTrend(logs), [logs])
 
   // ── Drill-down data ─────────────────────────────────────────────────────
   const drillData = useMemo((): DrillPoint[] => {
     if (!drill) return []
+
+    // ── Total distance per period ──────────────────────────────────────────
+    if (drill === 'total-distance') {
+      const safeInitialOdo = Number(initialOdometer) || 0
+      const sortedDistLogs = [...logs].sort((a, b) => a.date.localeCompare(b.date))
+
+      if (drillRange === 'all') {
+        if (sortedDistLogs.length === 0) return []
+        const years = [...new Set(sortedDistLogs.map((l) => parseISO(l.date).getFullYear()))].sort((a, b) => a - b)
+        return years.map((y) => {
+          const yearEnd   = new Date(y, 11, 31, 23, 59, 59)
+          const yearStart = new Date(y, 0, 1)
+          const upToEnd   = sortedDistLogs.filter((l) => parseISO(l.date) <= yearEnd)
+          const before    = sortedDistLogs.filter((l) => parseISO(l.date) <  yearStart)
+          const endOdo    = upToEnd.length > 0 ? Math.max(...upToEnd.map((l) => l.odometer)) : 0
+          const startOdo  = before.length  > 0 ? Math.max(...before.map((l)  => l.odometer)) : safeInitialOdo
+          return { label: String(y), value: Math.max(0, endOdo - startOdo) }
+        })
+      }
+
+      const nMonthsDist = drillRange === '3m' ? 3 : drillRange === '6m' ? 6 : drillRange === '1y' ? 12 : 24
+      const nowDist     = new Date()
+      const monthListDist = eachMonthOfInterval({ start: subMonths(startOfMonth(nowDist), nMonthsDist - 1), end: startOfMonth(nowDist) })
+      return monthListDist.map((ms) => {
+        const me       = endOfMonth(ms)
+        const label    = format(ms, 'MMM yy')
+        const upToEnd  = sortedDistLogs.filter((l) => { const d = parseISO(l.date); return d <= me })
+        const before   = sortedDistLogs.filter((l) => { const d = parseISO(l.date); return d <  ms })
+        const endOdo   = upToEnd.length > 0 ? Math.max(...upToEnd.map((l) => l.odometer)) : 0
+        const startOdo = before.length  > 0 ? Math.max(...before.map((l)  => l.odometer)) : safeInitialOdo
+        return { label, value: Math.max(0, endOdo - startOdo) }
+      })
+    }
+
+    // ── Avg km/L per period ────────────────────────────────────────────────
+    if (drill === 'avg-km-per-l') {
+      const sortedKmLLogs = [...logs].sort((a, b) => a.date.localeCompare(b.date))
+      if (drillRange === 'all') {
+        const yearMap = new Map<number, { km: number; liters: number }>()
+        for (let i = 1; i < sortedKmLLogs.length; i++) {
+          const km = calcKmSinceLastFill(sortedKmLLogs[i].odometer, sortedKmLLogs[i - 1].odometer)
+          if (km > 0) {
+            const year = parseISO(sortedKmLLogs[i].date).getFullYear()
+            const prev = yearMap.get(year) ?? { km: 0, liters: 0 }
+            yearMap.set(year, { km: prev.km + km, liters: prev.liters + sortedKmLLogs[i].liters })
+          }
+        }
+        return Array.from(yearMap.entries())
+          .sort(([a], [b]) => a - b)
+          .map(([year, { km, liters }]) => ({
+            label: String(year),
+            value: liters > 0 ? Math.round((km / liters) * 100) / 100 : 0,
+          }))
+      }
+      const nMonthsKmL = drillRange === '3m' ? 3 : drillRange === '6m' ? 6 : drillRange === '1y' ? 12 : 24
+      const nowKmL = new Date()
+      const monthListKmL = eachMonthOfInterval({ start: subMonths(startOfMonth(nowKmL), nMonthsKmL - 1), end: startOfMonth(nowKmL) })
+      const pairsMap = new Map<string, { km: number; liters: number }>()
+      for (let i = 1; i < sortedKmLLogs.length; i++) {
+        const km = calcKmSinceLastFill(sortedKmLLogs[i].odometer, sortedKmLLogs[i - 1].odometer)
+        if (km > 0) {
+          const key = format(parseISO(sortedKmLLogs[i].date), 'MMM yy')
+          const prev = pairsMap.get(key) ?? { km: 0, liters: 0 }
+          pairsMap.set(key, { km: prev.km + km, liters: prev.liters + sortedKmLLogs[i].liters })
+        }
+      }
+      return monthListKmL.map((ms) => {
+        const key  = format(ms, 'MMM yy')
+        const data = pairsMap.get(key)
+        return { label: key, value: data && data.liters > 0 ? Math.round((data.km / data.liters) * 100) / 100 : 0 }
+      })
+    }
+
+    // ── Total liters per period ────────────────────────────────────────────
+    if (drill === 'total-liters') {
+      if (drillRange === 'all') {
+        const yearMap = new Map<number, number>()
+        for (const log of logs) {
+          const year = parseISO(log.date).getFullYear()
+          yearMap.set(year, (yearMap.get(year) ?? 0) + log.liters)
+        }
+        return Array.from(yearMap.entries())
+          .sort(([a], [b]) => a - b)
+          .map(([year, liters]) => ({ label: String(year), value: Math.round(liters * 100) / 100 }))
+      }
+      const nMonthsL = drillRange === '3m' ? 3 : drillRange === '6m' ? 6 : drillRange === '1y' ? 12 : 24
+      const nowL = new Date()
+      const monthListL = eachMonthOfInterval({ start: subMonths(startOfMonth(nowL), nMonthsL - 1), end: startOfMonth(nowL) })
+      return monthListL.map((ms) => {
+        const me = endOfMonth(ms)
+        const ml = logs.filter((l) => { const d = parseISO(l.date); return d >= ms && d <= me })
+        return { label: format(ms, 'MMM yy'), value: Math.round(ml.reduce((s, l) => s + l.liters, 0) * 100) / 100 }
+      })
+    }
+
+    // ── Service count per period ───────────────────────────────────────────
+    if (drill === 'service-count') {
+      if (drillRange === 'all') {
+        const yearMap = new Map<number, number>()
+        for (const svc of services) {
+          const year = parseISO(svc.date).getFullYear()
+          yearMap.set(year, (yearMap.get(year) ?? 0) + 1)
+        }
+        return Array.from(yearMap.entries())
+          .sort(([a], [b]) => a - b)
+          .map(([year, count]) => ({ label: String(year), value: count }))
+      }
+      const nMonthsSvc = drillRange === '3m' ? 3 : drillRange === '6m' ? 6 : drillRange === '1y' ? 12 : 24
+      const nowSvc = new Date()
+      const monthListSvc = eachMonthOfInterval({ start: subMonths(startOfMonth(nowSvc), nMonthsSvc - 1), end: startOfMonth(nowSvc) })
+      return monthListSvc.map((ms) => {
+        const me  = endOfMonth(ms)
+        const msv = services.filter((s) => { const d = parseISO(s.date); return d >= ms && d <= me })
+        return { label: format(ms, 'MMM yy'), value: msv.length }
+      })
+    }
 
     // Helper: compute km-per-fill pairs grouped by key (month label or year string)
     function kmPerFillByKey(keyFn: (date: Date) => string): DrillPoint[] {
@@ -223,7 +361,7 @@ export function VehicleStats({
       const ml = logs.filter((l) => { const d = parseISO(l.date); return d >= ms && d <= me })
       return { label, value: ml.length }
     })
-  }, [drill, drillRange, logs, services])
+  }, [drill, drillRange, logs, services, initialOdometer])
 
   const drillTotal  = drillData.reduce((s, d) => s + d.value, 0)
   const drillActive = drillData.filter((d) => d.value > 0).length
@@ -234,7 +372,11 @@ export function VehicleStats({
     'fuel-cost':   { monthTitle: t('vehicles.stats.fuelCostByMonth'),       yearTitle: t('vehicles.stats.fuelCostByYear'),       color: '#6366f1', isCurrency: true,  unit: undefined },
     'service-cost':{ monthTitle: t('vehicles.stats.serviceCostByMonth'),    yearTitle: t('vehicles.stats.serviceCostByYear'),    color: '#f59e0b', isCurrency: true,  unit: undefined },
     'fill-ups':    { monthTitle: t('vehicles.stats.fillUpsByMonth'),        yearTitle: t('vehicles.stats.fillUpsByMonth'),       color: '#10b981', isCurrency: false, unit: undefined },
-    'km-per-fill': { monthTitle: t('vehicles.stats.kmBetweenFillsByMonth'), yearTitle: t('vehicles.stats.kmBetweenFillsByMonth'), color: '#06b6d4', isCurrency: false, unit: 'km' },
+    'km-per-fill':     { monthTitle: t('vehicles.stats.kmBetweenFillsByMonth'), yearTitle: t('vehicles.stats.kmBetweenFillsByMonth'), color: '#06b6d4', isCurrency: false, unit: 'km' },
+    'total-distance':  { monthTitle: t('vehicles.stats.distanceByMonth'),         yearTitle: t('vehicles.stats.distanceByYear'),         color: '#10b981', isCurrency: false, unit: 'km'    },
+    'avg-km-per-l':    { monthTitle: t('vehicles.stats.avgKmPerLByMonth'),      yearTitle: t('vehicles.stats.avgKmPerLByYear'),      color: '#8b5cf6', isCurrency: false, unit: 'km/L' },
+    'total-liters':    { monthTitle: t('vehicles.stats.totalLitersByMonth'),    yearTitle: t('vehicles.stats.totalLitersByYear'),    color: '#06b6d4', isCurrency: false, unit: 'L'    },
+    'service-count':   { monthTitle: t('vehicles.stats.serviceCountByMonth'),   yearTitle: t('vehicles.stats.serviceCountByYear'),   color: '#f59e0b', isCurrency: false, unit: undefined },
   }), [t])
 
   // Fleet mode overrides
@@ -271,7 +413,7 @@ export function VehicleStats({
     {
       label:    t('vehicles.stats.avgKmPerL'),
       value:    displayAvgKmPerL > 0 ? `${displayAvgKmPerL.toFixed(1)} km/L` : '—',
-      drillKey: null,
+      drillKey: 'avg-km-per-l' as DrillKey,
     },
     {
       label:     t('vehicles.stats.kmBetweenFills'),
@@ -282,7 +424,7 @@ export function VehicleStats({
       label:    t('vehicles.stats.totalDistance'),
       value:    displayTotalDistance > 0 ? `${displayTotalDistance.toLocaleString()} km` : '—',
       tooltip:  distanceTooltip,
-      drillKey: null,
+      drillKey: 'total-distance' as DrillKey,
     },
     {
       label:     t('vehicles.stats.fillUps'),
@@ -294,12 +436,12 @@ export function VehicleStats({
       label:     t('vehicles.stats.totalLiters'),
       value:     `${stats.totalLiters.toFixed(1)} L`,
       thisMonth: currentMonthStats.liters > 0 ? `${currentMonthStats.liters.toFixed(1)} L` : undefined,
-      drillKey:  null,
+      drillKey:  'total-liters' as DrillKey,
     },
     {
       label:    t('vehicles.stats.serviceCount'),
       value:    services.length.toString(),
-      drillKey: null,
+      drillKey: 'service-count' as DrillKey,
     },
   ]
 
@@ -310,6 +452,26 @@ export function VehicleStats({
 
   return (
     <div className="space-y-6">
+
+      {/* ── Fuel efficiency degradation alert ──────────────────────── */}
+      {efficiencyTrend?.isDegrading && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <TrendingDown size={18} className="text-amber-500 mt-0.5 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-amber-800">
+              {t('vehicles.stats.efficiencyAlertTitle')}
+            </p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              {t('vehicles.stats.efficiencyAlertBody', {
+                pct:      efficiencyTrend.degradationPercent.toFixed(1),
+                recent:   efficiencyTrend.recentKmPerL.toFixed(1),
+                baseline: efficiencyTrend.baselineKmPerL.toFixed(1),
+                n:        efficiencyTrend.windowSize,
+              })}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── Summary cards ───────────────────────────────────────────── */}
       <TooltipProvider>
@@ -420,11 +582,33 @@ export function VehicleStats({
       )}
 
       {/* ── Service cost by type (pie) ──────────────────────────────── */}
-      {serviceCostByType.length > 0 && (
+      {services.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold mb-2">{t('vehicles.stats.serviceCostByType')}</h3>
           <div className="rounded-xl border bg-white p-3">
-            <ResponsiveContainer width="100%" height={250}>
+            {/* Pie range selector */}
+            <div className="flex gap-1.5 mb-3 flex-wrap">
+              {PIE_RANGES.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => { setPieRange(value); setActiveServiceTypeId(null) }}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                    pieRange === value
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {t(`vehicles.stats.range.${value}`)}
+                </button>
+              ))}
+            </div>
+
+            {serviceCostByType.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-8">{t('vehicles.stats.noData')}</p>
+            ) : (
+            <>
+            <ResponsiveContainer width="100%" height={200}>
               <PieChart>
                 <Pie
                   data={serviceCostByType}
@@ -432,19 +616,63 @@ export function VehicleStats({
                   nameKey="name"
                   cx="50%"
                   cy="50%"
-                  outerRadius={80}
-                  label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
-                  labelLine={false}
-                  fontSize={10}
+                  outerRadius={85}
+                  onClick={(_: unknown, index: number) => {
+                    const id = serviceCostByType[index]?.id ?? null
+                    setActiveServiceTypeId(activeServiceTypeId === id ? null : id)
+                  }}
+                  style={{ cursor: 'pointer' }}
                 >
-                  {serviceCostByType.map((_, i) => (
-                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                  {serviceCostByType.map((entry, i) => (
+                    <Cell
+                      key={entry.id}
+                      fill={CHART_COLORS[i % CHART_COLORS.length]}
+                      opacity={activeServiceTypeId === null || activeServiceTypeId === entry.id ? 1 : 0.3}
+                      stroke={activeServiceTypeId === entry.id ? '#fff' : 'none'}
+                      strokeWidth={activeServiceTypeId === entry.id ? 2 : 0}
+                    />
                   ))}
                 </Pie>
-                <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Tooltip formatter={(val) => formatCurrency(Math.round(Number(val) * 100), baseCurrency)} />
               </PieChart>
             </ResponsiveContainer>
+
+            {/* Service type breakdown list */}
+            <ul className="mt-3 space-y-1">
+              {(() => {
+                const total = serviceCostByType.reduce((s, e) => s + e.value, 0)
+                return serviceCostByType.map((entry, i) => {
+                  const pct      = total > 0 ? ((entry.value / total) * 100).toFixed(1) : '0.0'
+                  const isActive = activeServiceTypeId === entry.id
+                  return (
+                    <li
+                      key={entry.id}
+                      className={`flex items-center gap-2 rounded-lg px-2 py-1.5 cursor-pointer select-none transition-colors ${
+                        isActive ? 'bg-gray-100 ring-1 ring-inset ring-gray-200' : 'hover:bg-gray-50'
+                      }`}
+                      onClick={() => setActiveServiceTypeId(isActive ? null : entry.id)}
+                    >
+                      <span
+                        className="h-2.5 w-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
+                      />
+                      <span className="flex-1 text-xs text-gray-700 truncate">{entry.name}</span>
+                      <span
+                        className="text-xs font-semibold tabular-nums"
+                        style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}
+                      >
+                        {pct}%
+                      </span>
+                      <span className="text-xs text-gray-400 tabular-nums">
+                        {formatCurrency(Math.round(entry.value * 100), baseCurrency)}
+                      </span>
+                    </li>
+                  )
+                })
+              })()}
+            </ul>
+            </>
+            )}
           </div>
         </div>
       )}
@@ -502,7 +730,7 @@ export function VehicleStats({
           {/* Summary stats */}
           {activeDrill && (
             <div className="grid grid-cols-2 gap-3 px-4 pb-6">
-              {drill !== 'km-per-fill' && (
+              {drill !== 'km-per-fill' && drill !== 'avg-km-per-l' && (
                 <div className="rounded-xl bg-gray-50 px-3 py-2.5 text-center">
                   <p className="text-[11px] text-gray-400 mb-0.5">{t('vehicles.stats.drillTotal')}</p>
                   <p className="text-base font-bold text-gray-800">
@@ -512,7 +740,7 @@ export function VehicleStats({
                   </p>
                 </div>
               )}
-              <div className={`rounded-xl bg-gray-50 px-3 py-2.5 text-center ${drill === 'km-per-fill' ? 'col-span-2' : ''}`}>
+              <div className={`rounded-xl bg-gray-50 px-3 py-2.5 text-center ${drill === 'km-per-fill' || drill === 'avg-km-per-l' ? 'col-span-2' : ''}`}>
                 <p className="text-[11px] text-gray-400 mb-0.5">{t('vehicles.stats.drillAvg')}</p>
                 <p className="text-base font-bold text-gray-800">
                   {activeDrill.isCurrency
