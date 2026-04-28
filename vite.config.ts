@@ -1,10 +1,8 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- vitest types
-import type { } from 'vitest'
 
 function getBasePath(): string {
   const repo = process.env.GITHUB_REPOSITORY?.split('/')[1]

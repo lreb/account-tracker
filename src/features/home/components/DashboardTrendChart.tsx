@@ -3,8 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { formatCurrency } from '@/lib/currency'
-
-export type TrendPeriod = '3m' | '6m' | '1y' | '2y'
+import type { TrendPeriod } from './DashboardTrendChart.types'
 
 interface TrendDataPoint {
   month: string

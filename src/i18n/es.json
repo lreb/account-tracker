@@ -49,7 +49,8 @@
     "scrollToTop": "Volver arriba",
     "search": "Buscar…",
     "noResults": "Sin resultados",
-    "description": "Descripción"
+    "description": "Descripción",
+    "back": "Volver"
   },
   "reminders": {
     "title": "Recordatorios",

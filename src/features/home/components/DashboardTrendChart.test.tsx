@@ -1,7 +1,8 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { DashboardTrendChart, type TrendPeriod } from './DashboardTrendChart'
+import { DashboardTrendChart } from './DashboardTrendChart'
+import type { TrendPeriod } from './DashboardTrendChart.types'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k }),

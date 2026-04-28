@@ -41,7 +41,7 @@ export default function SettingsPage() {
               </div>
             </div>
             <button
-              onClick={install}
+              onClick={() => { void install() }}
               className="w-full rounded-lg bg-primary text-primary-foreground text-sm font-medium py-2 px-4 transition-opacity hover:opacity-90 active:opacity-80"
             >
               {t('settings.installAppBtn')}
