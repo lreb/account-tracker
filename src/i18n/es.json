@@ -626,7 +626,17 @@
     "resetSetupAction": "Continuar",
     "driveConnectedSuccess": "Conectado a Google Drive.",
     "driveConnectFailed": "Error al iniciar sesión en Google. Inténtalo de nuevo.",
-    "driveConnecting": "Conectando a Google Drive..."
+    "driveConnecting": "Conectando a Google Drive...",
+    "installApp": "Instalar App",
+    "installAppDesc": "Agrega esta app a tu pantalla de inicio para acceso rápido, incluso sin conexión.",
+    "installAppBtn": "Instalar App",
+    "installAppInstalledTitle": "App instalada",
+    "installAppInstalledDesc": "Estás usando la app desde tu pantalla de inicio.",
+    "installAppIOSTitle": "Abre Safari y sigue estos pasos:",
+    "installAppIOSStep1": "Toca el botón Compartir en la barra de herramientas",
+    "installAppIOSStep2": "Selecciona \"Agregar a pantalla de inicio\"",
+    "installAppIOSStep3": "Toca \"Agregar\" para confirmar",
+    "installAppBrowserHint": "Abre esta página en Chrome o Edge para instalar la app en tu dispositivo."
   },
   "exchangeRates": {
     "fetchLatest": "Obtener Tipos Actuales",

@@ -628,7 +628,17 @@
     "resetSetupAction": "Continue",
     "driveConnectedSuccess": "Connected to Google Drive.",
     "driveConnectFailed": "Google sign-in failed. Please try again.",
-    "driveConnecting": "Connecting to Google Drive..."
+    "driveConnecting": "Connecting to Google Drive...",
+    "installApp": "Install App",
+    "installAppDesc": "Add this app to your home screen for quick access, even when offline.",
+    "installAppBtn": "Install App",
+    "installAppInstalledTitle": "App installed",
+    "installAppInstalledDesc": "You're running the app from your home screen.",
+    "installAppIOSTitle": "Open in Safari and follow these steps:",
+    "installAppIOSStep1": "Tap the Share button in the toolbar",
+    "installAppIOSStep2": "Select \"Add to Home Screen\"",
+    "installAppIOSStep3": "Tap \"Add\" to confirm",
+    "installAppBrowserHint": "Open this page in Chrome or Edge to install the app on your device."
   },
   "exchangeRates": {
     "fetchLatest": "Fetch Latest Rates",
