@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
+import { ArrowLeft } from 'lucide-react'
 
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useAccountsStore } from '@/stores/accounts.store'
@@ -33,6 +35,7 @@ import {
 
 export default function DataRetentionPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { transactions, load: loadTransactions } = useTransactionsStore()
   const { accounts, load: loadAccounts } = useAccountsStore()
   const { labels, load: loadLabels } = useLabelsStore()
@@ -126,7 +129,16 @@ export default function DataRetentionPage() {
 
   return (
     <div className="p-4 pb-24 space-y-4">
-      <h1 className="text-xl font-bold">{t('settings.dataRetentionTitle')}</h1>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-muted"
+          aria-label={t('common.back')}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <h1 className="text-xl font-bold">{t('settings.dataRetentionTitle')}</h1>
+      </div>
 
       <div className="rounded-2xl border bg-white p-4 space-y-3">
         <p className="text-xs text-gray-500">{t('settings.compactionDescription')}</p>

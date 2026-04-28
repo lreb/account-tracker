@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
-  CloudUpload, CloudDownload, LogOut, Info,
+  CloudUpload, CloudDownload, LogOut, Info, ArrowLeft,
 } from 'lucide-react'
 
 import { useTransactionsStore } from '@/stores/transactions.store'
@@ -30,6 +31,7 @@ import { Button } from '@/components/ui/button'
 
 export default function GoogleDriveSyncPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { load: loadTransactions } = useTransactionsStore()
   const { load: loadAccounts } = useAccountsStore()
   const { load: loadCategories } = useCategoriesStore()
@@ -133,7 +135,16 @@ export default function GoogleDriveSyncPage() {
 
   return (
     <div className="p-4 pb-24 space-y-4">
-      <h1 className="text-xl font-bold">{t('settings.googleDriveTitle')}</h1>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-muted"
+          aria-label={t('common.back')}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <h1 className="text-xl font-bold">{t('settings.googleDriveTitle')}</h1>
+      </div>
 
       {editingDriveConfig ? (
         <div className="rounded-2xl border bg-white p-4 space-y-3">

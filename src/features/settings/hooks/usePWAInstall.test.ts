@@ -61,6 +61,7 @@ function makeInstallEvent(opts: {
 
 describe('usePWAInstall', () => {
   beforeEach(() => {
+    localStorage.clear()
     mockMatchMedia(false)
     setNavigator({
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',

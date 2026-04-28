@@ -5,7 +5,7 @@ import { format } from 'date-fns'
 import { toast } from 'sonner'
 import i18n from '@/i18n'
 import {
-  Download, Upload, Table2, FileJson, CloudUpload,
+  Download, Upload, Table2, FileJson, CloudUpload, ArrowLeft,
 } from 'lucide-react'
 
 import { db } from '@/db'
@@ -211,7 +211,16 @@ export default function ImportExportPage() {
 
   return (
     <div className="p-4 pb-24 space-y-4">
-      <h1 className="text-xl font-bold">{t('settings.importExportTitle')}</h1>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-muted"
+          aria-label={t('common.back')}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <h1 className="text-xl font-bold">{t('settings.importExportTitle')}</h1>
+      </div>
 
       {/* ── CSV Data section ─────────────────────────────────────────────── */}
       <div className="space-y-2">

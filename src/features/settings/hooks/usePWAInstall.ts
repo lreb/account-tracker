@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 
+const PWA_INSTALLED_KEY = 'pwa-installed'
+
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
@@ -23,11 +25,14 @@ export function usePWAInstall(): UsePWAInstallReturn {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [isInstalled, setIsInstalled] = useState(() => {
     const standaloneMediaQuery = window.matchMedia('(display-mode: standalone)')
-    return (
+    const isStandalone =
       standaloneMediaQuery.matches ||
       ('standalone' in navigator &&
         (navigator as Navigator & { standalone?: boolean }).standalone === true)
-    )
+    // display-mode: standalone only matches when the app is actually launched from
+    // the OS (home screen / app drawer), not from a regular browser tab — so we
+    // also persist a flag to localStorage so the installed state survives reloads.
+    return isStandalone || localStorage.getItem(PWA_INSTALLED_KEY) === 'true'
   })
   const isInstallingRef = useRef(false)
 
@@ -40,6 +45,7 @@ export function usePWAInstall(): UsePWAInstallReturn {
     }
 
     const onAppInstalled = () => {
+      localStorage.setItem(PWA_INSTALLED_KEY, 'true')
       setIsInstalled(true)
       setDeferredPrompt(null)
     }
