@@ -36,7 +36,7 @@ export default function PreferencesPage() {
         <button
           onClick={() => navigate(-1)}
           className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-muted"
-          aria-label={t('common.back')}
+          aria-label={t('common.back', { defaultValue: 'Back' })}
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
