@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Globe } from 'lucide-react'
+import { Globe, ArrowLeft } from 'lucide-react'
 import i18n from '@/i18n'
 
 import { useSettingsStore } from '@/stores/settings.store'
@@ -15,6 +16,7 @@ import {
 
 export default function PreferencesPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { saveSetting, language, baseCurrency } = useSettingsStore()
 
   async function handleLanguageChange(lang: string) {
@@ -30,7 +32,16 @@ export default function PreferencesPage() {
 
   return (
     <div className="p-4 pb-24 space-y-4">
-      <h1 className="text-xl font-bold">{t('settings.preferencesTitle')}</h1>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-muted"
+          aria-label={t('common.back', { defaultValue: 'Back' })}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <h1 className="text-xl font-bold">{t('settings.preferencesTitle')}</h1>
+      </div>
 
       {/* ── Language section ─────────────────────────────────────────────── */}
       <div className="space-y-2">

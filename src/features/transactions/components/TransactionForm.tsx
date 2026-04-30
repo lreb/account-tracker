@@ -19,7 +19,7 @@ import { useSettingsStore } from '@/stores/settings.store'
 import { useTransactionCoreFields } from '@/hooks/useTransactionCoreFields'
 
 import { Button } from '@/components/ui/button'
-import { AmountCalculatorButton } from '@/components/ui/amount-calculator-button'
+import { AmountInput } from '@/components/ui/amount-input'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -499,30 +499,16 @@ export default function TransactionForm() {
       </div>
 
       {/* Amount */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between gap-2">
-          <Label htmlFor="amount">{t('common.amount', 'Amount')}</Label>
-          <AmountCalculatorButton
-            currentValue={watch('amount')}
-            onApply={(value) => {
-              setValue('amount', value, {
-                shouldDirty: true,
-                shouldValidate: true,
-                shouldTouch: true,
-              })
-            }}
-          />
-        </div>
-        <Input
-          id="amount"
-          type="number"
-          step="0.01"
-          inputMode="decimal"
-          placeholder="0.00"
-          {...register('amount')}
-        />
-        {errors.amount && <p className="text-xs text-red-500">{t(errors.amount.message!)}</p>}
-      </div>
+      <AmountInput
+        label={t('common.amount', 'Amount')}
+        value={watchAmount}
+        currency={watchCurrency || baseCurrency}
+        error={errors.amount ? t(errors.amount.message!) : undefined}
+        onApply={(value) =>
+          setValue('amount', value, { shouldDirty: true, shouldValidate: true, shouldTouch: true })
+        }
+        registerProps={register('amount')}
+      />
 
       {/* Date & Time */}
       <div className="grid grid-cols-2 gap-3">

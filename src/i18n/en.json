@@ -47,6 +47,7 @@
     "errorBoundaryDescription": "An unexpected error occurred in this section. You can try again or go back to the dashboard.",
     "saved": "Saved",
     "scrollToTop": "Scroll to top",
+    "back": "Back",
     "search": "Search…",
     "noResults": "No results",
     "description": "Description"
@@ -119,7 +120,8 @@
     "trendPeriod": {
       "3m": "3M",
       "6m": "6M",
-      "1y": "1Y"
+      "1y": "1Y",
+      "2y": "2Y"
     }
   },
   "transactions": {
@@ -628,7 +630,46 @@
     "resetSetupAction": "Continue",
     "driveConnectedSuccess": "Connected to Google Drive.",
     "driveConnectFailed": "Google sign-in failed. Please try again.",
-    "driveConnecting": "Connecting to Google Drive..."
+    "driveConnecting": "Connecting to Google Drive...",
+    "installApp": "Install App",
+    "installAppDesc": "Add this app to your home screen for quick access, even when offline.",
+    "installAppBtn": "Install App",
+    "installAppInstalledTitle": "App installed",
+    "installAppInstalledDesc": "You're running the app from your home screen.",
+    "installAppIOSTitle": "Open in Safari and follow these steps:",
+    "installAppIOSStep1": "Tap the Share button in the toolbar",
+    "installAppIOSStep2": "Select \"Add to Home Screen\"",
+    "installAppIOSStep3": "Tap \"Add\" to confirm",
+    "installAppBrowserHint": "Open this page in Chrome or Edge to install the app on your device.",
+    "aiAssistantTitle": "AI Assistant"
+  },
+  "ai": {
+    "title": "AI Assistant",
+    "description": "Connect your own AI model to get personalized financial insights. Your data stays on your device — only an anonymous monthly summary is sent when you request an analysis.",
+    "provider": "Provider",
+    "baseUrl": "Base URL",
+    "baseUrlHint": "LM Studio default: http://localhost:1234/v1 · Ollama default: http://localhost:11434",
+    "model": "Model name",
+    "modelPlaceholder": "e.g. phi-3.1-mini-4k-instruct",
+    "modelHint": "Exact model name as it appears in LM Studio or Ollama.",
+    "apiKey": "API Key",
+    "apiKeyOptional": "optional for local models",
+    "apiKeyPlaceholder": "sk-…  (leave blank for LM Studio / Ollama)",
+    "apiKeyHint": "Stored only on this device. Sent directly to the provider — never to any other server.",
+    "testConnection": "Test Connection",
+    "testOk": "Connected",
+    "testFailed": "Connection failed",
+    "testEmptyResponse": "Provider responded but returned an empty message.",
+    "save": "Save",
+    "privacyNotice": "Your API key and financial data are stored locally and never leave your device except for AI calls you explicitly trigger.",
+    "panelTitle": "AI Analysis",
+    "panelHint": "Click the button to analyze your current month's spending with your configured AI model.",
+    "notConfigured": "No AI model configured. Set up your local or cloud AI to enable analysis.",
+    "configure": "Configure AI",
+    "analyzeBtn": "Analyze {{period}}",
+    "analyzing": "Analyzing…",
+    "analysisError": "AI analysis failed. Check your connection and model settings.",
+    "providerNotImplemented": "This AI provider is not yet implemented."
   },
   "exchangeRates": {
     "fetchLatest": "Fetch Latest Rates",

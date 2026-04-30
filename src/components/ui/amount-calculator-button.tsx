@@ -12,55 +12,84 @@ import {
 
 type CalculatorOperator = '+' | '-' | '*' | '/'
 
+type CalcState = {
+  display: string
+  storedValue: number | null
+  operator: CalculatorOperator | null
+  waitingNext: boolean
+}
+
+const INIT_CALC_STATE: CalcState = {
+  display: '0',
+  storedValue: null,
+  operator: null,
+  waitingNext: false,
+}
+
 type AmountCalculatorButtonProps = {
   currentValue?: string
   onApply: (value: string) => void
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  hideTrigger?: boolean
 }
 
-export function AmountCalculatorButton({ currentValue, onApply }: AmountCalculatorButtonProps) {
+export function AmountCalculatorButton({
+  currentValue,
+  onApply,
+  open: controlledOpen,
+  onOpenChange,
+  hideTrigger = false,
+}: AmountCalculatorButtonProps) {
   const { t } = useTranslation()
-  const [isOpen, setIsOpen] = useState(false)
-  const [display, setDisplay] = useState('0')
-  const [storedValue, setStoredValue] = useState<number | null>(null)
-  const [operator, setOperator] = useState<CalculatorOperator | null>(null)
-  const [waitingNext, setWaitingNext] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const [calc, setCalc] = useState<CalcState>(INIT_CALC_STATE)
+  const { display, storedValue, operator, waitingNext } = calc
 
-  const reset = () => {
-    setDisplay('0')
-    setStoredValue(null)
-    setOperator(null)
-    setWaitingNext(false)
+  const isControlled = controlledOpen !== undefined
+  const isOpen = isControlled ? controlledOpen : internalOpen
+
+  const handleOpenChange = (value: boolean) => {
+    if (!isControlled) setInternalOpen(value)
+    onOpenChange?.(value)
   }
 
-  const openCalculator = () => {
-    const parsed = currentValue ? parseFloat(currentValue) : NaN
-    if (!isNaN(parsed) && isFinite(parsed)) {
-      setDisplay(parsed.toString())
-      setStoredValue(null)
-      setOperator(null)
-      setWaitingNext(false)
-    } else {
-      reset()
+  // Track the previous isOpen value as state so we can detect the closed→open
+  // transition during render. This is the React-recommended pattern for resetting
+  // derived state when a prop/value changes (no useEffect, no ref during render).
+  // See: https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen)
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen)
+    if (isOpen) {
+      const parsed = currentValue ? parseFloat(currentValue) : NaN
+      setCalc(!isNaN(parsed) && isFinite(parsed)
+        ? { display: parsed.toString(), storedValue: null, operator: null, waitingNext: true }
+        : INIT_CALC_STATE
+      )
     }
-    setIsOpen(true)
+  }
+
+  const reset = () => setCalc(INIT_CALC_STATE)
+
+  const openCalculator = () => {
+    handleOpenChange(true)
   }
 
   const inputDigit = (digit: string) => {
     if (waitingNext) {
-      setDisplay(digit)
-      setWaitingNext(false)
+      setCalc((prev) => ({ ...prev, display: digit, waitingNext: false }))
       return
     }
-    setDisplay((prev) => (prev === '0' ? digit : `${prev}${digit}`))
+    setCalc((prev) => ({ ...prev, display: prev.display === '0' ? digit : `${prev.display}${digit}` }))
   }
 
   const inputDecimal = () => {
     if (waitingNext) {
-      setDisplay('0.')
-      setWaitingNext(false)
+      setCalc((prev) => ({ ...prev, display: '0.', waitingNext: false }))
       return
     }
-    setDisplay((prev) => (prev.includes('.') ? prev : `${prev}.`))
+    setCalc((prev) => ({ ...prev, display: prev.display.includes('.') ? prev.display : `${prev.display}.` }))
   }
 
   const calculate = (left: number, right: number, op: CalculatorOperator): number => {
@@ -78,20 +107,17 @@ export function AmountCalculatorButton({ currentValue, onApply }: AmountCalculat
     }
 
     if (storedValue === null) {
-      setStoredValue(inputValue)
-      setOperator(nextOperator)
-      setWaitingNext(true)
+      setCalc((prev) => ({ ...prev, storedValue: inputValue, operator: nextOperator, waitingNext: true }))
       return
     }
 
     if (operator && !waitingNext) {
       const result = calculate(storedValue, inputValue, operator)
-      setDisplay(result.toString())
-      setStoredValue(result)
+      setCalc((prev) => ({ ...prev, display: result.toString(), storedValue: result, operator: nextOperator, waitingNext: true }))
+      return
     }
 
-    setOperator(nextOperator)
-    setWaitingNext(true)
+    setCalc((prev) => ({ ...prev, operator: nextOperator, waitingNext: true }))
   }
 
   const applyEquals = () => {
@@ -103,22 +129,18 @@ export function AmountCalculatorButton({ currentValue, onApply }: AmountCalculat
       return
     }
     const result = calculate(storedValue, inputValue, operator)
-    setDisplay(result.toString())
-    setStoredValue(null)
-    setOperator(null)
-    setWaitingNext(true)
+    setCalc({ display: result.toString(), storedValue: null, operator: null, waitingNext: true })
   }
 
   const backspace = () => {
     if (waitingNext) {
-      setDisplay('0')
-      setWaitingNext(false)
+      setCalc((prev) => ({ ...prev, display: '0', waitingNext: false }))
       return
     }
-    setDisplay((prev) => {
-      if (prev.length <= 1) return '0'
-      if (prev.startsWith('-') && prev.length === 2) return '0'
-      return prev.slice(0, -1)
+    setCalc((prev) => {
+      const d = prev.display
+      const next = d.length <= 1 ? '0' : (d.startsWith('-') && d.length === 2 ? '0' : d.slice(0, -1))
+      return { ...prev, display: next }
     })
   }
 
@@ -133,28 +155,30 @@ export function AmountCalculatorButton({ currentValue, onApply }: AmountCalculat
 
     if (isNaN(result) || !isFinite(result) || result <= 0) {
       onApply('')
-      setIsOpen(false)
+      handleOpenChange(false)
       return
     }
 
     onApply(result.toFixed(2))
-    setIsOpen(false)
+    handleOpenChange(false)
   }
 
   return (
     <>
-      <Button
-        type="button"
-        variant="outline"
-        size="icon-sm"
-        onClick={openCalculator}
-        aria-label={t('transactions.calculator.open', 'Open calculator')}
-        title={t('transactions.calculator.open', 'Open calculator')}
-      >
-        <Calculator />
-      </Button>
+      {!hideTrigger && (
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-sm"
+          onClick={openCalculator}
+          aria-label={t('transactions.calculator.open', 'Open calculator')}
+          title={t('transactions.calculator.open', 'Open calculator')}
+        >
+          <Calculator />
+        </Button>
+      )}
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
         <DialogContent className="max-w-xs p-0" showCloseButton={false}>
           <DialogHeader className="px-4 pt-4 pb-0">
             <DialogTitle>{t('transactions.calculator.title', 'Amount Calculator')}</DialogTitle>
@@ -166,40 +190,40 @@ export function AmountCalculatorButton({ currentValue, onApply }: AmountCalculat
             </div>
 
             <div className="grid grid-cols-4 gap-2">
-              <Button type="button" variant="secondary" className="h-12 text-base" onClick={reset}>
+              <Button type="button" variant="secondary" className="h-14 text-lg" onClick={reset}>
                 {t('transactions.calculator.clear', 'C')}
               </Button>
-              <Button type="button" variant="secondary" className="h-12 text-base" onClick={backspace} aria-label={t('transactions.calculator.backspace', 'Backspace')}>
+              <Button type="button" variant="secondary" className="h-14 text-lg" onClick={backspace} aria-label={t('transactions.calculator.backspace', 'Backspace')}>
                 <Delete className="size-5" />
               </Button>
-              <Button type="button" variant="secondary" className="h-12 text-base" onClick={() => applyOperator('/')}>/</Button>
-              <Button type="button" variant="secondary" className="h-12 text-base" onClick={() => applyOperator('*')}>×</Button>
+              <Button type="button" variant="secondary" className="h-14 text-lg" onClick={() => applyOperator('/')}>/</Button>
+              <Button type="button" variant="secondary" className="h-14 text-lg" onClick={() => applyOperator('*')}>×</Button>
 
-              <Button type="button" variant="outline" className="h-12 text-base" onClick={() => inputDigit('7')}>7</Button>
-              <Button type="button" variant="outline" className="h-12 text-base" onClick={() => inputDigit('8')}>8</Button>
-              <Button type="button" variant="outline" className="h-12 text-base" onClick={() => inputDigit('9')}>9</Button>
-              <Button type="button" variant="secondary" className="h-12 text-base" onClick={() => applyOperator('-')}>−</Button>
+              <Button type="button" variant="outline" className="h-14 text-lg" onClick={() => inputDigit('7')}>7</Button>
+              <Button type="button" variant="outline" className="h-14 text-lg" onClick={() => inputDigit('8')}>8</Button>
+              <Button type="button" variant="outline" className="h-14 text-lg" onClick={() => inputDigit('9')}>9</Button>
+              <Button type="button" variant="secondary" className="h-14 text-lg" onClick={() => applyOperator('-')}>−</Button>
 
-              <Button type="button" variant="outline" className="h-12 text-base" onClick={() => inputDigit('4')}>4</Button>
-              <Button type="button" variant="outline" className="h-12 text-base" onClick={() => inputDigit('5')}>5</Button>
-              <Button type="button" variant="outline" className="h-12 text-base" onClick={() => inputDigit('6')}>6</Button>
-              <Button type="button" variant="secondary" className="h-12 text-base" onClick={() => applyOperator('+')}>+</Button>
+              <Button type="button" variant="outline" className="h-14 text-lg" onClick={() => inputDigit('4')}>4</Button>
+              <Button type="button" variant="outline" className="h-14 text-lg" onClick={() => inputDigit('5')}>5</Button>
+              <Button type="button" variant="outline" className="h-14 text-lg" onClick={() => inputDigit('6')}>6</Button>
+              <Button type="button" variant="secondary" className="h-14 text-lg" onClick={() => applyOperator('+')}>+</Button>
 
-              <Button type="button" variant="outline" className="h-12 text-base" onClick={() => inputDigit('1')}>1</Button>
-              <Button type="button" variant="outline" className="h-12 text-base" onClick={() => inputDigit('2')}>2</Button>
-              <Button type="button" variant="outline" className="h-12 text-base" onClick={() => inputDigit('3')}>3</Button>
-              <Button type="button" variant="secondary" className="h-12 text-base" onClick={applyEquals}>=</Button>
+              <Button type="button" variant="outline" className="h-14 text-lg" onClick={() => inputDigit('1')}>1</Button>
+              <Button type="button" variant="outline" className="h-14 text-lg" onClick={() => inputDigit('2')}>2</Button>
+              <Button type="button" variant="outline" className="h-14 text-lg" onClick={() => inputDigit('3')}>3</Button>
+              <Button type="button" variant="secondary" className="h-14 text-lg" onClick={applyEquals}>=</Button>
 
-              <Button type="button" variant="outline" className="col-span-2 h-12 text-base" onClick={() => inputDigit('0')}>0</Button>
-              <Button type="button" variant="outline" className="h-12 text-base" onClick={inputDecimal}>.</Button>
-              <Button type="button" variant="outline" className="h-12 text-base" onClick={() => inputDigit('00')}>00</Button>
+              <Button type="button" variant="outline" className="col-span-2 h-14 text-lg" onClick={() => inputDigit('0')}>0</Button>
+              <Button type="button" variant="outline" className="h-14 text-lg" onClick={inputDecimal}>.</Button>
+              <Button type="button" variant="outline" className="h-14 text-lg" onClick={() => inputDigit('00')}>00</Button>
             </div>
 
             <div className="flex gap-2 pt-1">
-              <Button type="button" variant="outline" className="flex-1 h-12 text-base" onClick={() => setIsOpen(false)}>
+              <Button type="button" variant="outline" className="flex-1 h-14 text-lg" onClick={() => handleOpenChange(false)}>
                 {t('common.cancel')}
               </Button>
-              <Button type="button" className="flex-1 h-12 text-base" onClick={handleApply}>
+              <Button type="button" className="flex-1 h-14 text-lg" onClick={handleApply}>
                 {t('transactions.calculator.ok', 'OK')}
               </Button>
             </div>
