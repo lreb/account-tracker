@@ -31,7 +31,7 @@ import { useLabelsStore } from '@/stores/labels.store'
 import type { VehicleService, Transaction } from '@/types'
 
 import { Button } from '@/components/ui/button'
-import { AmountCalculatorButton } from '@/components/ui/amount-calculator-button'
+import { AmountInput } from '@/components/ui/amount-input'
 import { OdometerConverterButton } from '@/components/ui/odometer-converter-button'
 import { Input } from '@/components/ui/input'
 import { Label as FormLabel } from '@/components/ui/label'
@@ -105,6 +105,11 @@ export default function ServiceFormPage() {
   const watchCost = watch('cost')
   const watchDate = watch('date')
   const watchTime = watch('time')
+
+  const accountCurrency = useMemo(
+    () => accounts.find((a) => a.id === watchAccountId)?.currency ?? baseCurrency,
+    [accounts, watchAccountId, baseCurrency],
+  )
 
   const availableAccounts = useMemo(
     () => getAccountSelectOptions(accounts, [watchAccountId]),
@@ -431,23 +436,16 @@ export default function ServiceFormPage() {
 
         {/* Cost + Odometer */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <div className="flex items-center justify-between gap-2">
-              <FormLabel>{t('vehicles.cost')}</FormLabel>
-              <AmountCalculatorButton
-                currentValue={watchCost}
-                onApply={(value) => {
-                  setValue('cost', value, {
-                    shouldDirty: true,
-                    shouldValidate: true,
-                    shouldTouch: true,
-                  })
-                }}
-              />
-            </div>
-            <Input type="number" step="0.01" inputMode="decimal" placeholder="0.00" {...register('cost')} />
-            {errors.cost && <p className="text-xs text-red-500">{t(errors.cost.message!)}</p>}
-          </div>
+          <AmountInput
+            label={t('vehicles.cost')}
+            value={watchCost}
+            currency={accountCurrency}
+            error={errors.cost ? t(errors.cost.message!) : undefined}
+            onApply={(value) =>
+              setValue('cost', value, { shouldDirty: true, shouldValidate: true, shouldTouch: true })
+            }
+            registerProps={register('cost')}
+          />
           <div className="space-y-1">
             <div className="flex items-center justify-between gap-2">
               <FormLabel>{t('vehicles.odometer')}</FormLabel>
