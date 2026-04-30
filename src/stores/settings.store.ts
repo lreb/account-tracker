@@ -10,6 +10,10 @@ interface SettingsState {
   googleClientId: string
   googleDriveFolderId: string
   googleDriveFolderName: string
+  aiProvider: string
+  aiApiKey: string
+  aiBaseUrl: string
+  aiModel: string
   load: () => Promise<void>
   saveSetting: (key: string, value: string) => Promise<void>
 }
@@ -21,6 +25,10 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   googleClientId: '',
   googleDriveFolderId: 'root',
   googleDriveFolderName: '',
+  aiProvider: '',
+  aiApiKey: '',
+  aiBaseUrl: '',
+  aiModel: '',
 
   load: async () => {
     try {
@@ -33,6 +41,10 @@ export const useSettingsStore = create<SettingsState>((set) => ({
         googleClientId: map['googleClientId'] ?? '',
         googleDriveFolderId: map['googleDriveFolderId'] ?? 'root',
         googleDriveFolderName: map['googleDriveFolderName'] ?? '',
+        aiProvider: map['aiProvider'] ?? '',
+        aiApiKey: map['aiApiKey'] ?? '',
+        aiBaseUrl: map['aiBaseUrl'] ?? '',
+        aiModel: map['aiModel'] ?? '',
       })
     } catch (err) {
       console.error(err)
@@ -49,6 +61,10 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       else if (key === 'googleClientId') set({ googleClientId: value })
       else if (key === 'googleDriveFolderId') set({ googleDriveFolderId: value })
       else if (key === 'googleDriveFolderName') set({ googleDriveFolderName: value })
+      else if (key === 'aiProvider') set({ aiProvider: value })
+      else if (key === 'aiApiKey') set({ aiApiKey: value })
+      else if (key === 'aiBaseUrl') set({ aiBaseUrl: value })
+      else if (key === 'aiModel') set({ aiModel: value })
     } catch (err) {
       console.error(err)
       toast.error('Failed to save setting')
