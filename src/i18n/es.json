@@ -47,10 +47,10 @@
     "errorBoundaryDescription": "Ocurrió un error inesperado en esta sección. Puedes reintentar o volver al inicio.",
     "saved": "Guardado",
     "scrollToTop": "Volver arriba",
+    "back": "Volver",
     "search": "Buscar…",
     "noResults": "Sin resultados",
-    "description": "Descripción",
-    "back": "Volver"
+    "description": "Descripción"
   },
   "reminders": {
     "title": "Recordatorios",

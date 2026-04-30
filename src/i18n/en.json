@@ -47,10 +47,10 @@
     "errorBoundaryDescription": "An unexpected error occurred in this section. You can try again or go back to the dashboard.",
     "saved": "Saved",
     "scrollToTop": "Scroll to top",
+    "back": "Back",
     "search": "Search…",
     "noResults": "No results",
-    "description": "Description",
-    "back": "Back"
+    "description": "Description"
   },
   "reminders": {
     "title": "Reminders",

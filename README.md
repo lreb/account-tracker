@@ -1,6 +1,9 @@
 # ExpenseTracking
 
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/lreb/account-tracker)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/lreb/
+account-tracker)
+
+[![DNS Access - Launch ExpenseTracking](https://img.shields.io/badge/DNS%20Access-Launch%20ExpenseTracking-0ea5e9?style=for-the-badge&logo=vercel&logoColor=white&labelColor=1e293b)](https://lreb.github.io/account-tracker/)
 
 A personal finance Progressive Web App (PWA) + Android application. Record income and expenses, track vehicle fuel and maintenance, and view reports. **No backend, no database service** — all data lives on your device via IndexedDB.
 
