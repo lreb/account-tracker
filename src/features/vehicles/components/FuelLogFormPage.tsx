@@ -23,7 +23,7 @@ import { useLabelsStore } from '@/stores/labels.store'
 import type { FuelLog, Transaction } from '@/types'
 
 import { Button } from '@/components/ui/button'
-import { AmountCalculatorButton } from '@/components/ui/amount-calculator-button'
+import { AmountInput } from '@/components/ui/amount-input'
 import { OdometerConverterButton } from '@/components/ui/odometer-converter-button'
 import { Input } from '@/components/ui/input'
 import { Label as FormLabel } from '@/components/ui/label'
@@ -97,6 +97,11 @@ export default function FuelLogFormPage() {
   const watchTotalCost = watch('totalCost')
   const watchDate = watch('date')
   const watchTime = watch('time')
+
+  const accountCurrency = useMemo(
+    () => accounts.find((a) => a.id === watchAccountId)?.currency ?? baseCurrency,
+    [accounts, watchAccountId, baseCurrency],
+  )
 
   const availableAccounts = useMemo(
     () => getAccountSelectOptions(accounts, [watchAccountId]),
@@ -429,30 +434,17 @@ export default function FuelLogFormPage() {
         </div>
 
         {/* Total cost */}
-        <div className="space-y-1">
-          <div className="flex items-center justify-between gap-2">
-            <FormLabel>{t('vehicles.totalCost')}</FormLabel>
-            <AmountCalculatorButton
-              currentValue={watchTotalCost}
-              onApply={(value) => {
-                setValue('totalCost', value, {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                  shouldTouch: true,
-                })
-                setLastEdited('totalCost')
-              }}
-            />
-          </div>
-          <Input
-            type="number"
-            step="0.01"
-            inputMode="decimal"
-            placeholder="0.00"
-            {...register('totalCost', { onChange: () => setLastEdited('totalCost') })}
-          />
-          {errors.totalCost && <p className="text-xs text-red-500">{t(errors.totalCost.message!)}</p>}
-        </div>
+        <AmountInput
+          label={t('vehicles.totalCost')}
+          value={watchTotalCost}
+          currency={accountCurrency}
+          error={errors.totalCost ? t(errors.totalCost.message!) : undefined}
+          onApply={(value) => {
+            setValue('totalCost', value, { shouldDirty: true, shouldValidate: true, shouldTouch: true })
+            setLastEdited('totalCost')
+          }}
+          registerProps={register('totalCost', { onChange: () => setLastEdited('totalCost') })}
+        />
 
         {/* Account */}
         <AccountSelect
