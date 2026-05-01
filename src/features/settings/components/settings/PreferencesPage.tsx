@@ -34,6 +34,7 @@ export default function PreferencesPage() {
     <div className="p-4 pb-24 space-y-4">
       <div className="flex items-center gap-2">
         <button
+          type="button"
           onClick={() => navigate(-1)}
           className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-muted"
           aria-label={t('common.back', { defaultValue: 'Back' })}
