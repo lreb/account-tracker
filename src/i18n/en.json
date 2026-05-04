@@ -444,6 +444,17 @@
       "projectedTotal": "Projected total",
       "daysElapsed": "Day {{elapsed}} / {{total}}",
       "byCategory": "By Category"
+    },
+    "ai": {
+      "title": "AI Analysis",
+      "analyzeButton": "Analyze {{period}}",
+      "analyzing": "Analyzing…",
+      "cancel": "Cancel",
+      "configureHint": "Configure an AI provider in Settings to get personalised insights.",
+      "configureAction": "Configure AI",
+      "response": "Response",
+      "newAnalysis": "New Analysis",
+      "errorGeneric": "Could not get AI response. Check your API key and connection."
     }
   },
   "reports": {
@@ -669,7 +680,26 @@
     "analyzeBtn": "Analyze {{period}}",
     "analyzing": "Analyzing…",
     "analysisError": "AI analysis failed. Check your connection and model settings.",
-    "providerNotImplemented": "This AI provider is not yet implemented."
+    "providerNotImplemented": "This AI provider is not yet implemented.",
+    "aiAssistantTitle": "AI Assistant",
+    "aiSectionConfig": "Configuration",
+    "aiProvider": "Provider",
+    "aiApiKey": "API Key",
+    "aiApiKeyPlaceholder": "sk-…",
+    "aiApiKeyRequired": "API key is required to test the connection.",
+    "aiModel": "Model",
+    "aiModelPlaceholder": "e.g. gpt-4o-mini",
+    "aiBaseUrl": "Base URL",
+    "aiBaseUrlPlaceholder": "https://api.openai.com/v1",
+    "aiShowKey": "Show key",
+    "aiHideKey": "Hide key",
+    "aiSaved": "AI settings saved.",
+    "aiTestConnection": "Test Connection",
+    "aiTestConnecting": "Testing…",
+    "aiTestSuccess": "Connected",
+    "aiTestFailed": "Connection failed",
+    "aiKeyNote": "Your API key is stored only on this device. It is sent directly to the configured provider — never to any third party.",
+    "aiLocalProviderHint": "Make sure LM Studio is running with the server enabled (default port 1234) and CORS is enabled in LM Studio → Settings → Local Server → Enable CORS. Base URL should be http://localhost:1234 (no /v1 suffix)."
   },
   "exchangeRates": {
     "fetchLatest": "Fetch Latest Rates",

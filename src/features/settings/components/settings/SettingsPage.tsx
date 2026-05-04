@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   ChevronRight, Download, CloudUpload, Clock, Globe,
   Smartphone, CheckCircle2, Share, BotMessageSquare,
+Bot,
 } from 'lucide-react'
 import { usePWAInstall } from '../../hooks/usePWAInstall'
 
@@ -12,6 +13,7 @@ const settingsItems = [
   { to: '/settings/google-drive',   icon: CloudUpload,        labelKey: 'settings.googleDriveTitle' },
   { to: '/settings/data-retention', icon: Clock,              labelKey: 'settings.dataRetentionTitle' },
   { to: '/settings/ai-assistant',   icon: BotMessageSquare,   labelKey: 'settings.aiAssistantTitle' },
+  { to: '/settings/ai-assistant',   icon: Bot,         labelKey: 'settings.aiAssistantTitle' }
 ] as const
 
 export default function SettingsPage() {

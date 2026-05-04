@@ -1,124 +1,171 @@
-import { useState, useRef, useMemo } from 'react'
+﻿import { useState, useRef, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { BotMessageSquare, Loader2, Sparkles, Settings } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { Bot, Sparkles, X, Settings } from 'lucide-react'
 import { format } from 'date-fns'
-import { useSettingsStore } from '@/stores/settings.store'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useCategoriesStore } from '@/stores/categories.store'
 import { useBudgetsStore } from '@/stores/budgets.store'
-import { createAiProvider } from '@/lib/ai/ai-provider'
-import { buildFinancialSummary, formatSummaryForPrompt } from '@/lib/ai/financial-summary'
+import { useSettingsStore } from '@/stores/settings.store'
+import { AI_PROVIDER_OPTIONS, createAiProvider } from '@/lib/ai-provider'
+import type { AiProviderConfig } from '@/lib/ai-provider'
+import { buildFinancialSummary, summaryToPrompt } from '@/lib/ai-financial-summary'
+import { Button } from '@/components/ui/button'
 
-const SYSTEM_PROMPT = `You are a personal finance assistant. The user will share a monthly financial summary.
-Provide 3–5 short, actionable insights. Be direct. Focus on patterns, over-budget categories, 
-and one concrete saving suggestion. Use plain language. Do not ask follow-up questions.`
+const SYSTEM_PROMPT = `You are a concise personal finance assistant. 
+The user will share an aggregated financial summary (no names, no account details). 
+Provide 3-5 specific, actionable insights based strictly on the data. 
+Focus on budget overruns, unusual spending patterns, and savings opportunities. 
+Be direct and practical. Keep your response under 300 words.`
 
 export default function AiAnalysisPanel() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { aiProvider, aiApiKey, aiBaseUrl, aiModel, baseCurrency } = useSettingsStore()
   const { transactions } = useTransactionsStore()
   const { categories } = useCategoriesStore()
   const { budgets } = useBudgetsStore()
+  const { aiProvider, aiApiKey, aiBaseUrl, aiModel, baseCurrency } = useSettingsStore()
 
   const [response, setResponse] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
-  const isConfigured = !!aiProvider && !!aiBaseUrl && !!aiModel
+  const providerOption = AI_PROVIDER_OPTIONS.find((o) => o.value === aiProvider)
+  const isConfigured = Boolean(
+    aiProvider &&
+      providerOption &&
+      (!providerOption.requiresApiKey || aiApiKey),
+  )
 
-  const currentPeriodLabel = useMemo(() => format(new Date(), 'MMMM yyyy'), [])
+  const period = useMemo(() => format(new Date(), 'MMMM yyyy'), [])
 
   async function handleAnalyze() {
-    abortRef.current?.abort()
+    if (!isConfigured) return
+
+    setIsAnalyzing(true)
+    setResponse('')
     const ctrl = new AbortController()
     abortRef.current = ctrl
-    setLoading(true)
-    setResponse('')
 
     try {
-      let config
-      if (aiProvider === 'openai-compatible') {
-        config = { type: 'openai-compatible' as const, baseUrl: aiBaseUrl, apiKey: aiApiKey, model: aiModel }
-      } else if (aiProvider === 'ollama') {
-        config = { type: 'ollama' as const, baseUrl: aiBaseUrl, model: aiModel }
-      } else {
-        throw new Error(t('ai.providerNotImplemented'))
+      const summary = buildFinancialSummary(
+        transactions,
+        categories,
+        budgets,
+        baseCurrency,
+        new Date(),
+      )
+
+      const config: AiProviderConfig = {
+        type: (aiProvider as AiProviderConfig['type']) || 'openai-compatible',
+        baseUrl: aiBaseUrl || providerOption?.defaultBaseUrl || 'https://api.openai.com/v1',
+        apiKey: aiApiKey,
+        model: aiModel || 'gpt-4o-mini',
       }
 
-      const summary = buildFinancialSummary(transactions, categories, budgets, baseCurrency)
-      const summaryText = formatSummaryForPrompt(summary)
-      const provider = await createAiProvider(config)
-
-      const reply = await provider.chat(
+      const ai = createAiProvider(config)
+      const result = await ai.chat(
         [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: summaryText },
+          { role: 'user', content: summaryToPrompt(summary) },
         ],
         ctrl.signal,
       )
 
-      if (!ctrl.signal.aborted) setResponse(reply)
+      setResponse(result)
     } catch (err) {
-      if (ctrl.signal.aborted) return
-      toast.error(t('ai.analysisError'))
+      if ((err as Error).name === 'AbortError') return
       console.error(err)
+      toast.error(t('insights.ai.errorGeneric'))
     } finally {
-      if (!ctrl.signal.aborted) setLoading(false)
+      setIsAnalyzing(false)
+      abortRef.current = null
     }
   }
 
-  if (!isConfigured) {
-    return (
-      <div className="rounded-xl border bg-muted/40 p-4 flex items-start gap-3">
-        <BotMessageSquare size={18} className="text-muted-foreground shrink-0 mt-0.5" />
-        <div className="min-w-0 flex-1 space-y-2">
-          <p className="text-sm font-medium">{t('ai.panelTitle')}</p>
-          <p className="text-xs text-muted-foreground">{t('ai.notConfigured')}</p>
-          <button
-            onClick={() => navigate('/settings/ai-assistant')}
-            className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
-          >
-            <Settings size={12} />
-            {t('ai.configure')}
-          </button>
-        </div>
-      </div>
-    )
+  function handleCancel() {
+    abortRef.current?.abort()
+    setIsAnalyzing(false)
+  }
+
+  function handleClear() {
+    setResponse('')
   }
 
   return (
-    <div className="rounded-xl border bg-card p-4 space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <BotMessageSquare size={18} className="text-primary shrink-0" />
-          <span className="font-medium text-sm">{t('ai.panelTitle')}</span>
-        </div>
-        <button
-          onClick={() => { void handleAnalyze() }}
-          disabled={loading}
-          className="flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
-        >
-          {loading ? (
-            <Loader2 size={12} className="animate-spin" />
-          ) : (
-            <Sparkles size={12} />
-          )}
-          {loading ? t('ai.analyzing') : t('ai.analyzeBtn', { period: currentPeriodLabel })}
-        </button>
+    <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/40">
+        <Bot className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-semibold">{t('insights.ai.title')}</span>
       </div>
 
-      {response && (
-        <div className="rounded-lg bg-muted/50 px-3 py-3 text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-          {response}
-        </div>
-      )}
+      <div className="p-4 space-y-3">
+        {!isConfigured ? (
+          /* Not configured state */
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">{t('insights.ai.configureHint')}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/settings/ai-assistant')}
+              className="flex items-center gap-2"
+            >
+              <Settings className="h-3.5 w-3.5" />
+              {t('insights.ai.configureAction')}
+            </Button>
+          </div>
+        ) : (
+          /* Configured state */
+          <div className="space-y-3">
+            {!response && !isAnalyzing && (
+              <Button
+                onClick={() => void handleAnalyze()}
+                className="flex items-center gap-2 w-full sm:w-auto"
+              >
+                <Sparkles className="h-4 w-4" />
+                {t('insights.ai.analyzeButton', { period })}
+              </Button>
+            )}
 
-      {!response && !loading && (
-        <p className="text-xs text-muted-foreground">{t('ai.panelHint')}</p>
-      )}
+            {isAnalyzing && (
+              <div className="flex items-center gap-3">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <span className="text-sm text-muted-foreground">{t('insights.ai.analyzing')}</span>
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  {t('insights.ai.cancel')}
+                </button>
+              </div>
+            )}
+
+            {response && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {t('insights.ai.response')}
+                </p>
+                <div className="rounded-lg bg-muted/50 border px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
+                  {response}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClear}
+                  className="flex items-center gap-2"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {t('insights.ai.newAnalysis')}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

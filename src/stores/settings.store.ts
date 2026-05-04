@@ -27,8 +27,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   googleDriveFolderName: '',
   aiProvider: '',
   aiApiKey: '',
-  aiBaseUrl: '',
-  aiModel: '',
+  aiBaseUrl: 'https://api.openai.com/v1',
+  aiModel: 'gpt-4o-mini',
 
   load: async () => {
     try {
@@ -43,8 +43,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
         googleDriveFolderName: map['googleDriveFolderName'] ?? '',
         aiProvider: map['aiProvider'] ?? '',
         aiApiKey: map['aiApiKey'] ?? '',
-        aiBaseUrl: map['aiBaseUrl'] ?? '',
-        aiModel: map['aiModel'] ?? '',
+        aiBaseUrl: map['aiBaseUrl'] ?? 'https://api.openai.com/v1',
+        aiModel: map['aiModel'] ?? 'gpt-4o-mini',
       })
     } catch (err) {
       console.error(err)
