@@ -26,6 +26,7 @@ import ImportExportPage from '@/features/settings/components/settings/ImportExpo
 import GoogleDriveSyncPage from '@/features/settings/components/settings/GoogleDriveSyncPage'
 import DataRetentionPage from '@/features/settings/components/settings/DataRetentionPage'
 import PreferencesPage from '@/features/settings/components/settings/PreferencesPage'
+import AiSettingsPage from '@/features/settings/components/settings/AiSettingsPage'
 import OAuthCallbackPage from '@/features/settings/components/OAuthCallbackPage'
 import RemindersPage from '@/features/reminders/components/RemindersPage'
 import RecurringTransactionFormPage from '@/features/reminders/components/RecurringTransactionFormPage'
@@ -80,6 +81,7 @@ export const router = createBrowserRouter([
           { path: 'google-drive', element: <GoogleDriveSyncPage /> },
           { path: 'data-retention', element: <DataRetentionPage /> },
           { path: 'preferences', element: <PreferencesPage /> },
+          { path: 'ai-assistant', element: <AiSettingsPage /> },
         ],
       },
     ],
