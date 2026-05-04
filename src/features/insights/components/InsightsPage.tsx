@@ -10,6 +10,7 @@ import {
   getSpendingProjection,
 } from '@/lib/insights'
 import InsightsSavingCapacity from './InsightsSavingCapacity'
+import AiAnalysisPanel from './AiAnalysisPanel'
 
 // ── Nav card ──────────────────────────────────────────────────────────────────
 
@@ -120,6 +121,8 @@ export default function InsightsPage() {
           onClick={() => navigate('projection')}
         />
       </div>
+
+      <AiAnalysisPanel />
     </div>
   )
 }
