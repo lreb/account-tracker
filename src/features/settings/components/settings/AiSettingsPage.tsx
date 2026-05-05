@@ -144,7 +144,7 @@ export default function AiSettingsPage() {
             <SelectContent>
               {AI_PROVIDER_OPTIONS.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
+                  {t(opt.label)}
                 </SelectItem>
               ))}
             </SelectContent>
