@@ -55,7 +55,7 @@ export default function AiSettingsPage() {
         saveSetting('aiBaseUrl', baseUrl),
         saveSetting('aiModel', model),
       ])
-      toast.success(t('settings.aiSaved'))
+      toast.success(t('ai.aiSaved'))
     } finally {
       setIsSaving(false)
     }
@@ -63,7 +63,7 @@ export default function AiSettingsPage() {
 
   async function handleTest() {
     if (requiresApiKey && !apiKey.trim()) {
-      toast.error(t('settings.aiApiKeyRequired'))
+      toast.error(t('ai.aiApiKeyRequired'))
       return
     }
     setIsTesting(true)
@@ -79,10 +79,10 @@ export default function AiSettingsPage() {
       const ai = createAiProvider(config)
       await ai.chat([{ role: 'user', content: 'Reply with OK' }], ctrl.signal)
       setTestStatus('ok')
-      toast.success(t('settings.aiTestSuccess'))
+      toast.success(t('ai.aiTestSuccess'))
     } catch {
       setTestStatus('fail')
-      toast.error(t('settings.aiTestFailed'))
+      toast.error(t('ai.aiTestFailed'))
     } finally {
       setIsTesting(false)
     }
@@ -100,19 +100,19 @@ export default function AiSettingsPage() {
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <h1 className="text-xl font-bold">{t('settings.aiAssistantTitle')}</h1>
+        <h1 className="text-xl font-bold">{t('ai.aiAssistantTitle')}</h1>
       </div>
 
       {/* Configuration */}
       <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground px-1">
-        {t('settings.aiSectionConfig')}
+        {t('ai.aiSectionConfig')}
       </p>
 
       <div className="rounded-2xl border overflow-hidden bg-card divide-y">
         {/* Provider */}
         <div className="px-4 py-3 space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">
-            {t('settings.aiProvider')}
+            {t('ai.aiProvider')}
           </label>
           <Select value={provider} onValueChange={handleProviderChange}>
             <SelectTrigger>
@@ -132,7 +132,7 @@ export default function AiSettingsPage() {
         {requiresApiKey && (
           <div className="px-4 py-3 space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">
-              {t('settings.aiApiKey')}
+              {t('ai.aiApiKey')}
             </label>
             <div className="flex gap-2">
               <input
@@ -142,7 +142,7 @@ export default function AiSettingsPage() {
                   setApiKey(e.target.value)
                   setTestStatus('idle')
                 }}
-                placeholder={t('settings.aiApiKeyPlaceholder')}
+                placeholder={t('ai.aiApiKeyPlaceholder')}
                 autoComplete="off"
                 spellCheck={false}
                 className="flex-1 rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
@@ -151,7 +151,7 @@ export default function AiSettingsPage() {
                 type="button"
                 onClick={() => setShowKey((v) => !v)}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border bg-muted hover:bg-accent"
-                aria-label={showKey ? t('settings.aiHideKey') : t('settings.aiShowKey')}
+                aria-label={showKey ? t('ai.aiHideKey') : t('ai.aiShowKey')}
               >
                 {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -162,13 +162,13 @@ export default function AiSettingsPage() {
         {/* Model */}
         <div className="px-4 py-3 space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">
-            {t('settings.aiModel')}
+            {t('ai.aiModel')}
           </label>
           <input
             type="text"
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            placeholder={t('settings.aiModelPlaceholder')}
+            placeholder={t('ai.aiModelPlaceholder')}
             className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
@@ -176,17 +176,17 @@ export default function AiSettingsPage() {
         {/* Base URL */}
         <div className="px-4 py-3 space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">
-            {t('settings.aiBaseUrl')}
+            {t('ai.aiBaseUrl')}
           </label>
           <input
             type="url"
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
-            placeholder={t('settings.aiBaseUrlPlaceholder')}
+            placeholder={t('ai.aiBaseUrlPlaceholder')}
             className="w-full rounded-lg border bg-background px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-ring"
           />
           {!requiresApiKey && (
-            <p className="text-xs text-muted-foreground">{t('settings.aiLocalProviderHint')}</p>
+            <p className="text-xs text-muted-foreground">{t('ai.aiLocalProviderHint')}</p>
           )}
         </div>
       </div>
@@ -194,7 +194,7 @@ export default function AiSettingsPage() {
       {/* Privacy note */}
       <div className="flex items-start gap-2 rounded-xl border bg-muted/50 px-4 py-3">
         <Bot className="h-4 w-4 shrink-0 mt-0.5 text-muted-foreground" />
-        <p className="text-xs text-muted-foreground">{t('settings.aiKeyNote')}</p>
+        <p className="text-xs text-muted-foreground">{t('ai.aiKeyNote')}</p>
       </div>
 
       {/* Actions */}
@@ -206,12 +206,12 @@ export default function AiSettingsPage() {
           className="flex-1"
         >
           {isTesting
-            ? t('settings.aiTestConnecting')
+            ? t('ai.aiTestConnecting')
             : testStatus === 'ok'
-              ? `✓ ${t('settings.aiTestSuccess')}`
+              ? `✓ ${t('ai.aiTestSuccess')}`
               : testStatus === 'fail'
-                ? `✗ ${t('settings.aiTestFailed')}`
-                : t('settings.aiTestConnection')}
+                ? `✗ ${t('ai.aiTestFailed')}`
+                : t('ai.aiTestConnection')}
         </Button>
         <Button
           onClick={() => void handleSave()}

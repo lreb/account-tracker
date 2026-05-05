@@ -2,8 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import {
   ChevronRight, Download, CloudUpload, Clock, Globe,
-  Smartphone, CheckCircle2, Share, BotMessageSquare,
-Bot,
+  Smartphone, CheckCircle2, Share, Bot,
 } from 'lucide-react'
 import { usePWAInstall } from '../../hooks/usePWAInstall'
 
@@ -12,8 +11,7 @@ const settingsItems = [
   { to: '/settings/import-export',  icon: Download,           labelKey: 'settings.importExportTitle' },
   { to: '/settings/google-drive',   icon: CloudUpload,        labelKey: 'settings.googleDriveTitle' },
   { to: '/settings/data-retention', icon: Clock,              labelKey: 'settings.dataRetentionTitle' },
-  { to: '/settings/ai-assistant',   icon: BotMessageSquare,   labelKey: 'settings.aiAssistantTitle' },
-  { to: '/settings/ai-assistant',   icon: Bot,         labelKey: 'settings.aiAssistantTitle' }
+  { to: '/settings/ai-assistant',   icon: Bot,                labelKey: 'settings.aiAssistantTitle' },
 ] as const
 
 export default function SettingsPage() {

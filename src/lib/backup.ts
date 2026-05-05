@@ -50,7 +50,11 @@ export async function buildFullBackup(): Promise<FullBackup> {
     exportedAt: new Date().toISOString(),
     data: {
       transactions, accounts, categories, labels,
-      exchangeRates, settings, budgets, vehicles,
+      exchangeRates,
+      // Exclude sensitive credentials — aiApiKey is stored only on this device
+      // and must never appear in exported files or Drive uploads.
+      settings: settings.filter(s => s.key !== 'aiApiKey'),
+      budgets, vehicles,
       fuelLogs, vehicleServices, recurringTransactions,
     },
   }
