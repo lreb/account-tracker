@@ -446,7 +446,7 @@
       "byCategory": "By Category"
     },
     "ai": {
-      "title": "AI Analysis",
+      "title": "AI Analysis BETA",
       "analyzeButton": "Analyze {{period}}",
       "analyzing": "Analyzing…",
       "cancel": "Cancel",
