@@ -48,14 +48,37 @@ export default function AiSettingsPage() {
 
   async function handleSave() {
     setIsSaving(true)
+    const nextProvider = provider
+    const nextApiKey = apiKey
+    const nextBaseUrl = baseUrl
+    const nextModel = model
+
     try {
       await Promise.all([
-        saveSetting('aiProvider', provider),
-        saveSetting('aiApiKey', apiKey),
-        saveSetting('aiBaseUrl', baseUrl),
-        saveSetting('aiModel', model),
+        saveSetting('aiProvider', nextProvider),
+        saveSetting('aiApiKey', nextApiKey),
+        saveSetting('aiBaseUrl', nextBaseUrl),
+        saveSetting('aiModel', nextModel),
       ])
-      toast.success(t('ai.aiSaved'))
+
+      const {
+        aiProvider: savedProvider,
+        aiApiKey: savedApiKey,
+        aiBaseUrl: savedBaseUrl,
+        aiModel: savedModel,
+      } = useSettingsStore.getState()
+
+      const allSaved =
+        savedProvider === nextProvider &&
+        savedApiKey === nextApiKey &&
+        savedBaseUrl === nextBaseUrl &&
+        savedModel === nextModel
+
+      if (allSaved) {
+        toast.success(t('ai.aiSaved'))
+      } else {
+        toast.error(t('common.saveError'))
+      }
     } finally {
       setIsSaving(false)
     }
