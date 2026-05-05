@@ -16,15 +16,20 @@ export class OpenAiCompatibleAdapter implements AiProvider {
 
   async chat(messages: AiMessage[], signal?: AbortSignal): Promise<string> {
     const endpoint = `${this.baseUrl.replace(/\/+$/, '')}/chat/completions`
+    const trimmedApiKey = this.apiKey.trim()
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    }
+
+    if (trimmedApiKey) {
+      headers.Authorization = `Bearer ${trimmedApiKey}`
+    }
 
     let res: Response
     try {
       res = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
-        },
+        headers,
         body: JSON.stringify({ model: this.model, messages, max_tokens: 1000 }),
         signal,
       })

@@ -42,14 +42,14 @@ export const AI_PROVIDER_OPTIONS: readonly {
 }[] = [
   {
     value: 'openai-compatible',
-    label: 'OpenAI / Compatible (Groq, Together AI…)',
+    label: 'settings.ai.providerOptions.openaiCompatible',
     defaultBaseUrl: 'https://api.openai.com/v1',
     requiresApiKey: true,
     modelPlaceholder: 'e.g. gpt-4o-mini',
   },
   {
     value: 'lm-studio',
-    label: 'LM Studio (local)',
+    label: 'settings.ai.providerOptions.lmStudio',
     defaultBaseUrl: 'http://localhost:1234',
     requiresApiKey: false,
     localHintKey: 'ai.aiLocalProviderHint',
