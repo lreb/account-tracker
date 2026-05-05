@@ -123,8 +123,6 @@ export default function InsightsPage() {
           onClick={() => navigate('projection')}
         />
       </div>
-
-      <AiAnalysisPanel />
     </div>
   )
 }
