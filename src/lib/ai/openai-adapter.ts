@@ -13,7 +13,11 @@ export class OpenAiCompatibleProvider implements AiProvider {
     private readonly apiKey: string,
     private readonly model: string,
   ) {
-    this.label = `OpenAI-compatible (${new URL(baseUrl).hostname})`
+    try {
+      this.label = `OpenAI-compatible (${new URL(baseUrl).hostname})`
+    } catch {
+      this.label = 'OpenAI-compatible'
+    }
   }
 
   async chat(messages: AiMessage[], signal?: AbortSignal): Promise<string> {
