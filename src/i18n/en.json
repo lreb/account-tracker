@@ -699,7 +699,8 @@
     "aiTestSuccess": "Connected",
     "aiTestFailed": "Connection failed",
     "aiKeyNote": "Your API key is stored only on this device. It is sent directly to the configured provider — never to any third party.",
-    "aiLocalProviderHint": "Make sure LM Studio is running with the server enabled (default port 1234) and CORS is enabled in LM Studio → Settings → Local Server → Enable CORS. Base URL should be http://localhost:1234 (no /v1 suffix)."
+    "aiLocalProviderHint": "Make sure LM Studio is running with the server enabled (default port 1234) and CORS is enabled in LM Studio → Settings → Local Server → Enable CORS. Base URL should be http://localhost:1234 (no /v1 suffix).",
+    "aiOllamaHint": "Make sure Ollama is running ('ollama serve'). Default port is 11434. No API key required. Enter the model name exactly as it appears in 'ollama list' (e.g. qwen3:8b)."
   },
   "exchangeRates": {
     "fetchLatest": "Fetch Latest Rates",

@@ -168,7 +168,7 @@ export default function AiSettingsPage() {
             type="text"
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            placeholder={t('ai.aiModelPlaceholder')}
+            placeholder={selectedOption?.modelPlaceholder ?? t('ai.aiModelPlaceholder')}
             className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
@@ -185,8 +185,8 @@ export default function AiSettingsPage() {
             placeholder={t('ai.aiBaseUrlPlaceholder')}
             className="w-full rounded-lg border bg-background px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-ring"
           />
-          {!requiresApiKey && (
-            <p className="text-xs text-muted-foreground">{t('ai.aiLocalProviderHint')}</p>
+          {selectedOption?.localHintKey && (
+            <p className="text-xs text-muted-foreground">{t(selectedOption.localHintKey)}</p>
           )}
         </div>
       </div>

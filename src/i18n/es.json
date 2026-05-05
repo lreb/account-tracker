@@ -697,7 +697,8 @@
     "aiTestSuccess": "Conectado",
     "aiTestFailed": "Conexión fallida",
     "aiKeyNote": "Tu clave de API se almacena solo en este dispositivo. Se envía directamente al proveedor configurado — nunca a terceros.",
-    "aiLocalProviderHint": "Asegúrate de que LM Studio esté corriendo con el servidor habilitado (puerto predeterminado 1234) y que CORS esté habilitado en LM Studio → Configuración → Servidor local → Habilitar CORS. La URL base debe ser http://localhost:1234 (sin el sufijo /v1)."
+    "aiLocalProviderHint": "Asegúrate de que LM Studio esté corriendo con el servidor habilitado (puerto predeterminado 1234) y que CORS esté habilitado en LM Studio → Configuración → Servidor local → Habilitar CORS. La URL base debe ser http://localhost:1234 (sin el sufijo /v1).",
+    "aiOllamaHint": "Asegúrate de que Ollama esté en ejecución ('ollama serve'). El puerto predeterminado es 11434. No se requiere clave de API. Introduce el nombre del modelo exactamente como aparece en 'ollama list' (ej. qwen3:8b)."
   },
   "exchangeRates": {
     "fetchLatest": "Obtener Tipos Actuales",
