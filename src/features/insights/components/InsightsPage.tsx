@@ -10,6 +10,7 @@ import {
   getSpendingProjection,
 } from '@/lib/insights'
 import InsightsSavingCapacity from './InsightsSavingCapacity'
+import AiAnalysisPanel from './AiAnalysisPanel'
 
 // ── Nav card ──────────────────────────────────────────────────────────────────
 
@@ -77,6 +78,8 @@ export default function InsightsPage() {
       <h1 className="text-xl font-bold">{t('insights.title')}</h1>
 
       <InsightsSavingCapacity />
+
+      <AiAnalysisPanel />
 
       <div className="space-y-3">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide px-1">

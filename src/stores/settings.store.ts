@@ -1,7 +1,13 @@
 import { create } from 'zustand'
 import { toast } from 'sonner'
 import { db } from '@/db'
+import { AI_PROVIDER_OPTIONS } from '@/lib/ai-provider'
+import type { AiProviderType } from '@/lib/ai-provider'
 import type { AppTheme } from '@/types'
+
+function isValidProvider(v: string): v is AiProviderType {
+  return AI_PROVIDER_OPTIONS.some((o) => o.value === v)
+}
 
 interface SettingsState {
   baseCurrency: string
@@ -10,6 +16,10 @@ interface SettingsState {
   googleClientId: string
   googleDriveFolderId: string
   googleDriveFolderName: string
+  aiProvider: AiProviderType | ''
+  aiApiKey: string
+  aiBaseUrl: string
+  aiModel: string
   load: () => Promise<void>
   saveSetting: (key: string, value: string) => Promise<void>
 }
@@ -21,6 +31,10 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   googleClientId: '',
   googleDriveFolderId: 'root',
   googleDriveFolderName: '',
+  aiProvider: '',
+  aiApiKey: '',
+  aiBaseUrl: 'https://api.openai.com/v1',
+  aiModel: 'gpt-4o-mini',
 
   load: async () => {
     try {
@@ -33,6 +47,10 @@ export const useSettingsStore = create<SettingsState>((set) => ({
         googleClientId: map['googleClientId'] ?? '',
         googleDriveFolderId: map['googleDriveFolderId'] ?? 'root',
         googleDriveFolderName: map['googleDriveFolderName'] ?? '',
+        aiProvider: isValidProvider(map['aiProvider'] ?? '') ? map['aiProvider'] as AiProviderType : '',
+        aiApiKey: map['aiApiKey'] ?? '',
+        aiBaseUrl: map['aiBaseUrl'] ?? 'https://api.openai.com/v1',
+        aiModel: map['aiModel'] ?? 'gpt-4o-mini',
       })
     } catch (err) {
       console.error(err)
@@ -49,6 +67,10 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       else if (key === 'googleClientId') set({ googleClientId: value })
       else if (key === 'googleDriveFolderId') set({ googleDriveFolderId: value })
       else if (key === 'googleDriveFolderName') set({ googleDriveFolderName: value })
+      else if (key === 'aiProvider') set({ aiProvider: isValidProvider(value) ? value : '' })
+      else if (key === 'aiApiKey') set({ aiApiKey: value })
+      else if (key === 'aiBaseUrl') set({ aiBaseUrl: value })
+      else if (key === 'aiModel') set({ aiModel: value })
     } catch (err) {
       console.error(err)
       toast.error('Failed to save setting')
