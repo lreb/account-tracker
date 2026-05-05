@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { Transaction, Account, Budget, Category } from '@/types'
+import DashboardPage from './DashboardPage'
 
 // ─── Mutable store state ──────────────────────────────────────────────────────
 // Declared before vi.mock() so the factory closures capture the same reference.
@@ -12,12 +13,16 @@ const mockAccounts: Account[] = []
 const mockBudgets: Budget[] = []
 const mockCategories: Category[] = []
 
+// Stable mock reference — keeps the useEffect([loadTransactions]) dep stable
+// across renders so the effect doesn't fire on every render cycle.
+const mockLoad = vi.fn()
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }))
 
 vi.mock('@/stores/transactions.store', () => ({
-  useTransactionsStore: () => ({ transactions: mockTransactions, load: vi.fn() }),
+  useTransactionsStore: () => ({ transactions: mockTransactions, load: mockLoad }),
 }))
 
 vi.mock('@/stores/accounts.store', () => ({
@@ -115,8 +120,6 @@ function makeBudget(overrides: Partial<Budget> = {}): Budget {
 }
 
 async function renderDashboard() {
-  // Dynamic import so vi.mock() factories above are already registered
-  const { default: DashboardPage } = await import('./DashboardPage')
   return render(
     <MemoryRouter>
       <DashboardPage />
@@ -132,6 +135,7 @@ beforeEach(() => {
   mockBudgets.length = 0
   mockCategories.length = 0
   _txId = 0
+  mockLoad.mockReset()
 })
 
 describe('DashboardPage', () => {
