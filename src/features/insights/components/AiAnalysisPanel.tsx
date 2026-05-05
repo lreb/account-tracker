@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react'
+﻿import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -35,13 +35,13 @@ export default function AiAnalysisPanel() {
   const isConfigured = Boolean(
     aiProvider &&
       providerOption &&
-      (!providerOption.requiresApiKey || aiApiKey),
+      (!providerOption.requiresApiKey || aiApiKey.trim()),
   )
 
-  const period = useMemo(() => format(new Date(), 'MMMM yyyy'), [])
+  const period = format(new Date(), 'MMMM yyyy')
 
   async function handleAnalyze() {
-    if (!isConfigured) return
+    if (!isConfigured || !providerOption) return
 
     setIsAnalyzing(true)
     setResponse('')
@@ -58,9 +58,9 @@ export default function AiAnalysisPanel() {
       )
 
       const config: AiProviderConfig = {
-        type: (aiProvider as AiProviderConfig['type']) || 'openai-compatible',
-        baseUrl: aiBaseUrl || providerOption?.defaultBaseUrl || 'https://api.openai.com/v1',
-        apiKey: aiApiKey,
+        type: providerOption.value,
+        baseUrl: aiBaseUrl || providerOption.defaultBaseUrl,
+        apiKey: aiApiKey.trim(),
         model: aiModel || 'gpt-4o-mini',
       }
 

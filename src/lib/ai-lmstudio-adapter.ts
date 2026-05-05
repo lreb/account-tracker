@@ -31,18 +31,43 @@ export class LmStudioAdapter implements AiProvider {
     const origin = this.baseUrl.replace(/\/(api\/v1|v1)\/?$/, '').replace(/\/+$/, '')
     const endpoint = `${origin}/api/v1/chat`
 
-    // LM Studio /api/v1/chat format:
-    //   system_prompt (optional) → top-level string field
-    //   input → last user message as a plain string
+    // LM Studio /api/v1/chat is single-turn: one "input" string + optional "system_prompt".
+    //   system_prompt → all system messages joined
+    //   input         → the last role:'user' message (not the last non-system message,
+    //                   which could be an assistant turn in a full chat history)
+    //   prior turns   → prepended to system_prompt as a labelled transcript so context
+    //                   is not silently discarded when a multi-turn history is passed in
     const systemParts = messages.filter((m) => m.role === 'system').map((m) => m.content)
-    const userMessages = messages.filter((m) => m.role !== 'system')
-    const lastUserContent = userMessages[userMessages.length - 1]?.content ?? ''
+
+    const conversationMessages = messages.filter((m) => m.role !== 'system')
+    const lastUserIdx = [...conversationMessages].reverse().findIndex((m) => m.role === 'user')
+    const lastUserContent =
+      lastUserIdx >= 0
+        ? conversationMessages[conversationMessages.length - 1 - lastUserIdx].content
+        : ''
+
+    // Build a transcript of all turns that precede the final user message so the
+    // model has conversational context even though the API is single-turn.
+    const priorTurns = conversationMessages.slice(
+      0,
+      conversationMessages.length - 1 - lastUserIdx,
+    )
+    const transcriptParts = priorTurns.map(
+      (m) => `${m.role === 'assistant' ? 'Assistant' : 'User'}: ${m.content}`,
+    )
+
+    const systemPromptParts = [
+      ...systemParts,
+      ...(transcriptParts.length > 0
+        ? [`[Conversation so far]\n${transcriptParts.join('\n')}`]
+        : []),
+    ]
 
     const body: Record<string, string> = {
       model: this.model,
       input: lastUserContent,
     }
-    if (systemParts.length > 0) body.system_prompt = systemParts.join('\n')
+    if (systemPromptParts.length > 0) body.system_prompt = systemPromptParts.join('\n\n')
 
     let res: Response
     try {

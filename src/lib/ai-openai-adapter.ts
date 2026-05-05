@@ -17,7 +17,7 @@ export class OpenAiCompatibleAdapter implements AiProvider {
   async chat(messages: AiMessage[], signal?: AbortSignal): Promise<string> {
     const endpoint = `${this.baseUrl.replace(/\/+$/, '')}/chat/completions`
     const trimmedApiKey = this.apiKey.trim()
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     }
 

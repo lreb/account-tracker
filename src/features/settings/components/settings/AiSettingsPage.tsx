@@ -21,7 +21,7 @@ export default function AiSettingsPage() {
   const { saveSetting, aiProvider, aiApiKey, aiBaseUrl, aiModel } = useSettingsStore()
 
   const [provider, setProvider] = useState<AiProviderType>(
-    (aiProvider as AiProviderType) || 'openai-compatible',
+    aiProvider || 'openai-compatible',
   )
   const [apiKey, setApiKey] = useState(aiApiKey)
   const [baseUrl, setBaseUrl] = useState(aiBaseUrl || 'https://api.openai.com/v1')
@@ -121,7 +121,7 @@ export default function AiSettingsPage() {
             <SelectContent>
               {AI_PROVIDER_OPTIONS.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
+                  {t(opt.label)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -168,7 +168,7 @@ export default function AiSettingsPage() {
             type="text"
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            placeholder={selectedOption?.modelPlaceholder ?? t('ai.aiModelPlaceholder')}
+            placeholder={t(selectedOption?.modelPlaceholder ?? 'ai.aiModelPlaceholder')}
             className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
           />
         </div>

@@ -42,26 +42,26 @@ export const AI_PROVIDER_OPTIONS: readonly {
 }[] = [
   {
     value: 'openai-compatible',
-    label: 'settings.ai.providerOptions.openaiCompatible',
+    label: 'ai.aiProviderOpenaiCompatible',
     defaultBaseUrl: 'https://api.openai.com/v1',
     requiresApiKey: true,
-    modelPlaceholder: 'e.g. gpt-4o-mini',
+    modelPlaceholder: 'ai.aiModelPlaceholderOpenai',
   },
   {
     value: 'lm-studio',
-    label: 'settings.ai.providerOptions.lmStudio',
+    label: 'ai.aiProviderLmStudio',
     defaultBaseUrl: 'http://localhost:1234',
     requiresApiKey: false,
     localHintKey: 'ai.aiLocalProviderHint',
-    modelPlaceholder: 'e.g. phi-3.1-mini-4k-instruct',
+    modelPlaceholder: 'ai.aiModelPlaceholderLmStudio',
   },
   {
     value: 'ollama',
-    label: 'Ollama (local)',
+    label: 'ai.aiProviderOllama',
     defaultBaseUrl: 'http://localhost:11434',
     requiresApiKey: false,
     localHintKey: 'ai.aiOllamaHint',
-    modelPlaceholder: 'e.g. qwen3:8b, llama3, mistral',
+    modelPlaceholder: 'ai.aiModelPlaceholderOllama',
   },
 ]
 

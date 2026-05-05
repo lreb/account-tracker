@@ -698,7 +698,13 @@
     "aiTestFailed": "Conexión fallida",
     "aiKeyNote": "Tu clave de API se almacena solo en este dispositivo. Se envía directamente al proveedor configurado — nunca a terceros.",
     "aiLocalProviderHint": "Asegúrate de que LM Studio esté corriendo con el servidor habilitado (puerto predeterminado 1234) y que CORS esté habilitado en LM Studio → Configuración → Servidor local → Habilitar CORS. La URL base debe ser http://localhost:1234 (sin el sufijo /v1).",
-    "aiOllamaHint": "Asegúrate de que Ollama esté en ejecución ('ollama serve'). El puerto predeterminado es 11434. No se requiere clave de API. Introduce el nombre del modelo exactamente como aparece en 'ollama list' (ej. qwen3:8b)."
+    "aiOllamaHint": "Asegúrate de que Ollama esté en ejecución ('ollama serve'). El puerto predeterminado es 11434. No se requiere clave de API. Introduce el nombre del modelo exactamente como aparece en 'ollama list' (ej. qwen3:8b).",
+    "aiProviderOpenaiCompatible": "OpenAI / Compatible (Groq, Together AI…)",
+    "aiProviderLmStudio": "LM Studio (local)",
+    "aiProviderOllama": "Ollama (local)",
+    "aiModelPlaceholderOpenai": "ej. gpt-4o-mini",
+    "aiModelPlaceholderLmStudio": "ej. phi-3.1-mini-4k-instruct",
+    "aiModelPlaceholderOllama": "ej. qwen3:8b, llama3, mistral"
   },
   "exchangeRates": {
     "fetchLatest": "Obtener Tipos Actuales",

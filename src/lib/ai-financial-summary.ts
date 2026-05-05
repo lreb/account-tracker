@@ -7,6 +7,7 @@ import {
 } from 'date-fns'
 import { convertToBase } from '@/lib/currency'
 import { detectRecurringPatterns } from '@/lib/insights'
+import { getPeriodRange } from '@/lib/dates'
 import type { Transaction, Category, Budget } from '@/types'
 
 // ─── Public types ─────────────────────────────────────────────────────────────
@@ -74,25 +75,60 @@ export function buildFinancialSummary(
       amount,
     }))
 
-  // Budget status (synchronous approximation — no rollover)
+  const allActive = transactions.filter((tx) => tx.status !== 'cancelled')
+
+  // Budget status — respects each budget's own period, startDate, endDate, and rollover
   const budgetStatus = budgets
-    .filter((b) => !b.endDate || b.endDate >= startStr)
+    .filter((b) => {
+      const { start: pStart, end: pEnd } = getPeriodRange(b.period, referenceDate)
+      return (
+        b.startDate <= pEnd.toISOString() &&
+        (!b.endDate || b.endDate >= pStart.toISOString())
+      )
+    })
     .map((b) => {
-      const spent = expenses
-        .filter((tx) => tx.categoryId === b.categoryId)
+      const { start: pStart, end: pEnd } = getPeriodRange(b.period, referenceDate)
+      const pStartStr = pStart.toISOString()
+      const pEndStr = pEnd.toISOString()
+
+      const spent = allActive
+        .filter(
+          (tx) =>
+            tx.type === 'expense' &&
+            tx.categoryId === b.categoryId &&
+            tx.date >= pStartStr &&
+            tx.date <= pEndStr,
+        )
         .reduce((s, tx) => s + toBase(tx), 0)
-      const pct = b.amount > 0 ? Math.round((spent / b.amount) * 100) : 0
+
+      let effectiveLimit = b.amount
+      if (b.rollover) {
+        const prevDate = new Date(pStart.getTime() - 1)
+        const { start: prevStart, end: prevEnd } = getPeriodRange(b.period, prevDate)
+        const prevSpent = allActive
+          .filter(
+            (tx) =>
+              tx.type === 'expense' &&
+              tx.categoryId === b.categoryId &&
+              tx.date >= prevStart.toISOString() &&
+              tx.date <= prevEnd.toISOString(),
+          )
+          .reduce((s, tx) => s + toBase(tx), 0)
+        const prevUnspent = b.amount - prevSpent
+        if (prevUnspent > 0) effectiveLimit += prevUnspent
+      }
+
+      const pct = effectiveLimit > 0 ? Math.round((spent / effectiveLimit) * 100) : 0
       return {
         categoryId: b.categoryId,
         label: catMap.get(b.categoryId) ?? b.categoryId,
         spent,
-        limit: b.amount,
+        limit: effectiveLimit,
         pct,
       }
     })
 
   // Top recurring patterns from all history
-  const allActive = transactions.filter((tx) => tx.status !== 'cancelled')
   const patterns = detectRecurringPatterns(allActive)
   const topRecurring = patterns.slice(0, 5).map((p) => ({
     label: catMap.get(p.categoryId) ?? p.categoryId,
