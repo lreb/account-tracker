@@ -50,7 +50,11 @@
     "back": "Volver",
     "search": "Buscar…",
     "noResults": "Sin resultados",
-    "description": "Descripción"
+    "description": "Descripción",
+    "dismiss": "Cerrar"
+  },
+  "shell": {
+    "openInAppBanner": "Esta app está instalada en tu dispositivo. Ábrela desde el icono en tu pantalla de inicio para la experiencia completa."
   },
   "reminders": {
     "title": "Recordatorios",
@@ -650,6 +654,8 @@
     "installAppIOSStep2": "Selecciona \"Agregar a pantalla de inicio\"",
     "installAppIOSStep3": "Toca \"Agregar\" para confirmar",
     "installAppBrowserHint": "Abre esta página en Chrome o Edge para instalar la app en tu dispositivo.",
+    "installAppInstalledInBrowserTitle": "App instalada — no estás en pantalla de inicio",
+    "installAppInstalledInBrowserDesc": "Cierra esta pestaña del navegador y toca el icono de la app en tu pantalla de inicio para iniciarla en modo pantalla completa.",
     "aiAssistantTitle": "Asistente de IA"
   },
   "ai": {

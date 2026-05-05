@@ -38,8 +38,8 @@ export function AmountInput({
 }: AmountInputProps) {
   const [open, setOpen] = useState(false)
 
-  const numericValue = value ? parseFloat(value) : NaN
-  const hasValue = !isNaN(numericValue) && numericValue > 0
+  const numericValue = value !== undefined && value !== null && value !== '' ? parseFloat(value) : NaN
+  const hasValue = !isNaN(numericValue) && numericValue >= 0
 
   return (
     <div className={cn('space-y-1', className)}>

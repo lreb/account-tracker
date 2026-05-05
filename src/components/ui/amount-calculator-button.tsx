@@ -153,7 +153,7 @@ export function AmountCalculatorButton({
       result = storedValue
     }
 
-    if (isNaN(result) || !isFinite(result) || result <= 0) {
+    if (isNaN(result) || !isFinite(result) || result < 0) {
       onApply('')
       handleOpenChange(false)
       return

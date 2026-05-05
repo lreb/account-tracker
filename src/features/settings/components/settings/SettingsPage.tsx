@@ -16,7 +16,7 @@ const settingsItems = [
 
 export default function SettingsPage() {
   const { t } = useTranslation()
-  const { isInstallable, isInstalled, isIOS, install } = usePWAInstall()
+  const { isInstallable, isInstalled, isStandalone, isIOS, install } = usePWAInstall()
 
   return (
     <div className="p-4 pb-24 space-y-4">
@@ -24,12 +24,22 @@ export default function SettingsPage() {
 
       {/* PWA Install Section */}
       <div className="rounded-2xl border overflow-hidden bg-white">
-        {isInstalled ? (
+        {isStandalone ? (
+          // Running in standalone mode — home screen icon is working correctly
           <div className="flex items-start gap-3 px-4 py-4">
             <CheckCircle2 size={20} className="text-green-500 shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-medium">{t('settings.installAppInstalledTitle')}</p>
               <p className="text-xs text-gray-500 mt-0.5">{t('settings.installAppInstalledDesc')}</p>
+            </div>
+          </div>
+        ) : isInstalled ? (
+          // Installed on home screen but user opened a browser tab instead
+          <div className="flex items-start gap-3 px-4 py-4">
+            <Smartphone size={20} className="text-amber-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium">{t('settings.installAppInstalledInBrowserTitle')}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{t('settings.installAppInstalledInBrowserDesc')}</p>
             </div>
           </div>
         ) : isInstallable ? (
