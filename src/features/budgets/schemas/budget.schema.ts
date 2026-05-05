@@ -6,7 +6,7 @@ export const budgetSchema = z.object({
   amount: z
     .string()
     .regex(/^\d+(\.\d{1,2})?$/, vm.invalidAmount)
-    .refine((v) => parseFloat(v) > 0, vm.amountPositive),
+    .refine((v) => parseFloat(v) >= 0, vm.amountPositive),
   period: z.enum(['weekly', 'monthly', 'yearly']),
   rollover: z.boolean().default(false),
   startDate: z.string().min(1, vm.startDateRequired),

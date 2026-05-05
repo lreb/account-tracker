@@ -4,19 +4,26 @@ import { usePWAInstall } from './usePWAInstall'
 
 // ——— helpers ———
 
-function mockMatchMedia(matches: boolean) {
+type DisplayMode = 'browser' | 'standalone' | 'fullscreen' | 'minimal-ui'
+
+/**
+ * Mocks `window.matchMedia` so that only `(display-mode: <mode>)` returns `true`.
+ * All other queries return `false`. This matches real-browser behaviour where
+ * exactly one display-mode is active at a time.
+ */
+function mockMatchMediaMode(mode: DisplayMode) {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
-    value: vi.fn().mockReturnValue({
-      matches,
-      media: '',
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: query === `(display-mode: ${mode})`,
+      media: query,
       onchange: null,
       addListener: vi.fn(),
       removeListener: vi.fn(),
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
       dispatchEvent: vi.fn(),
-    }),
+    })),
   })
 }
 
@@ -62,7 +69,9 @@ function makeInstallEvent(opts: {
 describe('usePWAInstall', () => {
   beforeEach(() => {
     localStorage.clear()
-    mockMatchMedia(false)
+    sessionStorage.clear()
+    // Default: simulate a regular browser tab — only (display-mode: browser) = true
+    mockMatchMediaMode('browser')
     setNavigator({
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
       platform: 'Win32',
@@ -86,9 +95,76 @@ describe('usePWAInstall', () => {
     })
 
     it('sets isInstalled true when display-mode is standalone', () => {
-      mockMatchMedia(true)
+      mockMatchMediaMode('standalone')
       const { result } = renderHook(() => usePWAInstall())
       expect(result.current.isInstalled).toBe(true)
+    })
+  })
+
+  // ── isStandalone detection ───────────────────────────────────────────────
+
+  describe('isStandalone detection', () => {
+    it('is false when display-mode is browser', () => {
+      mockMatchMediaMode('browser')
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isStandalone).toBe(false)
+    })
+
+    it('is true when display-mode is standalone', () => {
+      mockMatchMediaMode('standalone')
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isStandalone).toBe(true)
+    })
+
+    it('is true when display-mode is fullscreen', () => {
+      mockMatchMediaMode('fullscreen')
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isStandalone).toBe(true)
+    })
+
+    it('is true when display-mode is minimal-ui', () => {
+      mockMatchMediaMode('minimal-ui')
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isStandalone).toBe(true)
+    })
+
+    it('is true when localStorage has pwa-installed and display-mode is standalone', () => {
+      localStorage.setItem('pwa-installed', 'true')
+      mockMatchMediaMode('standalone')
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isStandalone).toBe(true)
+    })
+
+    it('is false when localStorage has pwa-installed but display-mode is browser', () => {
+      // App is installed but user opened a browser tab — banner should show
+      localStorage.setItem('pwa-installed', 'true')
+      mockMatchMediaMode('browser')
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isInstalled).toBe(true)
+      expect(result.current.isStandalone).toBe(false)
+    })
+
+    it('is true when ?source=pwa is present in the URL', () => {
+      mockMatchMediaMode('browser') // even if media query says browser
+      const originalSearch = window.location.search
+      Object.defineProperty(window, 'location', {
+        writable: true,
+        value: { ...window.location, search: '?source=pwa', pathname: '/', hash: '' },
+      })
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isStandalone).toBe(true)
+      // Restore
+      Object.defineProperty(window, 'location', {
+        writable: true,
+        value: { ...window.location, search: originalSearch },
+      })
+    })
+
+    it('is true when sessionStorage flag is set (carries through navigations)', () => {
+      sessionStorage.setItem('pwa-standalone-session', '1')
+      mockMatchMediaMode('browser') // media query says browser but session says standalone
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isStandalone).toBe(true)
     })
   })
 

@@ -50,7 +50,11 @@
     "back": "Back",
     "search": "Search…",
     "noResults": "No results",
-    "description": "Description"
+    "description": "Description",
+    "dismiss": "Dismiss"
+  },
+  "shell": {
+    "openInAppBanner": "This app is installed on your device. Open it from your home screen icon for the full experience."
   },
   "reminders": {
     "title": "Reminders",
@@ -652,6 +656,8 @@
     "installAppIOSStep2": "Select \"Add to Home Screen\"",
     "installAppIOSStep3": "Tap \"Add\" to confirm",
     "installAppBrowserHint": "Open this page in Chrome or Edge to install the app on your device.",
+    "installAppInstalledInBrowserTitle": "App installed — not running from home screen",
+    "installAppInstalledInBrowserDesc": "Close this browser tab and tap the app icon on your home screen to launch in full-screen mode.",
     "aiAssistantTitle": "AI Assistant"
   },
   "ai": {
