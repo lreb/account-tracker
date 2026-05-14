@@ -12,10 +12,12 @@ import {
   SERVICE_TYPES,
   type VehicleServiceFormValues,
 } from '../schemas/vehicle.schema'
+import { db } from '@/db'
 import {
   getAccountSelectOptions,
   getVisibleAccounts,
 } from '@/lib/accounts'
+import { getAccountBalanceAtDate, isTransactionForAccount } from '@/lib/balance-sheet'
 import { getTranslatedCategoryName, sortCategories } from '@/lib/categories'
 import {
   getOdometerNeighbors,
@@ -115,6 +117,32 @@ export default function ServiceFormPage() {
     () => getAccountSelectOptions(accounts, [watchAccountId]),
     [accounts, watchAccountId],
   )
+
+  // Current balance per account: openingBalance + income − expense ± transfers
+  // Queried directly from Dexie (all-time) so the result is always correct.
+  const [accountBalances, setAccountBalances] = useState<Map<string, number>>(() => {
+    const map = new Map<string, number>()
+    for (const acct of accounts) map.set(acct.id, acct.openingBalance)
+    return map
+  })
+
+  useEffect(() => {
+    let stale = false
+    async function computeBalances() {
+      const activeTx = await db.transactions
+        .filter((tx) => tx.status !== 'cancelled')
+        .toArray()
+      if (stale) return
+      const map = new Map<string, number>()
+      for (const acct of accounts) {
+        const acctTxs = activeTx.filter((tx) => isTransactionForAccount(tx, acct.id))
+        map.set(acct.id, getAccountBalanceAtDate(acct, acctTxs, new Date()))
+      }
+      setAccountBalances(map)
+    }
+    computeBalances()
+    return () => { stale = true }
+  }, [accounts])
 
   const odometerEntries = useMemo<OdometerEntry[]>(() => {
     const fromFuel = fuelLogs
@@ -464,6 +492,7 @@ export default function ServiceFormPage() {
           value={watchAccountId || ''}
           onChange={(v) => setValue('accountId', v)}
           options={availableAccounts}
+          balances={accountBalances}
           label={t('transactions.account')}
           error={errors.accountId ? t(errors.accountId.message!) : undefined}
         />

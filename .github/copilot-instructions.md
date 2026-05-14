@@ -1,5 +1,22 @@
 # ExpenseTracking — Copilot Workspace Instructions
 
+---
+
+## 📚 Documentation Hub
+
+**This document is a quick reference.** For detailed information, see:
+
+| Topic | Location | Coverage |
+|-------|----------|----------|
+| **Architecture & design decisions** | [docs/architecture.md](../docs/architecture.md) | System layers, module organization, design patterns, performance optimizations |
+| **Data models & API contracts** | [docs/api-contracts.md](../docs/api-contracts.md) | TypeScript interfaces, Frankfurter API, store hooks, backup formats |
+| **Core business rules** | [docs/business-rules.md](../docs/business-rules.md) | Transaction lifecycle, budgets, categories, currency handling, reconciliation, retention policy |
+| **Architectural decisions (ADRs)** | [docs/decision-log.md](../docs/decision-log.md) | Why we chose Zustand, Dexie, React 19 + Vite, offline-first, etc. (18 decisions documented) |
+| **Domain terminology** | [docs/domain-glossary.md](../docs/domain-glossary.md) | Shared vocabulary, financial concepts, tech terms, abbreviations |
+| **PWA intranet testing** | [docs/PWA-INTRANET-MANUAL.md](../docs/PWA-INTRANET-MANUAL.md) | Manual & automated LAN publish, Android testing, firewall notes |
+
+---
+
 ## Role & Expertise
 
 You are a **senior frontend engineer** with deep expertise in React and TypeScript, specializing in Progressive Web Apps (PWAs). You have extensive experience building performant, offline-capable, production-grade frontend applications with no backend dependency.
@@ -142,198 +159,28 @@ src/
 
 ---
 
-## Data Architecture
+### Data Persistence
 
 Data is persisted in **Dexie.js (IndexedDB)**. Zustand holds in-memory state and syncs to Dexie on mutations.
 
-### Core Tables / Stores
-
-```ts
-// transactions — income, expense, and transfer records
-{
-  id: string;                // uuid
-  type: 'income' | 'expense' | 'transfer';
-  amount: number;            // in account's currency (integer cents)
-  date: string;              // ISO 8601
-  categoryId: string;
-  accountId: string;         // source account
-  toAccountId?: string;      // destination account (transfers only)
-  description: string;
-  notes?: string;
-  status: 'pending' | 'cleared' | 'reconciled' | 'cancelled';
-  labels?: string[];         // user-defined tags (e.g. ['business', 'tax-deductible'])
-  currency: string;          // ISO 4217 (e.g. 'USD', 'MXN', 'EUR')
-  exchangeRate?: number;     // rate vs. baseCurrency at time of transaction (cross-currency only)
-  originalAmount?: number;   // amount in source currency before conversion (cross-currency transfers)
-  originalCurrency?: string; // source currency code (cross-currency transfers)
-}
-
-// accounts — cash, bank, card, savings, etc.
-{
-  id: string;
-  name: string;
-  type: 'cash' | 'bank' | 'card' | 'savings' | 'investment' | 'other';
-  openingBalance: number;    // integer cents, in account's own currency
-  currency: string;          // ISO 4217 — each account can have its own currency
-}
-
-// categories — predefined + user-created
-{
-  id: string;
-  name: string;
-  icon: string;          // icon name/key
-  isCustom: boolean;
-}
-
-// labels — user-defined tags for transactions
-{
-  id: string;
-  name: string;
-  color?: string;        // hex color for UI badge
-}
-
-// exchangeRates — historical rates for reporting (user-entered or fetched manually)
-{
-  id: string;
-  fromCurrency: string;  // ISO 4217
-  toCurrency: string;    // ISO 4217
-  rate: number;
-  date: string;          // ISO 8601 — rate on that specific date
-}
-
-// settings — key-value store for user preferences
-{
-  key: string;           // e.g. 'baseCurrency', 'language', 'theme'
-  value: string;
-  // baseCurrency: ISO 4217 code — all reports and totals are converted to this currency
-}
-
-// budgets — spending limits per category and period
-{
-  id: string;
-  categoryId: string;        // which category this budget applies to
-  amount: number;            // limit in baseCurrency cents
-  period: 'weekly' | 'monthly' | 'yearly';
-  rollover: boolean;         // whether unspent amount carries over to next period
-  startDate: string;         // ISO 8601 — when this budget takes effect
-  endDate?: string;          // ISO 8601 — optional end date (open-ended if omitted)
-  currency: string;          // ISO 4217 — must match baseCurrency for consistent reporting
-}
-
-// vehicles
-{
-  id: string;
-  name: string;
-  make?: string;
-  model?: string;
-  year?: number;
-}
-
-// fuelLogs
-{
-  id: string;
-  vehicleId: string;
-  date: string;
-  liters: number;
-  totalCost: number;
-  odometer: number;
-  // calculated: costPerLiter, kmSinceLastFill, kmPerLiter
-}
-
-// vehicleServices
-{
-  id: string;
-  vehicleId: string;
-  date: string;
-  serviceType: string;
-  cost: number;
-  odometer: number;
-  notes?: string;
-  nextServiceKm?: number;
-  nextServiceDate?: string;
-}
-```
+**For detailed data models:** See [docs/api-contracts.md](../docs/api-contracts.md)  
+**For business rules on transactions, budgets, categories:** See [docs/business-rules.md](../docs/business-rules.md)  
+**For table definitions and schema versioning:** See [src/db/index.ts](../src/db/index.ts)
 
 ---
 
-## Application Modules
+### Application Modules
 
-### 1. Transaction Recording (`/transactions`)
-- Add/edit/delete income, expenses, and **account-to-account transfers**
-- Transfer entry: source account, destination account, amount, exchange rate (if different currencies)
-- Fields: amount, date, category, account, description, notes, status, labels, currency
-- Transaction status lifecycle: `pending → cleared → reconciled` (or `cancelled`)
-- Label / tag support: multiple free-form labels per transaction
-- Multi-currency: each transaction records its own currency + exchange rate vs. base currency
-- Quick category picker with icons (max 3 taps to record)
+The app is organized around these feature domains:
 
-### 2. Vehicle & Fuel Management (`/vehicles`)
-- Register multiple vehicles
-- Log refuels: liters, total cost, odometer
-- Auto-calculate: km/liter, cost/km, km since last fill
-- Log services and maintenance
-- Alerts for upcoming service (by km or date)
+- **Transactions** (`/transactions`) — Record income, expenses, transfers with status tracking
+- **Vehicles** (`/vehicles`) — Fuel logging, service tracking, efficiency metrics
+- **Reports** (`/reports`) — Dashboards, charts, filters, CSV/PDF exports
+- **Budgets** (`/budgets`) — Spending limits, progress tracking, alerts
+- **Insights** (`/insights`) — Recurring patterns, category alerts, spending projections
+- **Settings** (`/settings`) — Accounts, categories, labels, exchange rates, language, backups
 
-### 3. Reports & Analysis (`/reports`)
-- Dashboard: income vs. expenses this month
-- Charts: pie (by category), bar (monthly trend)
-- Month-to-month and year-to-year comparisons
-- Cash flow by period
-- Filters: account, category, date range
-- Export to PDF (client-side) and CSV
-
-### 4. Budgets (`/budgets`)
-- Define spending limits per category (weekly / monthly / yearly)
-- Visual progress bar per budget: spent vs. limit
-- Color coding: green (< 75%), amber (75–99%), red (≥ 100%)
-- Alert when a budget reaches 80% and again at 100%
-- Optional rollover: unspent balance carries forward to next period
-- Budget summary card on the main dashboard
-- Budget vs. actual comparison available in Reports module
-
-### 5. Smart Recommendations (`/insights`)
-- Detect recurring spending patterns
-- Alert when a category exceeds historical average
-- Suggest savings based on real user data
-- Project current-month spending
-
-### 6. Settings & Accounts (`/settings`)
-- Manage financial accounts (each with its own currency)
-- Set **base currency** — all reports and dashboards convert to this currency
-- Manage **exchange rates** — manually record or update historical rates
-- Manage custom categories and **labels** (name, color)
-- Language toggle (en / es)
-- Export full data as JSON backup
-- Import JSON backup
-- Optional Google Drive / Dropbox sync
-
----
-
-## Predefined Expense Categories
-
-`transportation`, `food-groceries`, `health`, `housing`, `fuel-gas`,
-`restaurants`, `medical-pharmacy`, `rent-mortgage`, `vehicle-maintenance`,
-`supermarket`, `health-insurance`, `utilities`, `entertainment`,
-`education`, `investments-savings`, `other`
-
----
-
-## UX Principles
-
-- Transaction recorded in **≤ 3 taps/clicks**
-- Dashboard is the default landing screen
-- All icons for categories use visual recognition (no text-only lists)
-- Charts must be readable on small (360px wide) screens
-- App works fully **offline**; sync is optional and user-triggered
-
----
-
-## Security Rules
-
-- Never transmit financial data to external servers without explicit user action
-- Google Drive / Dropbox sync uses OAuth2 PKCE flow (no client secrets in code)
-- PDF exports may optionally be password-protected
-- No analytics, tracking pixels, or telemetry in MVP
+**For complete module descriptions:** See [docs/business-rules.md](../docs/business-rules.md#application-modules)
 
 ---
 
@@ -407,33 +254,13 @@ Each Zustand store is a hook. All mutations write through to Dexie and surface e
 - Labels are stored as `string[]` on the transaction; the `labels` table is used only for managing available label definitions
 - All user-facing strings must go through `react-i18next` — no hardcoded English strings in JSX
 
-### Frankfurter Exchange Rate API
+### Exchange Rates & Multi-Currency
 
-The app uses the **Frankfurter v2 API** for live and cached exchange rates. No API key required.
+The app uses **Frankfurter v2 API** (`https://api.frankfurter.dev/v2`) for exchange rates (no API key required).
 
-| Endpoint | Description |
-|---|---|
-| `GET https://api.frankfurter.dev/v2/rates?base={ISO}` | Latest rates for all currencies vs. `base`. Returns `Array<{date,base,quote,rate}>`. |
-| `GET https://api.frankfurter.dev/v2/rate/{FROM}/{TO}` | Single-pair rate. Returns `{date,base,quote,rate}`. Used by `CrossCurrencyDialog` for on-demand fetching. |
-| `GET https://api.frankfurter.dev/v2/currencies` | All supported currencies with names and symbols. |
+**For detailed API endpoints and cross-currency transfer flow:** See [docs/api-contracts.md#frankfurter-exchange-rate-api](../docs/api-contracts.md#frankfurter-exchange-rate-api) and [docs/business-rules.md#exchange-rates--multi-currency](../docs/business-rules.md#exchange-rates--multi-currency)
 
-**Critical:** the old domain `api.frankfurter.app` now redirects to v1 (legacy). **Always use `api.frankfurter.dev/v2`.**
-
-The store method `fetchFromApi(baseCurrency)` persists all rates for the base currency into the `exchangeRates` Dexie table. The method `fetchSinglePairRate(from, to)` fetches a live rate without persisting — used transiently by `CrossCurrencyDialog`.
-
-### Cross-currency Transfer Flow
-
-When a transfer is created between two accounts whose `currency` fields differ:
-
-1. `TransactionForm` computes `isCrossCurrencyTransfer` from the selected source/destination accounts.
-2. An **Exchange Rate** row button is rendered below the destination account selector.
-3. Tapping it opens `CrossCurrencyDialog` (`src/features/transactions/components/CrossCurrencyDialog.tsx`).
-4. The dialog pre-fills the rate from `getRateForPair(from, to)` (DB cache). If unavailable, the field starts empty.
-5. The user can tap **Fetch rate** to call `fetchSinglePairRate` live from the API.
-6. On confirm, `setValue('exchangeRate', rate)` is called on the form, and `crossCurrencyDestAmountCents` state is set.
-7. On `onSubmit`, `originalAmount` = dest amount in dest currency cents and `originalCurrency` = dest currency are stored on the `Transaction`.
-
-
+**Important:** Always use `api.frankfurter.dev/v2` (not deprecated `api.frankfurter.app`)
 
 ### Linting
 - ESLint is configured in `eslint.config.js` (flat config, ESLint 9+) with `@typescript-eslint`, `eslint-plugin-react-hooks`, and `eslint-plugin-react-refresh`

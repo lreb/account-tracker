@@ -8,6 +8,24 @@ A personal finance Progressive Web App (PWA) + Android application. Record incom
 
 ---
 
+## 📚 Documentation
+
+| Topic | File | Coverage |
+|-------|------|----------|
+| **Architecture & Design** | [docs/architecture.md](docs/architecture.md) | System layers, module organization, design patterns, performance optimizations |
+| **Business Rules** | [docs/business-rules.md](docs/business-rules.md) | Transaction lifecycle, budgets, categories, currency handling, reconciliation |
+| **Data Models & APIs** | [docs/api-contracts.md](docs/api-contracts.md) | TypeScript interfaces, external APIs, store contracts, backup formats |
+| **Design Decisions** | [docs/decision-log.md](docs/decision-log.md) | Why we chose Zustand, Dexie, React 19 + Vite, offline-first, etc. (18 ADRs) |
+| **Domain Glossary** | [docs/domain-glossary.md](docs/domain-glossary.md) | Shared vocabulary, financial concepts, tech terms, abbreviations |
+| **Security & Privacy** | [docs/security.md](docs/security.md) | Client-side processing, OAuth2 PKCE, API authentication, compliance (GDPR, CCPA) |
+| **Operational Rules** | [docs/operational-rules.md](docs/operational-rules.md) | Development workflow, CI/CD, releases, deployment, monitoring, incident response |
+| **QA & Testing Standards** | [docs/qa-rules.md](docs/qa-rules.md) | Testing strategy, unit/integration/E2E tests, browser compatibility, accessibility (WCAG 2.1 AA) |
+| **PWA Deployment** | [docs/PWA-INTRANET-MANUAL.md](docs/PWA-INTRANET-MANUAL.md) | Manual & automated LAN publish, Android testing, firewall configuration |
+| **AI Integration Plan** | [docs/AI-INTEGRATION-PLAN.md](docs/AI-INTEGRATION-PLAN.md) | Tier-1/Tier-2 insights strategy, offline analytics, optional cloud AI |
+| **Copilot Instructions** | [.github/copilot-instructions.md](.github/copilot-instructions.md) | Quick reference for development conventions and workflow |
+
+---
+
 ## Prerequisites
 
 | Tool | Version | Install |
@@ -138,9 +156,11 @@ All data is stored locally in **IndexedDB** via Dexie.js. No data ever leaves th
 
 **Database tables:** transactions, accounts, categories, budgets, vehicles, fuelLogs, vehicleServices, labels, exchangeRates, settings.
 
-### Schema migrations
+### Schema Migrations
 
-Every structural change to the Dexie schema **must** add a new `.version(n)` block in [`src/db/index.ts`](src/db/index.ts). Never modify existing version blocks.
+Every structural change to the Dexie schema **must** add a new `.version(n)` block in [src/db/index.ts](src/db/index.ts). Never modify existing version blocks.
+
+**For detailed data models and store contracts:** See [docs/api-contracts.md](docs/api-contracts.md)
 
 ---
 
@@ -158,17 +178,9 @@ Rates are cached in the local `exchangeRates` Dexie table. All API calls are mad
 
 **Important:** the old domain `api.frankfurter.app` redirects to v1. Always use `api.frankfurter.dev/v2`.
 
-### Cross-currency transfers
+**For detailed cross-currency transfer flow:** See [docs/business-rules.md#cross-currency-transfers](docs/business-rules.md#cross-currency-transfers)
 
-When a transfer is created between two accounts with different currencies:
-
-1. The `TransactionForm` detects the currency mismatch automatically.
-2. An **Exchange Rate** button appears, opening `CrossCurrencyDialog`.
-3. The dialog pre-fills the rate from the DB cache (`getRateForPair`).
-4. The user can tap **Fetch rate** to pull the live rate for that specific pair from `GET /v2/rate/{FROM}/{TO}`.
-5. On confirm, `exchangeRate` (FROM→TO) and `originalAmount`/`originalCurrency` (destination side) are stored on the transaction.
-
-
+---
 
 ## Internationalization
 
