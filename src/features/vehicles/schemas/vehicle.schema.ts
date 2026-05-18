@@ -11,6 +11,7 @@ export const vehicleSchema = z.object({
     .transform((v) => (v ? parseInt(v, 10) : undefined))
     .pipe(z.number().min(1900).max(2100).optional()),
   initialOdometer: z.string().optional(),
+  odometerUnit: z.enum(['km', 'mi']).default('km'),
 })
 
 export type VehicleFormValues = z.input<typeof vehicleSchema>

@@ -59,11 +59,12 @@ function VehicleDialog({
     formState: { errors, isSubmitting },
   } = useForm<VehicleFormValues>({
     resolver: zodResolver(vehicleSchema),
-    defaultValues: { name: '', make: '', model: '', year: '', initialOdometer: '' },
+    defaultValues: { name: '', make: '', model: '', year: '', initialOdometer: '', odometerUnit: 'km' as const },
   })
 
-  const watchMake  = watch('make')
-  const watchModel = watch('model')
+  const watchMake          = watch('make')
+  const watchModel         = watch('model')
+  const watchOdometerUnit  = watch('odometerUnit')
   const availableModels = MODEL_MAP[watchMake ?? ''] ?? []
 
   useEffect(() => {
@@ -80,11 +81,12 @@ function VehicleDialog({
         model: editing.model ?? '',
         year:  editing.year?.toString() ?? '',
         initialOdometer: editing.initialOdometer?.toString() ?? '',
+        odometerUnit: editing.odometerUnit ?? 'km',
       })
     } else {
       setCustomMakeMode(false)
       setCustomModelMode(false)
-      reset({ name: '', make: '', model: '', year: '', initialOdometer: '' })
+      reset({ name: '', make: '', model: '', year: '', initialOdometer: '', odometerUnit: 'km' })
     }
   }, [open, editing, reset])
 
@@ -96,6 +98,7 @@ function VehicleDialog({
       model: values.model || undefined,
       year: values.year as number | undefined,
       initialOdometer: values.initialOdometer ? parseInt(values.initialOdometer, 10) : undefined,
+      odometerUnit: values.odometerUnit,
       archivedAt: editing?.archivedAt,
     }
     if (editing) {
@@ -243,6 +246,26 @@ function VehicleDialog({
             <Input id="vOdo" type="number" inputMode="numeric" placeholder="0" {...register('initialOdometer')} />
           </div>
 
+          <div className="space-y-1">
+            <Label>{t('vehicles.odometerUnit')}</Label>
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-gray-100 p-1">
+              {(['km', 'mi'] as const).map((unit) => (
+                <button
+                  key={unit}
+                  type="button"
+                  onClick={() => setValue('odometerUnit', unit)}
+                  className={`rounded-lg py-1.5 text-sm font-medium transition-colors ${
+                    watchOdometerUnit === unit
+                      ? 'bg-white shadow text-gray-900'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {unit}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <DialogFooter className="gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => { reset(); onClose() }}>
               {t('common.cancel')}
@@ -366,6 +389,11 @@ export default function VehicleListPage() {
   const active   = vehicles.filter((v) => !v.archivedAt)
   const archived = vehicles.filter((v) => Boolean(v.archivedAt))
 
+  const fleetOdoUnit = useMemo(() => {
+    const units = active.map((v) => v.odometerUnit ?? 'km')
+    return units.length > 0 && units.every((u) => u === units[0]) ? units[0] : 'km'
+  }, [active])
+
   // ── Fleet stats data (active vehicles only) ────────────────────────────────
   const fleetLogs = useMemo(
     () => fuelLogs.filter((l) => active.some((v) => v.id === l.vehicleId)),
@@ -481,6 +509,7 @@ export default function VehicleListPage() {
             initialOdometer={0}
             overrideTotalDistance={fleetTotalDistanceKm}
             overrideAvgKmPerL={fleetAvgKmPerL}
+            odometerUnit={fleetOdoUnit}
           />
         </div>
       )}

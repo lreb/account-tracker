@@ -425,7 +425,7 @@ export default function FuelLogFormPage() {
         {/* Odometer */}
         <div className="space-y-1">
           <div className="flex items-center justify-between gap-2">
-            <FormLabel>{t('vehicles.odometer')}</FormLabel>
+            <FormLabel>{t('vehicles.odometer')} ({vehicle?.odometerUnit ?? 'km'})</FormLabel>
             <OdometerConverterButton
               currentValue={watch('odometer')}
               onApply={(v) => setValue('odometer', v, { shouldValidate: true })}

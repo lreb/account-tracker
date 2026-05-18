@@ -208,21 +208,22 @@ export default function BalanceSheetDetailPage() {
 
     for (const tx of accountTransactions) {
       // running is the balance after this tx — record it first
-      const primaryAcc = accountMap.get(tx.accountId)
       const entry: BalanceEntry = {
         accountBalance: running,
-        accountCurrency: primaryAcc?.currency ?? tx.currency ?? account.currency,
+        accountCurrency: account.currency,
       }
 
-      if (tx.type === 'transfer' && tx.toAccountId) {
-        const toAcc = accountMap.get(tx.toAccountId)
-        if (toAcc) {
+      if (tx.type === 'transfer') {
+        // Counterpart is whichever side of the transfer is NOT the current account.
+        const counterpartId = tx.accountId === account.id ? tx.toAccountId : tx.accountId
+        const counterpartAcc = counterpartId ? accountMap.get(counterpartId) : undefined
+        if (counterpartAcc) {
           // Derive the counterpart account's balance at this exact moment using
           // the same getAccountBalanceAtDate function — avoids tracking a separate
           // running total for every account and uses the same source of truth.
-          const toAccTxns = allTx.filter((t) => isTransactionForAccount(t, toAcc.id))
-          entry.toAccountBalance = getAccountBalanceAtDate(toAcc, toAccTxns, new Date(tx.date))
-          entry.toAccountCurrency = toAcc.currency
+          const counterpartTxns = allTx.filter((t) => isTransactionForAccount(t, counterpartAcc.id))
+          entry.toAccountBalance = getAccountBalanceAtDate(counterpartAcc, counterpartTxns, new Date(tx.date))
+          entry.toAccountCurrency = counterpartAcc.currency
         }
       }
 
@@ -404,7 +405,11 @@ export default function BalanceSheetDetailPage() {
                   return l ? [l] : []
                 })
                 const bal = balanceAfterTx.get(tx.id)
-                const toAcc = tx.toAccountId ? accountMap.get(tx.toAccountId) : undefined
+                // Counterpart account is the OTHER side of a transfer (not the current account).
+                const counterpartAccId = tx.type === 'transfer'
+                  ? (tx.accountId === account.id ? tx.toAccountId : tx.accountId)
+                  : undefined
+                const counterpartAcc = counterpartAccId ? accountMap.get(counterpartAccId) : undefined
                 return (
                   <TransactionListItem
                     key={tx.id + String(i)}
@@ -422,7 +427,7 @@ export default function BalanceSheetDetailPage() {
                     primaryBalance={bal != null ? { accountName: account.name, balance: bal.accountBalance, currency: bal.accountCurrency } : undefined}
                     secondaryBalance={
                       tx.type === 'transfer' && bal?.toAccountBalance != null && bal.toAccountCurrency
-                        ? { accountName: toAcc?.name ?? '', balance: bal.toAccountBalance, currency: bal.toAccountCurrency }
+                        ? { accountName: counterpartAcc?.name ?? '', balance: bal.toAccountBalance, currency: bal.toAccountCurrency }
                         : undefined
                     }
                   />
