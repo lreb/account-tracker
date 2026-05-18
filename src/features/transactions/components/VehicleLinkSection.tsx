@@ -25,6 +25,8 @@ export default function VehicleLinkSection({ vehicleLink, onChange }: Props) {
   const { vehicles } = useVehiclesStore()
 
   const activeVehicles = vehicles.filter((v) => !v.archivedAt)
+  const selectedVehicle = activeVehicles.find((v) => v.id === vehicleLink.vehicleId)
+  const odoUnit = selectedVehicle?.odometerUnit ?? 'km'
 
   return (
     <div className="rounded-2xl border bg-gray-50 p-4 space-y-4">
@@ -98,7 +100,7 @@ export default function VehicleLinkSection({ vehicleLink, onChange }: Props) {
           {vehicleLink.linkType === 'fuel' && (
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>{t('vehicles.odometer')}</Label>
+                <Label>{t('vehicles.odometer')} ({odoUnit})</Label>
                 <Input
                   type="number"
                   inputMode="numeric"
@@ -143,7 +145,7 @@ export default function VehicleLinkSection({ vehicleLink, onChange }: Props) {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label>{t('vehicles.odometer')}</Label>
+                <Label>{t('vehicles.odometer')} ({odoUnit})</Label>
                 <Input
                   type="number"
                   inputMode="numeric"
@@ -154,7 +156,7 @@ export default function VehicleLinkSection({ vehicleLink, onChange }: Props) {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs">{t('vehicles.nextServiceKm')}</Label>
+                  <Label className="text-xs">{t('vehicles.nextServiceKm', { unit: odoUnit })}</Label>
                   <Input
                     type="number"
                     inputMode="numeric"

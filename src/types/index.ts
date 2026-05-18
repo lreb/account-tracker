@@ -85,7 +85,8 @@ export interface Vehicle {
   make?: string
   model?: string
   year?: number
-  initialOdometer?: number   // km at registration
+  initialOdometer?: number   // odometer reading at registration (in vehicle's unit)
+  odometerUnit?: 'km' | 'mi' // defaults to 'km' when absent
   archivedAt?: string        // ISO 8601 — set when archived, absent when active
 }
 

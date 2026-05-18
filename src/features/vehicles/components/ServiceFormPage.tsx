@@ -476,7 +476,7 @@ export default function ServiceFormPage() {
           />
           <div className="space-y-1">
             <div className="flex items-center justify-between gap-2">
-              <FormLabel>{t('vehicles.odometer')}</FormLabel>
+                <FormLabel>{t('vehicles.odometer')} ({vehicle?.odometerUnit ?? 'km'})</FormLabel>
               <OdometerConverterButton
                 currentValue={watch('odometer')}
                 onApply={(v) => setValue('odometer', v, { shouldValidate: true })}
@@ -532,7 +532,7 @@ export default function ServiceFormPage() {
         {/* Next service */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <FormLabel>{t('vehicles.nextServiceKm')}</FormLabel>
+            <FormLabel>{t('vehicles.nextServiceKm')} ({vehicle?.odometerUnit ?? 'km'})</FormLabel>
             <Input
               type="number"
               inputMode="numeric"

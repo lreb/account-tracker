@@ -44,6 +44,7 @@ export function VehicleStats({
   initialOdometer,
   overrideTotalDistance,
   overrideAvgKmPerL,
+  odometerUnit = 'km',
 }: {
   logs: FuelLog[]
   services: VehicleService[]
@@ -53,6 +54,7 @@ export function VehicleStats({
   overrideTotalDistance?: number
   /** Fleet mode: pre-computed weighted-average km/L across all vehicles. Overrides internal calculation. */
   overrideAvgKmPerL?: number
+  odometerUnit?: 'km' | 'mi'
 }) {
   const { t } = useTranslation()
   const [drill, setDrill]                                   = useState<DrillKey | null>(null)
@@ -372,12 +374,12 @@ export function VehicleStats({
     'fuel-cost':   { monthTitle: t('vehicles.stats.fuelCostByMonth'),       yearTitle: t('vehicles.stats.fuelCostByYear'),       color: '#6366f1', isCurrency: true,  unit: undefined },
     'service-cost':{ monthTitle: t('vehicles.stats.serviceCostByMonth'),    yearTitle: t('vehicles.stats.serviceCostByYear'),    color: '#f59e0b', isCurrency: true,  unit: undefined },
     'fill-ups':    { monthTitle: t('vehicles.stats.fillUpsByMonth'),        yearTitle: t('vehicles.stats.fillUpsByMonth'),       color: '#10b981', isCurrency: false, unit: undefined },
-    'km-per-fill':     { monthTitle: t('vehicles.stats.kmBetweenFillsByMonth'), yearTitle: t('vehicles.stats.kmBetweenFillsByMonth'), color: '#06b6d4', isCurrency: false, unit: 'km' },
-    'total-distance':  { monthTitle: t('vehicles.stats.distanceByMonth'),         yearTitle: t('vehicles.stats.distanceByYear'),         color: '#10b981', isCurrency: false, unit: 'km'    },
-    'avg-km-per-l':    { monthTitle: t('vehicles.stats.avgKmPerLByMonth'),      yearTitle: t('vehicles.stats.avgKmPerLByYear'),      color: '#8b5cf6', isCurrency: false, unit: 'km/L' },
+    'km-per-fill':     { monthTitle: t('vehicles.stats.kmBetweenFillsByMonth', { unit: odometerUnit }), yearTitle: t('vehicles.stats.kmBetweenFillsByMonth', { unit: odometerUnit }), color: '#06b6d4', isCurrency: false, unit: odometerUnit },
+    'total-distance':  { monthTitle: t('vehicles.stats.distanceByMonth'),         yearTitle: t('vehicles.stats.distanceByYear'),         color: '#10b981', isCurrency: false, unit: odometerUnit    },
+    'avg-km-per-l':    { monthTitle: t('vehicles.stats.avgKmPerLByMonth', { unit: odometerUnit }),      yearTitle: t('vehicles.stats.avgKmPerLByYear', { unit: odometerUnit }),      color: '#8b5cf6', isCurrency: false, unit: `${odometerUnit}/L` },
     'total-liters':    { monthTitle: t('vehicles.stats.totalLitersByMonth'),    yearTitle: t('vehicles.stats.totalLitersByYear'),    color: '#06b6d4', isCurrency: false, unit: 'L'    },
     'service-count':   { monthTitle: t('vehicles.stats.serviceCountByMonth'),   yearTitle: t('vehicles.stats.serviceCountByYear'),   color: '#f59e0b', isCurrency: false, unit: undefined },
-  }), [t])
+  }), [t, odometerUnit])
 
   // Fleet mode overrides
   const displayAvgKmPerL    = overrideAvgKmPerL     ?? stats.avgKmPerL
@@ -411,18 +413,18 @@ export function VehicleStats({
       drillKey: null,
     },
     {
-      label:    t('vehicles.stats.avgKmPerL'),
-      value:    displayAvgKmPerL > 0 ? `${displayAvgKmPerL.toFixed(1)} km/L` : '—',
+      label:    t('vehicles.stats.avgKmPerL', { unit: odometerUnit }),
+      value:    displayAvgKmPerL > 0 ? `${displayAvgKmPerL.toFixed(1)} ${odometerUnit}/L` : '—',
       drillKey: 'avg-km-per-l' as DrillKey,
     },
     {
-      label:     t('vehicles.stats.kmBetweenFills'),
-      value:     stats.avgKmPerFill > 0 ? `${stats.avgKmPerFill} km` : '—',
+      label:     t('vehicles.stats.kmBetweenFills', { unit: odometerUnit }),
+      value:     stats.avgKmPerFill > 0 ? `${stats.avgKmPerFill} ${odometerUnit}` : '—',
       drillKey:  'km-per-fill',
     },
     {
       label:    t('vehicles.stats.totalDistance'),
-      value:    displayTotalDistance > 0 ? `${displayTotalDistance.toLocaleString()} km` : '—',
+      value:    displayTotalDistance > 0 ? `${displayTotalDistance.toLocaleString()} ${odometerUnit}` : '—',
       tooltip:  distanceTooltip,
       drillKey: 'total-distance' as DrillKey,
     },
@@ -467,6 +469,7 @@ export function VehicleStats({
                 recent:   efficiencyTrend.recentKmPerL.toFixed(1),
                 baseline: efficiencyTrend.baselineKmPerL.toFixed(1),
                 n:        efficiencyTrend.windowSize,
+                unit:     odometerUnit,
               })}
             </p>
           </div>
@@ -548,14 +551,14 @@ export function VehicleStats({
       {/* ── km between fills ────────────────────────────────────────── */}
       {kmBetweenFillsData.some((d) => d.avgKm > 0) && (
         <div>
-          <h3 className="text-sm font-semibold mb-2">{t('vehicles.stats.kmBetweenFillsByMonth')}</h3>
+          <h3 className="text-sm font-semibold mb-2">{t('vehicles.stats.kmBetweenFillsByMonth', { unit: odometerUnit })}</h3>
           <div className="rounded-xl border bg-white p-3">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={kmBetweenFillsData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} width={35} />
-                <Tooltip formatter={(val) => `${val} km`} />
+                <Tooltip formatter={(val) => `${val} ${odometerUnit}`} />
                 <Bar dataKey="avgKm" fill="#06b6d4" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>

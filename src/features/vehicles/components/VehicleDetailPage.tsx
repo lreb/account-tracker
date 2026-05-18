@@ -172,6 +172,7 @@ export default function VehicleDetailPage() {
     return db.localeCompare(da)
   })
 
+  const odoUnit = vehicle.odometerUnit ?? 'km'
   const lastLog = logs[0]
   const prevLog = logs[1]
   const kmSince = lastLog && prevLog ? calcKmSinceLastFill(lastLog.odometer, prevLog.odometer) : null
@@ -199,19 +200,19 @@ export default function VehicleDetailPage() {
           <div className="grid grid-cols-3 gap-2 mb-4">
             <StatCard
               icon={<Gauge size={16} />}
-              label="km/L"
+              label={`${odoUnit}/L`}
               value={kmPerL.toFixed(1)}
               tooltip={t('vehicles.tooltips.kmPerL')}
             />
             <StatCard
               icon={<TrendingDown size={16} />}
-              label={t('vehicles.costPerKm')}
+              label={t('vehicles.costPerKm', { unit: odoUnit })}
               value={costPerKm ? formatCurrency(costPerKm, baseCurrency) : '—'}
-              tooltip={t('vehicles.tooltips.costPerKm')}
+              tooltip={t('vehicles.tooltips.costPerKm', { unit: odoUnit })}
             />
             <StatCard
               icon={<Fuel size={16} />}
-              label={t('vehicles.lastKm')}
+              label={t('vehicles.lastKm', { unit: odoUnit })}
               value={kmSince?.toString() ?? '—'}
               tooltip={t('vehicles.tooltips.lastKm')}
             />
@@ -276,10 +277,10 @@ export default function VehicleDetailPage() {
                               </p>
                               <p className="text-xs text-gray-500">
                                 {log.liters.toFixed(2)} L · {formatCurrency(log.totalCost, baseCurrency)}
-                                {km !== null && ` · ${km} km`}
-                                {eff !== null && ` · ${eff.toFixed(1)} km/L`}
+                                {km !== null && ` · ${km} ${odoUnit}`}
+                                {eff !== null && ` · ${eff.toFixed(1)} ${odoUnit}/L`}
                               </p>
-                              <p className="text-xs text-gray-400">{t('vehicles.odometer')}: {log.odometer.toLocaleString()} km</p>
+                              <p className="text-xs text-gray-400">{t('vehicles.odometer')}: {log.odometer.toLocaleString()} {odoUnit}</p>
                               {log.notes && <p className="text-xs text-gray-400 truncate">{log.notes}</p>}
                               {txLabels.length > 0 && (
                                 <div className="flex flex-wrap gap-1 mt-1">
@@ -330,12 +331,12 @@ export default function VehicleDetailPage() {
                               <p className="text-sm font-medium truncate">{getServiceTypeLabel(svc.serviceType, t)}</p>
                               {svc.nextServiceKm && (
                                 <Badge variant="outline" className="text-[10px] px-1.5 shrink-0">
-                                  {t('vehicles.nextAt')}: {svc.nextServiceKm.toLocaleString()} km
+                                  {t('vehicles.nextAt')}: {svc.nextServiceKm.toLocaleString()} {odoUnit}
                                 </Badge>
                               )}
                             </div>
                             <p className="text-xs text-gray-500">
-                              {format(new Date(svc.date), 'MMM d, yyyy · h:mm a')} · {formatCurrency(svc.cost, baseCurrency)} · {svc.odometer.toLocaleString()} km
+                              {format(new Date(svc.date), 'MMM d, yyyy · h:mm a')} · {formatCurrency(svc.cost, baseCurrency)} · {svc.odometer.toLocaleString()} {odoUnit}
                             </p>
                             {svc.notes && <p className="text-xs text-gray-400 truncate">{svc.notes}</p>}
                             {txLabels.length > 0 && (
@@ -398,10 +399,10 @@ export default function VehicleDetailPage() {
                         </p>
                         <p className="text-xs text-gray-500">
                           {log.liters.toFixed(2)} L · {formatCurrency(log.totalCost, baseCurrency)}
-                          {km !== null && ` · ${km} km`}
-                          {eff !== null && ` · ${eff.toFixed(1)} km/L`}
+                          {km !== null && ` · ${km} ${odoUnit}`}
+                          {eff !== null && ` · ${eff.toFixed(1)} ${odoUnit}/L`}
                         </p>
-                        <p className="text-xs text-gray-400">{t('vehicles.odometer')}: {log.odometer.toLocaleString()} km</p>
+                        <p className="text-xs text-gray-400">{t('vehicles.odometer')}: {log.odometer.toLocaleString()} {odoUnit}</p>
                         {log.notes && <p className="text-xs text-gray-400 truncate">{log.notes}</p>}
                         {txLabels.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1">
@@ -458,12 +459,12 @@ export default function VehicleDetailPage() {
                           <p className="text-sm font-medium truncate">{getServiceTypeLabel(svc.serviceType, t)}</p>
                           {svc.nextServiceKm && (
                             <Badge variant="outline" className="text-[10px] px-1.5 shrink-0">
-                              {t('vehicles.nextAt')}: {svc.nextServiceKm.toLocaleString()} km
+                              {t('vehicles.nextAt')}: {svc.nextServiceKm.toLocaleString()} {odoUnit}
                             </Badge>
                           )}
                         </div>
                         <p className="text-xs text-gray-500">
-                          {format(new Date(svc.date), 'MMM d, yyyy · h:mm a')} · {formatCurrency(svc.cost, baseCurrency)} · {svc.odometer.toLocaleString()} km
+                          {format(new Date(svc.date), 'MMM d, yyyy · h:mm a')} · {formatCurrency(svc.cost, baseCurrency)} · {svc.odometer.toLocaleString()} {odoUnit}
                         </p>
                         {svc.notes && <p className="text-xs text-gray-400 truncate">{svc.notes}</p>}
                         {txLabels.length > 0 && (
@@ -508,12 +509,13 @@ export default function VehicleDetailPage() {
           services={services}
           baseCurrency={baseCurrency}
           initialOdometer={vehicle.initialOdometer ?? 0}
+          odometerUnit={odoUnit}
         />
       )}
 
       {/* Upcoming services tab */}
       {tab === 'upcoming' && (
-        <UpcomingServicesTab upcomingServices={upcomingServices} vehicleId={vehicle.id} />
+        <UpcomingServicesTab upcomingServices={upcomingServices} vehicleId={vehicle.id} odometerUnit={odoUnit} />
       )}
 
       <ScrollToTopButton />

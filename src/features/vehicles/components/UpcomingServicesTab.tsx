@@ -11,6 +11,7 @@ import type { UpcomingServiceItem } from './upcoming-services-tab.types'
 interface UpcomingServicesTabProps {
   upcomingServices: UpcomingServiceItem[]
   vehicleId: string
+  odometerUnit?: 'km' | 'mi'
 }
 
 const URGENCY_ORDER: Record<UpcomingServiceItem['urgency'], number> = {
@@ -19,7 +20,7 @@ const URGENCY_ORDER: Record<UpcomingServiceItem['urgency'], number> = {
   upcoming: 2,
 }
 
-export default function UpcomingServicesTab({ upcomingServices, vehicleId }: UpcomingServicesTabProps) {
+export default function UpcomingServicesTab({ upcomingServices, vehicleId, odometerUnit = 'km' }: UpcomingServicesTabProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
 
@@ -91,12 +92,12 @@ export default function UpcomingServicesTab({ upcomingServices, vehicleId }: Upc
               <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                 {svc.nextServiceKm != null && (
                   <p className={`text-xs ${textClass} opacity-80`}>
-                    {t('vehicles.stats.dueAt', { km: svc.nextServiceKm.toLocaleString() })}
+                    {t('vehicles.stats.dueAt', { km: svc.nextServiceKm.toLocaleString(), unit: odometerUnit })}
                     {kmRemaining !== null && (
                       <span className="ml-1 opacity-70">
                         {kmRemaining <= 0
-                          ? `(${t('vehicles.stats.overdueByKm', { km: Math.abs(kmRemaining).toLocaleString() })})`
-                          : `(${t('vehicles.stats.kmLeft', { km: kmRemaining.toLocaleString() })})`}
+                          ? `(${t('vehicles.stats.overdueByKm', { km: Math.abs(kmRemaining).toLocaleString(), unit: odometerUnit })})`
+                          : `(${t('vehicles.stats.kmLeft', { km: kmRemaining.toLocaleString(), unit: odometerUnit })})`}
                       </span>
                     )}
                   </p>
