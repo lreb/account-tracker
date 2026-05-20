@@ -214,7 +214,7 @@ export default function ImportExportPage() {
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={() => navigate('/settings')}
           className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-muted"
           aria-label={t('common.back')}
         >

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Eye, EyeOff, Pencil, Trash2, Plus, Wallet } from 'lucide-react'
+import { Eye, EyeOff, Pencil, Trash2, Plus, Wallet } from 'lucide-react'
 
 import {
   ACCOUNT_SUBTYPE_OPTIONS_BY_TYPE,
@@ -184,24 +184,9 @@ export default function AccountsSettingsPage() {
   }
 
   return (
-    <div className="p-4">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => navigate('/settings')}
-          >
-            <ArrowLeft size={16} />
-          </Button>
-          <h1 className="text-xl font-bold">{t('settings.accounts')}</h1>
-        </div>
-        <Button size="sm" onClick={openAdd} className="gap-1">
-          <Plus size={16} />
-          {t('common.add')}
-        </Button>
+    <div className="p-4 pb-24">
+      <div className="mb-4">
+        <h1 className="text-xl font-bold">{t('settings.accounts')}</h1>
       </div>
 
       {accounts.length === 0 ? (
@@ -349,6 +334,17 @@ export default function AccountsSettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Floating add button */}
+      <button
+        type="button"
+        onClick={openAdd}
+        aria-label={t('common.add')}
+        title={t('common.add')}
+        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg hover:bg-emerald-600 active:scale-95 transition-all"
+      >
+        <Plus size={24} strokeWidth={2.5} />
+      </button>
 
       <ScrollToTopButton />
     </div>

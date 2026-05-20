@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { format } from 'date-fns'
-import { Trash2, RefreshCw, Plus } from 'lucide-react'
+import { Trash2, RefreshCw, Plus, AlertTriangle } from 'lucide-react'
 
 import { useExchangeRatesStore } from '@/stores/exchange-rates.store'
 import { useSettingsStore } from '@/stores/settings.store'
@@ -25,7 +25,9 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog'
+import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
 
 const manualRateSchema = z.object({
   fromCurrency: z.string().min(3),
@@ -41,6 +43,7 @@ export default function ExchangeRatesSettingsPage() {
   const { baseCurrency, load: loadSettings } = useSettingsStore()
 
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
 
   useEffect(() => {
     loadSettings()
@@ -148,7 +151,7 @@ export default function ExchangeRatesSettingsPage() {
                 <span className="text-xs text-muted-foreground hidden sm:inline">{r.date}</span>
                 <button
                   type="button"
-                  onClick={() => remove(r.id)}
+                  onClick={() => setDeleteTargetId(r.id)}
                   className="text-muted-foreground hover:text-destructive transition-colors"
                   aria-label={t('common.delete')}
                 >
@@ -250,6 +253,40 @@ export default function ExchangeRatesSettingsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* ── Delete exchange rate confirmation dialog ─────────────────────── */}
+      <Dialog open={!!deleteTargetId} onOpenChange={(open) => { if (!open) setDeleteTargetId(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('exchangeRates.deleteConfirmTitle')}</DialogTitle>
+          </DialogHeader>
+          <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-500" aria-hidden="true" />
+            <p>
+              {t('exchangeRates.deleteConfirmDesc', {
+                from: rates.find((r) => r.id === deleteTargetId)?.fromCurrency ?? '',
+                to: rates.find((r) => r.id === deleteTargetId)?.toCurrency ?? '',
+              })}
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteTargetId(null)}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deleteTargetId) remove(deleteTargetId)
+                setDeleteTargetId(null)
+              }}
+            >
+              {t('common.delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ScrollToTopButton />
     </div>
   )
 }

@@ -16,6 +16,8 @@ import {
   X,
   Bell,
   TrendingUp,
+  Download,
+  CloudUpload,
 } from 'lucide-react'
 import { useVehiclesStore } from '@/stores/vehicles.store'
 import SidebarGoogleAuthSection from './SidebarGoogleAuthSection'
@@ -35,6 +37,11 @@ const mainItems = [
   { to: '/insights',      icon: Lightbulb,       labelKey: 'nav.insights',     end: false },
   { to: '/reminders',               icon: Bell,        labelKey: 'nav.reminders',        end: false },
   { to: '/tools/compound-interest', icon: TrendingUp,  labelKey: 'nav.compoundInterest', end: false },
+] as const
+
+const dataItems = [
+  { to: '/settings/import-export', icon: Download,     labelKey: 'settings.importExportTitle', end: false },
+  { to: '/settings/google-drive',  icon: CloudUpload,  labelKey: 'settings.googleDriveTitle',  end: false },
 ] as const
 
 const settingsItems = [
@@ -106,6 +113,33 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           </div>
           <ul className="space-y-0.5 px-3">
             {mainItems.map(({ to, icon: Icon, labelKey, end }) => (
+              <li key={to}>
+                <NavLink
+                  to={to}
+                  end={end}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-indigo-50 text-indigo-700'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`
+                  }
+                >
+                  <Icon size={18} className="shrink-0" />
+                  <span>{t(labelKey)}</span>
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+
+          {/* ── Data ────────────────────────────────────── */}
+          <div className="mt-4 px-3 mb-1">
+            <p className="px-2 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+              {t('sidebar.data')}
+            </p>
+          </div>
+          <ul className="space-y-0.5 px-3">
+            {dataItems.map(({ to, icon: Icon, labelKey, end }) => (
               <li key={to}>
                 <NavLink
                   to={to}
