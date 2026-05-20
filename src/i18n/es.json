@@ -559,6 +559,16 @@
     "labelsOrphanCleanupTitle": "¿Eliminar etiqueta huérfana?",
     "labelsOrphanCleanupDesc": "Esto eliminará permanentemente este ID de etiqueta de {{count}} transacción(es). Ya no aparecerá en ninguna parte de la aplicación.",
     "labelsOrphanCleanupAction": "Eliminar de todas las transacciones",
+    "labelsNewLabel": "Nueva etiqueta",
+    "labelsEditLabel": "Editar etiqueta",
+    "labelsName": "Nombre",
+    "labelsColor": "Color",
+    "labelsNamePlaceholder": "ej. Negocio, Deducible de impuestos",
+    "labelsNoLabels": "Aún no hay etiquetas.",
+    "labelsAddFirst": "Crea tu primera etiqueta",
+    "labelsDeleteTitle": "¿Eliminar etiqueta?",
+    "labelsDeleteDesc": "Estás a punto de eliminar \"{{name}}\". También se eliminará de todas las transacciones.",
+    "labelsDeleteAction": "Eliminar etiqueta",
     "language": "Idioma",
     "baseCurrency": "Moneda Base",
     "theme": "Tema",
@@ -728,7 +738,9 @@
     "offlineWarning": "Sin conexión — mostrando datos en caché",
     "autoFilled": "Completado automáticamente",
     "rateUpdated": "Tipo actualizado desde Frankfurter",
-    "fetchFailed": "No se pudo obtener el tipo — verifica tu conexión"
+    "fetchFailed": "No se pudo obtener el tipo — verifica tu conexión",
+    "deleteConfirmTitle": "¿Eliminar tipo de cambio?",
+    "deleteConfirmDesc": "Esto eliminará permanentemente el tipo {{from}} → {{to}}. Esta acción no se puede deshacer."
   },
   "crossCurrency": {
     "title": "Establecer Tipo de Cambio",

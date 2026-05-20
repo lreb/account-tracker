@@ -561,6 +561,16 @@
     "labelsOrphanCleanupTitle": "Remove orphaned label?",
     "labelsOrphanCleanupDesc": "This will permanently remove this label ID from {{count}} transaction(s). It will no longer appear anywhere in the app.",
     "labelsOrphanCleanupAction": "Remove from all transactions",
+    "labelsNewLabel": "New Label",
+    "labelsEditLabel": "Edit Label",
+    "labelsName": "Name",
+    "labelsColor": "Color",
+    "labelsNamePlaceholder": "e.g. Business, Tax-deductible",
+    "labelsNoLabels": "No labels yet.",
+    "labelsAddFirst": "Create your first label",
+    "labelsDeleteTitle": "Delete label?",
+    "labelsDeleteDesc": "You are about to delete \"{{name}}\". This will also remove it from all transactions.",
+    "labelsDeleteAction": "Delete label",
     "language": "Language",
     "baseCurrency": "Base Currency",
     "theme": "Theme",
@@ -730,7 +740,9 @@
     "offlineWarning": "Offline — showing cached rates",
     "autoFilled": "Auto-filled from cache",
     "rateUpdated": "Rate updated from Frankfurter",
-    "fetchFailed": "Could not fetch rate — check your connection"
+    "fetchFailed": "Could not fetch rate — check your connection",
+    "deleteConfirmTitle": "Remove exchange rate?",
+    "deleteConfirmDesc": "This will permanently remove the {{from}} → {{to}} rate. This cannot be undone."
   },
   "crossCurrency": {
     "title": "Set Exchange Rate",

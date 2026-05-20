@@ -91,22 +91,29 @@ function LabelDialog({
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose() }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>{editing ? 'Edit Label' : 'New Label'}</DialogTitle>
+          <DialogTitle>
+            {editing ? t('settings.labelsEditLabel') : t('settings.labelsNewLabel')}
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-1">
           <div className="space-y-1">
-            <FormLabel htmlFor="lName">Name</FormLabel>
-            <Input id="lName" placeholder="e.g. Business, Tax-deductible" {...register('name')} />
+            <FormLabel htmlFor="lName">{t('settings.labelsName')}</FormLabel>
+            <Input
+              id="lName"
+              placeholder={t('settings.labelsNamePlaceholder')}
+              {...register('name')}
+            />
             {errors.name && <p className="text-xs text-red-500">{t(errors.name.message!)}</p>}
           </div>
 
           <div className="space-y-2">
-            <FormLabel>Color</FormLabel>
+            <FormLabel>{t('settings.labelsColor')}</FormLabel>
             <div className="flex flex-wrap gap-2">
               {PRESET_COLORS.map((color) => (
                 <button
                   key={color}
                   type="button"
+                  aria-label={color}
                   onClick={() => setValue('color', color)}
                   className={`h-7 w-7 rounded-full border-2 transition-transform ${
                     selectedColor === color
@@ -120,8 +127,12 @@ function LabelDialog({
           </div>
 
           <DialogFooter className="gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={isSubmitting}>Save</Button>
+            <Button type="button" variant="outline" onClick={onClose}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {t('common.save')}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -137,6 +148,7 @@ export default function LabelsSettingsPage() {
   const removeLabelFromTransactions = useTransactionsStore((s) => s.removeLabelFromTransactions)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Label | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [confirmOrphanId, setConfirmOrphanId] = useState<string | null>(null)
 
   useEffect(() => { load() }, [load])
@@ -185,22 +197,20 @@ export default function LabelsSettingsPage() {
     setConfirmOrphanId(null)
   }
 
+  const confirmDeleteLabel = labels.find((l) => l.id === confirmDeleteId) ?? null
+
   return (
     <div className="p-4 pb-24">
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4">
         <h1 className="text-xl font-bold">{t('settings.labels')}</h1>
-        <Button size="sm" onClick={openAdd} className="gap-1">
-          <Plus size={16} />
-          Add
-        </Button>
       </div>
 
       {allLabels.length === 0 ? (
         <div className="text-center mt-16 space-y-2">
           <Tag size={40} className="mx-auto text-gray-300" />
-          <p className="text-sm text-gray-400">No labels yet.</p>
+          <p className="text-sm text-gray-400">{t('settings.labelsNoLabels')}</p>
           <Button variant="outline" size="sm" onClick={openAdd}>
-            Create your first label
+            {t('settings.labelsAddFirst')}
           </Button>
         </div>
       ) : (
@@ -248,7 +258,13 @@ export default function LabelsSettingsPage() {
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 text-red-500 hover:text-red-600"
-                  onClick={() => orphanIds.has(label.id) ? setConfirmOrphanId(label.id) : handleDelete(label.id)}
+                  onClick={() => {
+                    if (orphanIds.has(label.id)) {
+                      setConfirmOrphanId(label.id)
+                    } else {
+                      setConfirmDeleteId(label.id)
+                    }
+                  }}
                 >
                   <Trash2 size={15} />
                 </Button>
@@ -260,8 +276,42 @@ export default function LabelsSettingsPage() {
 
       <LabelDialog open={dialogOpen} editing={editing} onClose={closeDialog} />
 
+      {/* ── Delete confirmation ───────────────────────────────────────── */}
+      <Dialog
+        open={confirmDeleteId !== null}
+        onOpenChange={(v) => { if (!v) setConfirmDeleteId(null) }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t('settings.labelsDeleteTitle')}</DialogTitle>
+            <DialogDescription>
+              {t('settings.labelsDeleteDesc', { name: confirmDeleteLabel?.name ?? '' })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 pt-2">
+            <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (confirmDeleteId) {
+                  await handleDelete(confirmDeleteId)
+                  setConfirmDeleteId(null)
+                }
+              }}
+            >
+              {t('settings.labelsDeleteAction')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ── Orphan cleanup confirmation ──────────────────────────────── */}
-      <Dialog open={confirmOrphanId !== null} onOpenChange={(v) => { if (!v) setConfirmOrphanId(null) }}>
+      <Dialog
+        open={confirmOrphanId !== null}
+        onOpenChange={(v) => { if (!v) setConfirmOrphanId(null) }}
+      >
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>{t('settings.labelsOrphanCleanupTitle')}</DialogTitle>
@@ -281,6 +331,17 @@ export default function LabelsSettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Floating add button */}
+      <button
+        type="button"
+        onClick={openAdd}
+        aria-label={t('common.add')}
+        title={t('common.add')}
+        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg hover:bg-emerald-600 active:scale-95 transition-all"
+      >
+        <Plus size={24} strokeWidth={2.5} />
+      </button>
 
       <ScrollToTopButton />
     </div>
