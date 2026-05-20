@@ -86,6 +86,8 @@ features/transactions/
 
 **Rule**: A feature-scoped hook is co-located with its feature. Only when a hook is consumed by 2+ features does it move to `src/hooks/`.
 
+**Rule**: A feature-scoped type file (e.g. `foo.types.ts`) is co-located with its feature. Only when a type is imported by 2+ different features does it move to `src/types/`.
+
 ### Store Pattern
 
 All state lives in Zustand stores (`src/stores/<domain>.store.ts`). Each store:
