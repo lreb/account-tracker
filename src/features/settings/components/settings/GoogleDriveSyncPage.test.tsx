@@ -191,6 +191,18 @@ describe('GoogleDriveSyncPage', () => {
       fireEvent.click(screen.getByText('settings.driveRestore'))
       expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
+
+    it('restore dialog shows data-override warning message', () => {
+      renderPage()
+      fireEvent.click(screen.getByText('settings.driveRestore'))
+      expect(screen.getByText('settings.restoreConfirmDesc')).toBeInTheDocument()
+    })
+
+    it('restore dialog shows the confirmation title', () => {
+      renderPage()
+      fireEvent.click(screen.getByText('settings.driveRestore'))
+      expect(screen.getByText('settings.restoreConfirmTitle')).toBeInTheDocument()
+    })
   })
 
   describe('configure form', () => {

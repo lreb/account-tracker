@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
-  CloudUpload, CloudDownload, LogOut, Info, ArrowLeft,
+  CloudUpload, CloudDownload, LogOut, Info, ArrowLeft, AlertTriangle,
 } from 'lucide-react'
 
 import { useTransactionsStore } from '@/stores/transactions.store'
@@ -25,7 +25,7 @@ import {
 } from '@/lib/google-drive'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
-  DialogFooter, DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 
@@ -231,8 +231,11 @@ export default function GoogleDriveSyncPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('settings.restoreConfirmTitle')}</DialogTitle>
-            <DialogDescription>{t('settings.restoreConfirmDesc')}</DialogDescription>
           </DialogHeader>
+          <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-500" aria-hidden="true" />
+            <p>{t('settings.restoreConfirmDesc')}</p>
+          </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setConfirmRestore(null)} disabled={isBusy}>
               {t('common.cancel')}
