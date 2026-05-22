@@ -1,6 +1,6 @@
-import React, { useMemo, useState, useDeferredValue } from 'react'
+import React, { useEffect, useMemo, useState, useDeferredValue } from 'react'
 import { useTranslation } from 'react-i18next'
-import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear } from 'date-fns'
+import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns'
 import {
   BarChart,
   Bar,
@@ -15,12 +15,14 @@ import {
   Line,
 } from 'recharts'
 
+import { db } from '@/db'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useAccountsStore } from '@/stores/accounts.store'
 import { useCategoriesStore } from '@/stores/categories.store'
 import { useLabelsStore } from '@/stores/labels.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { getVisibleAccountIds, getVisibleAccounts } from '@/lib/accounts'
+import { getAccountBalanceAtDate, isTransactionForAccount } from '@/lib/balance-sheet'
 import { formatCurrency } from '@/lib/currency'
 import {
   computePeriodSummary,
@@ -46,7 +48,10 @@ const PIE_COLORS = [
   '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#84cc16',
 ]
 
-type PresetKey = 'thisMonth' | 'lastMonth' | 'last3' | 'last6' | 'thisYear' | 'custom'
+import {
+  type MonthlyPresetKey as PresetKey,
+  getMonthlyPresetRange as getPresetRange,
+} from '../lib/report-date-helpers'
 
 const PRESET_TRANSLATION_KEY: Record<PresetKey, string> = {
   thisMonth: 'thisMonth',
@@ -65,20 +70,6 @@ const REPORT_TAB_TRANSLATION_KEY = {
   labels: 'labelsTab',
 } as const
 
-function getPresetRange(key: PresetKey): { from: Date; to: Date } {
-  const today = new Date()
-  switch (key) {
-    case 'thisMonth':  return { from: startOfMonth(today),           to: endOfMonth(today) }
-    case 'lastMonth': {
-      const lm = subMonths(today, 1)
-      return { from: startOfMonth(lm),             to: endOfMonth(lm) }
-    }
-    case 'last3':      return { from: startOfMonth(subMonths(today, 2)), to: endOfMonth(today) }
-    case 'last6':      return { from: startOfMonth(subMonths(today, 5)), to: endOfMonth(today) }
-    case 'thisYear':   return { from: startOfYear(today),            to: endOfYear(today) }
-    case 'custom':     return { from: startOfMonth(today),           to: endOfMonth(today) }
-  }
-}
 
 // ─── Small helpers ────────────────────────────────────────────────────────────
 
@@ -148,7 +139,11 @@ function CurrencyTooltip({ active, payload, label, currency }: {
 
 export default function ReportsPage() {
   const { t } = useTranslation()
-  const { transactions: rawTransactions } = useTransactionsStore()
+  const { transactions: rawTransactions, load: loadTransactions } = useTransactionsStore()
+  // Reload full transaction history on every mount — TransactionListPage loads a
+  // date-filtered subset into this same store, so without this reports would show
+  // incomplete data if the user navigated from a filtered transaction list.
+  useEffect(() => { void loadTransactions() }, [loadTransactions])
   const transactions = useDeferredValue(rawTransactions)
   const isComputing = rawTransactions !== transactions
   const { accounts } = useAccountsStore()
@@ -161,6 +156,31 @@ export default function ReportsPage() {
     () => transactions.some((transaction) => visibleAccountIds.has(transaction.accountId)),
     [transactions, visibleAccountIds],
   )
+
+  // ── Live account balances (all-time, not date-filtered) ─────────────────
+  const [liveBalances, setLiveBalances] = useState<Map<string, number>>(() => {
+    const map = new Map<string, number>()
+    for (const acct of accounts) map.set(acct.id, acct.openingBalance)
+    return map
+  })
+
+  useEffect(() => {
+    let stale = false
+    async function computeBalances() {
+      const activeTx = await db.transactions
+        .filter((tx) => tx.status !== 'cancelled')
+        .toArray()
+      if (stale) return
+      const map = new Map<string, number>()
+      for (const acct of accounts) {
+        const acctTxs = activeTx.filter((tx) => isTransactionForAccount(tx, acct.id))
+        map.set(acct.id, getAccountBalanceAtDate(acct, acctTxs, new Date()))
+      }
+      setLiveBalances(map)
+    }
+    void computeBalances()
+    return () => { stale = true }
+  }, [accounts])
 
   // ── Filter state ─────────────────────────────────────────────────────────
   const [preset, setPreset] = useState<PresetKey>('thisMonth')
@@ -179,8 +199,8 @@ export default function ReportsPage() {
   const filters: ReportFilters = useMemo(() => {
     if (preset === 'custom') {
       return {
-        from: new Date(customFrom),
-        to: new Date(customTo),
+        from: new Date(`${customFrom}T00:00:00.000`),
+        to: new Date(`${customTo}T23:59:59.999`),
         accountId: effectiveAccount === 'all' ? undefined : effectiveAccount,
       }
     }
@@ -312,6 +332,7 @@ export default function ReportsPage() {
                   value={effectiveAccount === 'all' ? '' : effectiveAccount}
                   onChange={(id) => setFilterAccount(id)}
                   options={visibleAccounts}
+                  balances={liveBalances}
                   label=""
                 />
               </div>
@@ -402,6 +423,7 @@ export default function ReportsPage() {
             accounts={visibleAccounts}
             baseCurrency={baseCurrency}
             visibleAccountIds={visibleAccountIds}
+            accountBalances={liveBalances}
           />
 
           {/* Income by category */}
@@ -411,6 +433,7 @@ export default function ReportsPage() {
             accounts={visibleAccounts}
             baseCurrency={baseCurrency}
             visibleAccountIds={visibleAccountIds}
+            accountBalances={liveBalances}
           />
         </div>
       )}

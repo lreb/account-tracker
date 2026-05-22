@@ -150,12 +150,14 @@ export function computeCategoryBreakdown(
   filters: ReportFilters,
   type: 'expense' | 'income' = 'expense',
   visibleAccountIds?: Set<string>,
+  includeTransfers = false,
 ): CategorySlice[] {
   const fromISO = filters.from.toISOString()
   const toISO   = filters.to.toISOString()
   const filtered = transactions.filter((t) => {
     if (t.status === 'cancelled') return false
-    if (t.type !== type) return false
+    const matchesType = t.type === type || (includeTransfers && t.type === 'transfer')
+    if (!matchesType) return false
     if (!txInRange(t, fromISO, toISO)) return false
     if (visibleAccountIds && !isTransactionForVisiblePrimaryAccount(t, visibleAccountIds)) return false
     if (filters.accountId && t.accountId !== filters.accountId) return false

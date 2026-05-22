@@ -1,15 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  startOfWeek,
-  endOfWeek,
-  startOfMonth,
-  endOfMonth,
-  startOfYear,
-  endOfYear,
-  subMonths,
-  format,
-} from 'date-fns'
+import { format, startOfMonth, endOfMonth } from 'date-fns'
 import {
   PieChart,
   Pie,
@@ -25,12 +16,7 @@ import { CategoryIcon } from '@/lib/icon-map'
 import type { Transaction, Category, Account } from '@/types'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from '@/components/ui/select'
+import { AccountSelect } from '@/components/ui/account-select'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -39,7 +25,10 @@ const PIE_COLORS = [
   '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#84cc16',
 ]
 
-type PresetKey = 'thisWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'custom'
+import {
+  type WeeklyPresetKey as PresetKey,
+  getWeeklyPresetRange as getPresetRange,
+} from '../lib/report-date-helpers'
 
 const PRESET_KEYS: PresetKey[] = ['thisWeek', 'thisMonth', 'lastMonth', 'thisYear', 'custom']
 
@@ -51,27 +40,6 @@ const PRESET_I18N_KEY: Record<PresetKey, string> = {
   custom:    'reports.presets.custom',
 }
 
-function getPresetRange(key: PresetKey): { from: Date; to: Date } {
-  const today = new Date()
-  switch (key) {
-    case 'thisWeek':
-      return {
-        from: startOfWeek(today, { weekStartsOn: 1 }),
-        to: endOfWeek(today, { weekStartsOn: 1 }),
-      }
-    case 'thisMonth':
-      return { from: startOfMonth(today), to: endOfMonth(today) }
-    case 'lastMonth': {
-      const lm = subMonths(today, 1)
-      return { from: startOfMonth(lm), to: endOfMonth(lm) }
-    }
-    case 'thisYear':
-      return { from: startOfYear(today), to: endOfYear(today) }
-    case 'custom':
-      return { from: startOfMonth(today), to: endOfMonth(today) }
-  }
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export interface IncomesByCategoryReportProps {
@@ -80,6 +48,7 @@ export interface IncomesByCategoryReportProps {
   accounts: Account[]
   baseCurrency: string
   visibleAccountIds: Set<string>
+  accountBalances?: Map<string, number>
 }
 
 export function CategoryIncomesByCategoryReport({
@@ -88,6 +57,7 @@ export function CategoryIncomesByCategoryReport({
   accounts,
   baseCurrency,
   visibleAccountIds,
+  accountBalances,
 }: IncomesByCategoryReportProps) {
   const { t } = useTranslation()
 
@@ -103,18 +73,13 @@ export function CategoryIncomesByCategoryReport({
 
   const filters: ReportFilters = useMemo(() => {
     const base = preset === 'custom'
-      ? { from: new Date(customFrom), to: new Date(customTo) }
+      ? { from: new Date(`${customFrom}T00:00:00.000`), to: new Date(`${customTo}T23:59:59.999`) }
       : getPresetRange(preset)
     return {
       ...base,
       accountId: filterAccount === 'all' ? undefined : filterAccount,
     }
   }, [preset, customFrom, customTo, filterAccount])
-
-  const selectedAccountName = useMemo(() => {
-    if (filterAccount === 'all') return t('reports.allAccounts')
-    return accounts.find((a) => a.id === filterAccount)?.name ?? t('reports.allAccounts')
-  }, [filterAccount, accounts, t])
 
   const slices = useMemo(
     () =>
@@ -170,23 +135,30 @@ export function CategoryIncomesByCategoryReport({
       </div>
 
       {/* Account filter */}
-      <Select
-        value={filterAccount}
-        onValueChange={(value) => {
-          setFilterAccount(value ?? 'all')
-          setActiveIndex(null)
-        }}
-      >
-        <SelectTrigger className="h-8 text-xs w-48">
-          <span className="truncate">{selectedAccountName}</span>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">{t('reports.allAccounts')}</SelectItem>
-          {accounts.map((a) => (
-            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className="flex items-center gap-1">
+        <div className="w-56">
+          <AccountSelect
+            value={filterAccount === 'all' ? '' : filterAccount}
+            onChange={(id) => {
+              setFilterAccount(id || 'all')
+              setActiveIndex(null)
+            }}
+            options={accounts}
+            balances={accountBalances}
+            label=""
+          />
+        </div>
+        {filterAccount !== 'all' && (
+          <button
+            type="button"
+            onClick={() => { setFilterAccount('all'); setActiveIndex(null) }}
+            className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            title={t('reports.allAccounts')}
+          >
+            ×
+          </button>
+        )}
+      </div>
 
       {/* Custom date range inputs */}
       {preset === 'custom' && (
