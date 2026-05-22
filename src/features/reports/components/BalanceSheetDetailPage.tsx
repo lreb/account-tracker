@@ -12,13 +12,12 @@ import { useLabelsStore } from '@/stores/labels.store'
 import {
   BALANCE_SHEET_PRESETS,
   getAccountBalanceAtDate,
-  getAccountTransactionAmount,
   isTransactionForAccount,
   type BalanceSheetPreset,
 } from '@/lib/balance-sheet'
 import { getTranslatedCategoryName } from '@/lib/categories'
 import { formatCurrency } from '@/lib/currency'
-import type { Account, Transaction } from '@/types'
+import type { Transaction } from '@/types'
 
 import { AddFabMenu } from '@/components/ui/add-fab-menu'
 import { Button } from '@/components/ui/button'
@@ -26,33 +25,13 @@ import { ScrollToTopButton } from '@/components/ui/scroll-to-top-button'
 import { TransactionListItem } from '@/components/ui/transaction-list-item'
 import { TransactionDateGroupHeader } from '@/components/ui/transaction-date-group-header'
 import { useGroupedTransactions } from '@/features/transactions/hooks/useGroupedTransactions'
+import { ExportStatementButtons } from '@/components/ui/export-statement-buttons'
 import { BalanceSheetDetailFiltersSheet } from './BalanceSheetDetailFiltersSheet'
 import { EMPTY_FILTERS, type DetailFilters } from './balance-sheet-detail-filters.types'
+import { getTransactionPresentation } from '../lib/transaction-presentation'
 
 // Persists scroll position across navigation (e.g. edit → back).
 let persistedScrollOffset: number = 0
-
-function getTransactionPresentation(transaction: Transaction, account: Account) {
-  const signedAmount = getAccountTransactionAmount(transaction, account)
-  const absoluteAmount = Math.abs(signedAmount)
-
-  if (transaction.type === 'transfer') {
-    const isIncoming = transaction.toAccountId === account.id
-    return {
-      amount: absoluteAmount,
-      prefix: isIncoming ? '+' : '-',
-      labelKey: isIncoming ? 'balanceSheet.transactionKinds.transferIn' : 'balanceSheet.transactionKinds.transferOut',
-      currency: account.currency,
-    }
-  }
-
-  return {
-    amount: absoluteAmount,
-    prefix: signedAmount >= 0 ? '+' : '-',
-    labelKey: transaction.type === 'income' ? 'transactions.income' : 'transactions.expense',
-    currency: transaction.currency,
-  }
-}
 
 export default function BalanceSheetDetailPage() {
   const { t } = useTranslation()
@@ -164,8 +143,8 @@ export default function BalanceSheetDetailPage() {
 
   const filteredAccountTransactions = useMemo(() => {
     const q = filters.search.trim().toLowerCase()
-    const dateFromISO = filters.dateFrom ? `${filters.dateFrom}T00:00:00.000Z` : ''
-    const dateToISO   = filters.dateTo   ? `${filters.dateTo}T23:59:59.999Z`   : ''
+    const dateFromISO = filters.dateFrom ? new Date(`${filters.dateFrom}T00:00:00.000`).toISOString() : ''
+    const dateToISO   = filters.dateTo   ? new Date(`${filters.dateTo}T23:59:59.999`).toISOString()   : ''
     const all = transactions
       .filter((transaction) => isTransactionForAccount(transaction, account?.id ?? ''))
       .sort((left, right) => right.date.localeCompare(left.date))
@@ -334,19 +313,31 @@ export default function BalanceSheetDetailPage() {
             </h2>
             <p className="text-xs text-gray-400">{t('balanceSheet.transactionsSubtitle', { account: account.name })}</p>
           </div>
-          <button
-            type="button"
-            onClick={openFilters}
-            className="relative flex items-center gap-1 rounded-full border bg-white px-3 py-1.5 text-sm text-gray-600 shadow-sm shrink-0"
-          >
-            <SlidersHorizontal size={14} />
-            {t('transactions.filters.button')}
-            {activeCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
-                {activeCount}
-              </span>
-            )}
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <ExportStatementButtons
+              transactions={filteredAccountTransactions}
+              account={account}
+              balanceAfterTx={balanceAfterTx}
+              categoryMap={categoryMap}
+              labelMap={labelMap}
+              currentBalance={currentBalance}
+              dateFrom={filters.dateFrom || undefined}
+              dateTo={filters.dateTo || undefined}
+            />
+            <button
+              type="button"
+              onClick={openFilters}
+              className="relative flex items-center gap-1 rounded-full border bg-white px-3 py-1.5 text-sm text-gray-600 shadow-sm"
+            >
+              <SlidersHorizontal size={14} />
+              {t('transactions.filters.button')}
+              {activeCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
+                  {activeCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Active filter chips */}

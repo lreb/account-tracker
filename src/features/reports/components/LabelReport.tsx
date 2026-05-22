@@ -1,15 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  startOfWeek,
-  endOfWeek,
-  startOfMonth,
-  endOfMonth,
-  startOfYear,
-  endOfYear,
-  subMonths,
-  format,
-} from 'date-fns'
+import { format, startOfMonth, endOfMonth } from 'date-fns'
 
 import { computeLabelBreakdown, type ReportFilters } from '@/lib/reports'
 import { formatCurrency } from '@/lib/currency'
@@ -20,30 +11,12 @@ import { Label as UILabel } from '@/components/ui/label'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type PresetKey = 'thisWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'custom'
+import {
+  type WeeklyPresetKey as PresetKey,
+  getWeeklyPresetRange as getPresetRange,
+} from '../lib/report-date-helpers'
 
 const PRESET_KEYS: PresetKey[] = ['thisWeek', 'thisMonth', 'lastMonth', 'thisYear', 'custom']
-
-function getPresetRange(key: PresetKey): { from: Date; to: Date } {
-  const today = new Date()
-  switch (key) {
-    case 'thisWeek':
-      return {
-        from: startOfWeek(today, { weekStartsOn: 1 }),
-        to: endOfWeek(today, { weekStartsOn: 1 }),
-      }
-    case 'thisMonth':
-      return { from: startOfMonth(today), to: endOfMonth(today) }
-    case 'lastMonth': {
-      const lm = subMonths(today, 1)
-      return { from: startOfMonth(lm), to: endOfMonth(lm) }
-    }
-    case 'thisYear':
-      return { from: startOfYear(today), to: endOfYear(today) }
-    default:
-      return { from: startOfMonth(today), to: endOfMonth(today) }
-  }
-}
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -71,7 +44,7 @@ export function LabelReport({
 
   const filters: ReportFilters = useMemo(() => {
     if (preset === 'custom') {
-      return { from: new Date(customFrom), to: new Date(customTo) }
+      return { from: new Date(`${customFrom}T00:00:00.000`), to: new Date(`${customTo}T23:59:59.999`) }
     }
     return getPresetRange(preset)
   }, [preset, customFrom, customTo])

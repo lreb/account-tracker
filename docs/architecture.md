@@ -170,6 +170,55 @@ When transferring between accounts with different currencies:
 
 ---
 
+## Date / Time Handling
+
+### Transaction date storage
+
+Transactions are saved as UTC ISO strings:
+
+```ts
+new Date(`${date}T${time}:00`).toISOString()
+// e.g. "2026-05-22T05:57:00.000Z"  ← 11:57 PM Chihuahua (UTC-6)
+```
+
+### Filter boundary rule — always use LOCAL time, never `Z`
+
+**Common pitfall:** writing `T23:59:59.999Z` for an end-of-day ceiling.
+
+- `T23:59:59.999Z` = 11:59 PM **UTC**.
+- A transaction entered at 11:57 PM in Chihuahua (UTC-6) is stored as `T05:57:00.000Z` (next UTC day). That is **after** the `T23:59:59.999Z` ceiling, so it is wrongly excluded.
+
+**Fix:** drop the `Z` suffix to create a **local-time** boundary:
+
+```ts
+// ✅ Correct — local end-of-day
+new Date(`${dateTo}T23:59:59.999`)          // no Z → interpreted in the device's local timezone
+// In UTC-6 this becomes T05:59:59.999Z     → correctly covers all same-day local transactions
+
+// ❌ Wrong — UTC end-of-day
+new Date(`${dateTo}T23:59:59.999Z`)         // Z → hard UTC ceiling, excludes late-night local entries
+```
+
+Apply the same principle to start-of-day:
+
+```ts
+new Date(`${dateFrom}T00:00:00.000`)        // no Z → local midnight
+```
+
+### Special case — lexicographic string comparison (BalanceSheetDetailPage)
+
+`BalanceSheetDetailPage` compares `tx.date` (a UTC ISO string) with filter strings **lexicographically**, so both sides must be in the same UTC format:
+
+```ts
+const dateFromISO = new Date(`${filters.dateFrom}T00:00:00.000`).toISOString()
+const dateToISO   = new Date(`${filters.dateTo}T23:59:59.999`).toISOString()
+// Then: tx.date >= dateFromISO && tx.date <= dateToISO
+```
+
+Building the `Date` without `Z` first preserves local timezone intent; `.toISOString()` then converts it to the correct UTC string for the comparison.
+
+---
+
 ## Security & Privacy
 
 - No analytics, tracking pixels, or telemetry
