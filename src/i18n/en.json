@@ -120,7 +120,10 @@
       "lastQuarter": "Last quarter",
       "last6m": "Last 6 months",
       "lastYear": "Last year",
-      "all": "All time"
+      "all": "All time",
+      "custom": "Custom range",
+      "from": "From",
+      "to": "To"
     },
     "trendPeriod": {
       "3m": "3M",

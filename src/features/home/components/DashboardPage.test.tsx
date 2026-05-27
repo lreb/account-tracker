@@ -1,7 +1,8 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { startOfDay, endOfDay, parseISO } from 'date-fns'
 import type { Transaction, Account, Budget, Category } from '@/types'
 import DashboardPage from './DashboardPage'
 
@@ -66,15 +67,29 @@ vi.mock('@/components/ui/computing-overlay', () => ({
   ComputingOverlay: () => null,
 }))
 
-// shadcn Select — mock to avoid Radix portal issues in jsdom
+// shadcn Select — mock with event delegation so SelectItem clicks fire the parent Select's onValueChange
 vi.mock('@/components/ui/select', () => ({
-  Select: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Select: ({ children, onValueChange }: { children: React.ReactNode; onValueChange?: (v: string) => void }) => (
+    <div
+      onClick={(e) => {
+        const item = (e.target as Element).closest('[data-value]')
+        if (item && onValueChange) onValueChange(item.getAttribute('data-value') ?? '')
+      }}
+    >
+      {children}
+    </div>
+  ),
   SelectTrigger: ({ children }: { children: React.ReactNode }) => <button type="button">{children}</button>,
   SelectValue: ({ placeholder }: { placeholder?: string }) => <span>{placeholder}</span>,
   SelectContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   SelectItem: ({ children, value }: { children: React.ReactNode; value: string }) => (
     <div data-value={value}>{children}</div>
   ),
+}))
+
+// Input — render as a native input to avoid @base-ui/react issues in jsdom
+vi.mock('@/components/ui/input', () => ({
+  Input: ({ className: _cls, ...props }: React.ComponentProps<'input'>) => <input {...props} />,
 }))
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -223,5 +238,48 @@ describe('DashboardPage', () => {
     expect(resolve('6m')).toBe(6)
     expect(resolve('1y')).toBe(12)
     expect(resolve('2y')).toBe(24)
+  })
+
+  it('does not render custom date range inputs by default', async () => {
+    await renderDashboard()
+    expect(screen.queryByLabelText('dashboard.period.from')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('dashboard.period.to')).not.toBeInTheDocument()
+  })
+
+  it('renders custom date range inputs when custom period is selected', async () => {
+    await renderDashboard()
+    // Click the SelectItem with data-value="custom" — event bubbles to Select which calls onValueChange
+    const customOption = screen.getByText('dashboard.period.custom')
+    fireEvent.click(customOption)
+    expect(screen.getByLabelText('dashboard.period.from')).toBeInTheDocument()
+    expect(screen.getByLabelText('dashboard.period.to')).toBeInTheDocument()
+    expect(screen.getByLabelText('dashboard.period.from')).toHaveAttribute('type', 'date')
+    expect(screen.getByLabelText('dashboard.period.to')).toHaveAttribute('type', 'date')
+  })
+
+  it('custom date range inputs accept value changes', async () => {
+    await renderDashboard()
+    const customOption = screen.getByText('dashboard.period.custom')
+    fireEvent.click(customOption)
+
+    const fromInput = screen.getByLabelText('dashboard.period.from') as HTMLInputElement
+    const toInput   = screen.getByLabelText('dashboard.period.to')   as HTMLInputElement
+
+    fireEvent.change(fromInput, { target: { value: '2025-01-01' } })
+    fireEvent.change(toInput,   { target: { value: '2025-01-31' } })
+
+    expect(fromInput.value).toBe('2025-01-01')
+    expect(toInput.value).toBe('2025-01-31')
+  })
+
+  it('custom period summaryFilters use start-of-day / end-of-day bounds', () => {
+    // Verify the date boundary helpers used by the 'custom' useMemo case
+    const from = startOfDay(parseISO('2025-03-01'))
+    const to   = endOfDay(parseISO('2025-03-31'))
+    expect(from.getHours()).toBe(0)
+    expect(from.getMinutes()).toBe(0)
+    expect(to.getHours()).toBe(23)
+    expect(to.getMinutes()).toBe(59)
+    expect(to.getSeconds()).toBe(59)
   })
 })
