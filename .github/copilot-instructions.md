@@ -254,6 +254,17 @@ Each Zustand store is a hook. All mutations write through to Dexie and surface e
 - Labels are stored as `string[]` on the transaction; the `labels` table is used only for managing available label definitions
 - All user-facing strings must go through `react-i18next` — no hardcoded English strings in JSX
 
+### Version Management
+
+The application version is automatically read from `package.json` at build time and displayed in the Sidebar.
+
+**To update the version:**
+1. Edit the `version` field in `package.json` (e.g., `"version": "1.0.6"`)
+2. The version is automatically exposed globally as `__APP_VERSION__` via Vite's `define` option in `vite.config.ts`
+3. The Sidebar component (`src/components/layout/Sidebar.tsx`) displays it below the app name
+
+**No other files need to be updated** — the version is the single source of truth in `package.json`.
+
 ### Exchange Rates & Multi-Currency
 
 The app uses **Frankfurter v2 API** (`https://api.frankfurter.dev/v2`) for exchange rates (no API key required).

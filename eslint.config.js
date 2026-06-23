@@ -20,6 +20,7 @@ export default [
       globals: {
         ...globals.browser,
         ...globals.es2020,
+        __APP_VERSION__: 'readonly',
       },
     },
     plugins: {
