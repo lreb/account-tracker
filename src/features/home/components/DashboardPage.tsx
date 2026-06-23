@@ -1,7 +1,7 @@
 import { useMemo, useDeferredValue, useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns'
+import { startOfMonth, endOfMonth, startOfDay, endOfDay, parseISO, subMonths, format } from 'date-fns'
 import { TrendingUp, TrendingDown, ArrowRight } from 'lucide-react'
 
 import { useTransactionsStore } from '@/stores/transactions.store'
@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ComputingOverlay } from '@/components/ui/computing-overlay'
+import { Input } from '@/components/ui/input'
 
 export default function DashboardPage() {
   const { t } = useTranslation()
@@ -62,10 +63,12 @@ export default function DashboardPage() {
   const [now] = useState(() => new Date())
 
   // ── Period pickers ───────────────────────────────────────────────────────
-  type SummaryPeriod = 'this_month' | 'last_month' | 'last_quarter' | 'last_6m' | 'last_year' | 'all'
+  type SummaryPeriod = 'this_month' | 'last_month' | 'last_quarter' | 'last_6m' | 'last_year' | 'all' | 'custom'
 
   const [summaryPeriod, setSummaryPeriod] = useState<SummaryPeriod>('this_month')
   const [trendPeriod,   setTrendPeriod]   = useState<TrendPeriod>('6m')
+  const [customFrom,    setCustomFrom]    = useState(() => format(startOfMonth(now), 'yyyy-MM-dd'))
+  const [customTo,      setCustomTo]      = useState(() => format(endOfMonth(now), 'yyyy-MM-dd'))
 
   const summaryPeriodLabels: Record<SummaryPeriod, string> = {
     this_month:   t('dashboard.period.thisMonth'),
@@ -74,6 +77,7 @@ export default function DashboardPage() {
     last_6m:      t('dashboard.period.last6m'),
     last_year:    t('dashboard.period.lastYear'),
     all:          t('dashboard.period.all'),
+    custom:       t('dashboard.period.custom'),
   }
 
   // Map summary period → { current, prev } ReportFilters.
@@ -110,6 +114,11 @@ export default function DashboardPage() {
           summaryFilters: { from: startOfMonth(subMonths(now, 11)), to: endOfMonth(now) },
           prevFilters:    { from: startOfMonth(subMonths(now, 23)), to: endOfMonth(subMonths(now, 12)) },
         }
+      case 'custom': {
+        const from = customFrom ? startOfDay(parseISO(customFrom)) : startOfMonth(now)
+        const to   = customTo   ? endOfDay(parseISO(customTo))     : endOfMonth(now)
+        return { summaryFilters: { from, to }, prevFilters: null }
+      }
       case 'all':
       default:
         return {
@@ -117,7 +126,7 @@ export default function DashboardPage() {
           prevFilters:    null,
         }
     }
-  }, [summaryPeriod, now])
+  }, [summaryPeriod, now, customFrom, customTo])
 
   const trendMonths = trendPeriod === '3m' ? 3 : trendPeriod === '6m' ? 6 : trendPeriod === '1y' ? 12 : 24
 
@@ -212,7 +221,7 @@ export default function DashboardPage() {
 
       {/* ── Summary period picker + income/expenses/net ──────────────── */}
       <div className="space-y-3">
-        <div className="flex items-center justify-end">
+        <div className="flex flex-col gap-2 items-end">
           <Select value={summaryPeriod} onValueChange={(v) => setSummaryPeriod(v as SummaryPeriod)}>
             <SelectTrigger className="h-7 w-36 text-xs">
               <SelectValue>{summaryPeriodLabels[summaryPeriod]}</SelectValue>
@@ -224,8 +233,35 @@ export default function DashboardPage() {
               <SelectItem value="last_6m">{t('dashboard.period.last6m')}</SelectItem>
               <SelectItem value="last_year">{t('dashboard.period.lastYear')}</SelectItem>
               <SelectItem value="all">{t('dashboard.period.all')}</SelectItem>
+              <SelectItem value="custom">{t('dashboard.period.custom')}</SelectItem>
             </SelectContent>
           </Select>
+          {summaryPeriod === 'custom' && (
+            <div className="flex items-center gap-2 text-xs w-full">
+              <label htmlFor="dash-custom-from" className="text-gray-500 shrink-0">
+                {t('dashboard.period.from')}
+              </label>
+              <Input
+                id="dash-custom-from"
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                max={customTo}
+                className="h-7 flex-1 min-w-0 text-xs"
+              />
+              <label htmlFor="dash-custom-to" className="text-gray-500 shrink-0">
+                {t('dashboard.period.to')}
+              </label>
+              <Input
+                id="dash-custom-to"
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                min={customFrom}
+                className="h-7 flex-1 min-w-0 text-xs"
+              />
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-3">

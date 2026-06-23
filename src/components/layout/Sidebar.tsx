@@ -88,9 +88,14 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
       >
         {/* Sidebar header */}
         <div className="flex items-center justify-between h-14 px-4 border-b shrink-0">
-          <span className="font-semibold text-lg tracking-tight text-gray-900">
-            ExpenseTracking
-          </span>
+          <div className="flex flex-col">
+            <span className="font-semibold text-lg tracking-tight text-gray-900">
+              ExpenseTracking
+            </span>
+            <span className="text-[10px] text-gray-400 font-mono">
+              v{__APP_VERSION__}
+            </span>
+          </div>
           <button
             type="button"
             onClick={onClose}
