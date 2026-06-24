@@ -102,6 +102,7 @@ export default function AiAnalysisPanel() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { transactions } = useTransactionsStore()
+  const loadAllTransactions = useTransactionsStore((s) => s.load)
   const { categories } = useCategoriesStore()
   const { budgets } = useBudgetsStore()
   const { aiProvider, aiApiKey, aiBaseUrl, aiModel, baseCurrency } = useSettingsStore()
@@ -123,11 +124,15 @@ export default function AiAnalysisPanel() {
   const period = format(new Date(), 'yyyy-MM')
   const scopeButtonLabel = getScopeLabel(scope, t)
 
-  // Load AI analyses on mount and cleanup old ones
+  // Load AI analyses on mount and cleanup old ones.
+  // Also reload ALL transactions (no date filter) — TransactionListPage replaces
+  // the store with a date-filtered slice; without this reload the analysis
+  // would only see that limited subset. Matches the same pattern in DashboardPage.
   useEffect(() => {
+    void loadAllTransactions()
     void load()
     void cleanupOld()
-  }, [load, cleanupOld])
+  }, [loadAllTransactions, load, cleanupOld])
 
   // Check for cached analysis when analyses or period changes
   useEffect(() => {
