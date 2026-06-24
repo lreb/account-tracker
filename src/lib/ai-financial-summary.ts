@@ -33,10 +33,13 @@ function toBase(tx: Transaction): number {
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Builds a sanitised financial summary for the given reference month.
+ * Builds a sanitised financial summary for the given reference month or custom date range.
  * This is the mandatory data gate — only aggregated category totals are
  * included. Raw descriptions, notes, account names, and individual amounts
  * are never present in the output.
+ *
+ * @param customStartDate - Optional start date for custom range analysis (e.g., 30/90/365-day scope)
+ * @param customEndDate - Optional end date for custom range analysis
  */
 export function buildFinancialSummary(
   transactions: Transaction[],
@@ -44,12 +47,19 @@ export function buildFinancialSummary(
   budgets: Budget[],
   baseCurrency: string,
   referenceDate: Date = new Date(),
+  customStartDate?: Date,
+  customEndDate?: Date,
 ): FinancialSummary {
-  const start = startOfMonth(referenceDate)
-  const end = endOfMonth(referenceDate)
+  const start = customStartDate ?? startOfMonth(referenceDate)
+  const end = customEndDate ?? endOfMonth(referenceDate)
   const startStr = start.toISOString()
   const endStr = end.toISOString()
-  const period = format(referenceDate, 'yyyy-MM')
+  
+  // Period label: use YYYY-MM for month analysis, date range for custom periods
+  // For custom dates, format in local time to avoid UTC conversion changing the date
+  const period = customStartDate
+    ? `${format(start, 'yyyy-MM-dd')} to ${format(end, 'yyyy-MM-dd')}`
+    : format(referenceDate, 'yyyy-MM')
 
   const catMap = new Map(categories.map((c) => [c.id, c.name]))
 
@@ -137,9 +147,11 @@ export function buildFinancialSummary(
   }))
 
   // Spending projection
-  const daysInMonth = getDaysInMonth(referenceDate)
+  const totalDaysInPeriod = Math.max(1, differenceInCalendarDays(end, start) + 1)
   const daysElapsed = Math.max(1, differenceInCalendarDays(referenceDate, start) + 1)
-  const projectedMonthlyExpense = Math.round((totalExpenses / daysElapsed) * daysInMonth)
+  // For custom ranges, project to end of range; for monthly, project to end of month
+  const projectionTarget = customStartDate ? totalDaysInPeriod : getDaysInMonth(referenceDate)
+  const projectedMonthlyExpense = Math.round((totalExpenses / daysElapsed) * projectionTarget)
 
   return {
     period,
@@ -158,17 +170,24 @@ export function buildFinancialSummary(
  * Serialises the summary to a plain-text prompt payload.
  * This is the only content sent to the AI — never raw transactions or IDs.
  */
-export function summaryToPrompt(summary: FinancialSummary): string {
+export function summaryToPrompt(summary: FinancialSummary, transactionCount?: number, periodLabel?: string): string {
   const fmt = (cents: number) => `${(cents / 100).toFixed(2)} ${summary.baseCurrency}`
 
   const lines: string[] = [
-    `Financial Summary — ${summary.period}`,
+    `Financial Summary — ${periodLabel || summary.period}`,
     `Base currency: ${summary.baseCurrency}`,
+  ]
+
+  if (transactionCount !== undefined) {
+    lines.push(`Transactions analyzed: ${transactionCount}`)
+  }
+
+  lines.push(
     '',
     `Income:   ${fmt(summary.totalIncome)}`,
     `Expenses: ${fmt(summary.totalExpenses)}`,
     `Net:      ${fmt(summary.netCashFlow)}`,
-  ]
+  )
 
   if (summary.byCategory.length > 0) {
     lines.push('', 'Spending by category:')

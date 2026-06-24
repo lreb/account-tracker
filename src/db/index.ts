@@ -1,7 +1,8 @@
-// Current DB version: 8
+// Current DB version: 9
 import Dexie, { type Table } from 'dexie'
 import type {
   Account,
+  AiAnalysis,
   Budget,
   Category,
   ExchangeRate,
@@ -26,6 +27,7 @@ class ExpenseTrackingDB extends Dexie {
   fuelLogs!: Table<FuelLog, string>
   vehicleServices!: Table<VehicleService, string>
   recurringTransactions!: Table<RecurringTransaction, string>
+  aiAnalyses!: Table<AiAnalysis, string>
 
   constructor() {
     super('ExpenseTracking')
@@ -84,6 +86,10 @@ class ExpenseTrackingDB extends Dexie {
     // Version 8: add recurringTransactions table for scheduled/reminder transactions
     this.version(8).stores({
       recurringTransactions: 'id, nextDueDate, accountId, categoryId, active',
+    })
+    // Version 9: add aiAnalyses table for AI analysis history and caching
+    this.version(9).stores({
+      aiAnalyses: 'id, period, createdAt',
     })
   }
 }

@@ -348,3 +348,169 @@ describe('summaryToPrompt — privacy gate', () => {
     expect(prompt).toContain('200.00 USD')
   })
 })
+
+// ─── buildFinancialSummary — custom date range ────────────────────────────────
+
+describe('buildFinancialSummary — custom date range', () => {
+  it('uses custom date range when provided (30-day scope)', () => {
+    // Simulate 30-day analysis: May 25 - Jun 24, 2025 (local time)
+    const customStart = new Date('2025-05-25T00:00:00')
+    const customEnd = new Date('2025-06-24T23:59:59')
+    const referenceDate = customEnd
+
+    // Transactions spanning both months
+    const txs: Transaction[] = [
+      {
+        id: 'tx-may-1',
+        date: '2025-05-26T10:00:00Z',
+        type: 'expense',
+        amount: 10000, // $100
+        categoryId: 'food',
+        accountId: 'checking',
+        status: 'cleared',
+        description: 'May grocery',
+        currency: 'USD',
+      },
+      {
+        id: 'tx-jun-1',
+        date: '2025-06-10T10:00:00Z',
+        type: 'expense',
+        amount: 15000, // $150
+        categoryId: 'transport',
+        accountId: 'checking',
+        status: 'cleared',
+        description: 'June transport',
+        currency: 'USD',
+      },
+    ]
+
+    const summary = buildFinancialSummary(
+      txs,
+      CATEGORIES,
+      [],
+      'USD',
+      referenceDate,
+      customStart,
+      customEnd,
+    )
+
+    // Should include both May and June transactions
+    expect(summary.totalExpenses).toBe(25000) // $100 + $150
+    // Period uses ISO string date part, so expect YYYY-MM-DD format
+    expect(summary.period).toContain('2025-05-25')
+    expect(summary.period).toContain('2025-06-24')
+    expect(summary.byCategory).toHaveLength(2)
+  })
+
+  it('sets period label to date range format for custom dates', () => {
+    const customStart = new Date('2025-04-01T00:00:00')
+    const customEnd = new Date('2025-06-30T23:59:59')
+    
+    const summary = buildFinancialSummary(
+      [],
+      CATEGORIES,
+      [],
+      'USD',
+      customEnd,
+      customStart,
+      customEnd,
+    )
+
+    expect(summary.period).toContain('2025-04-01')
+    expect(summary.period).toContain('2025-06-30')
+  })
+
+  it('projects to end of custom range, not end of month', () => {
+    const customStart = new Date('2025-06-01T00:00:00')
+    const customEnd = new Date('2025-06-20T23:59:59') // 20-day period
+    const referenceDate = new Date('2025-06-10T12:00:00') // Somewhere in the middle
+
+    const txs: Transaction[] = [
+      {
+        id: 'tx-1',
+        date: '2025-06-05T10:00:00Z',
+        type: 'expense',
+        amount: 10000, // $100
+        categoryId: 'food',
+        accountId: 'checking',
+        status: 'cleared',
+        description: 'Test',
+        currency: 'USD',
+      },
+    ]
+
+    const summary = buildFinancialSummary(
+      txs,
+      CATEGORIES,
+      [],
+      'USD',
+      referenceDate,
+      customStart,
+      customEnd,
+    )
+
+    // Days elapsed from Jun 1 to Jun 10 (inclusive) = 10 days
+    // Total days Jun 1 to Jun 20 (inclusive) = 20 days
+    // $100 spent in 10 days → ($100 / 10) * 20 = $200 projected for full 20-day range
+    expect(summary.projection.daysElapsed).toBe(10)
+    expect(summary.projection.projectedMonthlyExpense).toBe(20000)
+  })
+
+  it('falls back to monthly analysis when custom dates are not provided', () => {
+    const referenceDate = new Date('2025-04-15T12:00:00Z')
+    
+    const summary = buildFinancialSummary(
+      TRANSACTIONS_APRIL,
+      CATEGORIES,
+      [],
+      'USD',
+      referenceDate,
+    )
+
+    // Should use month-based period and projection
+    expect(summary.period).toBe('2025-04')
+    expect(summary.projection.daysElapsed).toBe(15) // Mid-April
+  })
+
+  it('excludes cancelled transactions even with custom date range', () => {
+    const customStart = new Date('2025-05-01T00:00:00')
+    const customEnd = new Date('2025-05-31T23:59:59')
+
+    const txs: Transaction[] = [
+      {
+        id: 'tx-active',
+        date: '2025-05-10T10:00:00Z',
+        type: 'expense',
+        amount: 10000,
+        categoryId: 'food',
+        accountId: 'checking',
+        status: 'cleared',
+        description: 'Active',
+        currency: 'USD',
+      },
+      {
+        id: 'tx-cancelled',
+        date: '2025-05-15T10:00:00Z',
+        type: 'expense',
+        amount: 50000,
+        categoryId: 'food',
+        accountId: 'checking',
+        status: 'cancelled',
+        description: 'Cancelled',
+        currency: 'USD',
+      },
+    ]
+
+    const summary = buildFinancialSummary(
+      txs,
+      CATEGORIES,
+      [],
+      'USD',
+      customEnd,
+      customStart,
+      customEnd,
+    )
+
+    expect(summary.totalExpenses).toBe(10000) // Only active transaction
+  })
+})

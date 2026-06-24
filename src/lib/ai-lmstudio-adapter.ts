@@ -98,4 +98,98 @@ export class LmStudioAdapter implements AiProvider {
     if (!content) throw new Error('Empty response from LM Studio')
     return content
   }
+
+  async chatStream(messages: AiMessage[], onChunk: (chunk: string) => void, signal?: AbortSignal): Promise<void> {
+    const origin = this.baseUrl.replace(/\/(api\/v1|v1)\/?$/, '').replace(/\/+$/, '')
+    const endpoint = `${origin}/api/v1/chat`
+
+    // Same message processing as non-streaming chat
+    const systemParts = messages.filter((m) => m.role === 'system').map((m) => m.content)
+    const conversationMessages = messages.filter((m) => m.role !== 'system')
+    const lastUserIdx = [...conversationMessages].reverse().findIndex((m) => m.role === 'user')
+    const lastUserContent =
+      lastUserIdx >= 0
+        ? conversationMessages[conversationMessages.length - 1 - lastUserIdx].content
+        : ''
+
+    const priorTurns = conversationMessages.slice(
+      0,
+      conversationMessages.length - 1 - lastUserIdx,
+    )
+    const transcriptParts = priorTurns.map(
+      (m) => `${m.role === 'assistant' ? 'Assistant' : 'User'}: ${m.content}`,
+    )
+
+    const systemPromptParts = [
+      ...systemParts,
+      ...(transcriptParts.length > 0
+        ? [`[Conversation so far]\n${transcriptParts.join('\n')}`]
+        : []),
+    ]
+
+    const body: Record<string, unknown> = {
+      model: this.model,
+      input: lastUserContent,
+      stream: true,
+    }
+    if (systemPromptParts.length > 0) body.system_prompt = systemPromptParts.join('\n\n')
+
+    let res: Response
+    try {
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal,
+      })
+    } catch (err) {
+      if (err instanceof TypeError) {
+        throw new Error(
+          `Cannot reach LM Studio at ${endpoint}. ` +
+            `Make sure LM Studio is running, the local server is enabled (port 1234), ` +
+            `and CORS is enabled: LM Studio → Settings → Local Server → Enable CORS.`,
+        )
+      }
+      throw err
+    }
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`LM Studio error ${res.status}${text ? `: ${text.slice(0, 200)}` : ''}`)
+    }
+
+    if (!res.body) throw new Error('No response body')
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n').filter((line) => line.trim() !== '')
+
+        for (const line of lines) {
+          const message = line.replace(/^data: /, '')
+          if (message === '[DONE]') return
+
+          try {
+            const parsed = JSON.parse(message)
+            // LM Studio streaming returns { output: [{type: 'message', content: '...'}], done: boolean }
+            const content = parsed.output?.find((item: { type: string; content: string }) => item.type === 'message')?.content
+            if (content) {
+              onChunk(content)
+            }
+            if (parsed.done) return
+          } catch {
+            // Skip invalid JSON chunks
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock()
+    }
+  }
 }

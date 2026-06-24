@@ -56,4 +56,72 @@ export class OpenAiCompatibleAdapter implements AiProvider {
     if (!content) throw new Error('Empty response from AI provider')
     return content
   }
+
+  async chatStream(messages: AiMessage[], onChunk: (chunk: string) => void, signal?: AbortSignal): Promise<void> {
+    const endpoint = `${this.baseUrl.replace(/\/+$/, '')}/chat/completions`
+    const trimmedApiKey = this.apiKey.trim()
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+
+    if (trimmedApiKey) {
+      headers.Authorization = `Bearer ${trimmedApiKey}`
+    }
+
+    let res: Response
+    try {
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ model: this.model, messages, max_tokens: 1000, stream: true }),
+        signal,
+      })
+    } catch (err) {
+      if (err instanceof TypeError) {
+        throw new Error(
+          `Cannot reach ${endpoint}. ` +
+            `If using a local provider (LM Studio, Ollama), make sure the server is running ` +
+            `and CORS is enabled in its settings.`,
+        )
+      }
+      throw err
+    }
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`AI API error ${res.status}${text ? `: ${text.slice(0, 200)}` : ''}`)
+    }
+
+    if (!res.body) throw new Error('No response body')
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n').filter((line) => line.trim() !== '')
+
+        for (const line of lines) {
+          const message = line.replace(/^data: /, '')
+          if (message === '[DONE]') return
+
+          try {
+            const parsed = JSON.parse(message)
+            const content = parsed.choices?.[0]?.delta?.content
+            if (content) {
+              onChunk(content)
+            }
+          } catch {
+            // Skip invalid JSON chunks
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock()
+    }
+  }
 }

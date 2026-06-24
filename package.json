@@ -1,7 +1,7 @@
 {
   "name": "expense-tracking",
   "private": true,
-  "version": "1.0.6",
+  "version": "1.1.0",
   "type": "module",
   "engines": {
     "node": "^20.19.0 || ^22.13.0 || >=24"
@@ -63,6 +63,7 @@
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
+    "fake-indexeddb": "^6.2.5",
     "globals": "^17.4.0",
     "husky": "^9.1.7",
     "jsdom": "^29.1.0",

@@ -232,10 +232,246 @@ New keys in the `settings` Dexie table (no migration needed — key/value store)
 
 ## Open Questions
 
-| # | Question |
+| # | Question | Status |
+|---|---|---|
+| Q1 | Persist AI conversation history? (session-only vs. new Dexie table) | ✅ **Resolved** — Implemented in DB v9 (see below) |
+| Q2 | Allow user-editable system prompt in Settings? | Open |
+| Q3 | Receipt scanning via camera + vision model? (deferred — requires camera API) | Deferred |
+| Q4 | MCP priority: Android Capacitor build or desktop PWA first? | Open |
+| Q5 | Strict JSON schema validation on webhook responses? | Open |
+
+---
+
+## Persistence Implementation (Completed)
+
+**Status:** Shipped in database version 9  
+**Feature:** AI analysis results are cached in IndexedDB to avoid redundant AI calls and preserve insights across navigation.
+
+### Schema Change
+
+Added `aiAnalyses` table to `src/db/index.ts`:
+
+```ts
+.version(9).stores({
+  aiAnalyses: 'id, period, createdAt'
+})
+```
+
+**`AiAnalysis` interface** (in `src/types/index.ts`):
+
+```ts
+export interface AiAnalysis {
+  id: string                    // nanoid
+  period: string                // "YYYY-MM"
+  scopeDays: 30 | 90 | 365      // analysis window
+  prompt: string                // financial summary sent to AI
+  response: string              // AI-generated text
+  provider: string              // e.g. "openai"
+  model: string                 // e.g. "gpt-4o-mini"
+  transactionCount: number      // snapshot of tx count for cache invalidation
+  createdAt: string             // ISO timestamp
+}
+```
+
+### Store Layer
+
+**`src/stores/ai-analyses.store.ts`** provides:
+
+| Method | Behavior |
 |---|---|
-| Q1 | Persist AI conversation history? (session-only vs. new Dexie table) |
-| Q2 | Allow user-editable system prompt in Settings? |
-| Q3 | Receipt scanning via camera + vision model? (deferred — requires camera API) |
-| Q4 | MCP priority: Android Capacitor build or desktop PWA first? |
-| Q5 | Strict JSON schema validation on webhook responses? |
+| `load()` | Loads last 24 analyses (2 years at 1/month) sorted by `createdAt` desc |
+| `add(analysis)` | Persists new analysis to Dexie + prepends to in-memory state |
+| `getLatestForPeriod(period)` | Returns most recent analysis for given period (e.g. "2026-04") or null |
+| `cleanupOld()` | Deletes analyses older than 12 months; silent failure |
+
+### Smart Cache Invalidation
+
+**`AiAnalysisPanel`** checks cache freshness before re-analyzing:
+
+1. **Cache hit:** If an analysis exists for the current period and `transactionCount` matches recent transaction count → show cached response
+2. **Cache miss:** If count differs → prompt user with "new transactions" indicator
+3. **Manual refresh:** User can force re-analysis via refresh button
+4. **Scope selector:** User chooses 30/90/365-day analysis window; scope changes invalidate cache
+
+### UI Enhancements
+
+- **Analysis scope dropdown:** 30 / 90 / 365 days (default: 90)
+- **Cache age indicator:** "Analyzed 3 hours ago" via `formatDistanceToNow` from `date-fns`
+- **Data changed badge:** Shows "• new transactions" when cache is stale
+- **Manual refresh button:** Forces new AI call even if cache is fresh
+- **Persistence:** Analysis survives page reload and navigation
+
+### Test Coverage
+
+**`src/stores/ai-analyses.store.test.ts`** — 13 tests (100% store coverage):
+- Load operations (sorting, limit, error handling)
+- Add operations (Dexie + state sync, error handling)
+- `getLatestForPeriod` (latest match, no match, empty state)
+- Cleanup (12-month retention, no-op when all recent, silent error handling)
+
+### Retention Policy
+
+- **Auto-cleanup:** Triggered on `AiAnalysisPanel` mount via `useEffect`
+- **Retention window:** 12 months from `createdAt`
+- **Load limit:** Only last 24 analyses loaded into memory (reduces bundle weight on large histories)
+
+### Data Preparation Fix (June 24, 2026)
+
+**Issue:** `buildFinancialSummary()` in `src/lib/ai-financial-summary.ts` was filtering transactions to the reference month only, ignoring custom date ranges passed from the scope selector. When user selected a 30-day scope (e.g., May 25 - June 24), the function re-filtered to June 1-24, discarding May transactions. This resulted in zero income/expenses being sent to the AI, producing generic advice.
+
+**Root Cause:** Lines 51-58 hard-coded `startOfMonth(referenceDate)` and `endOfMonth(referenceDate)` filtering, re-applying month boundaries to pre-filtered transaction arrays.
+
+**Fix:** Added optional `customStartDate` and `customEndDate` parameters to `buildFinancialSummary()`. When provided:
+- Uses custom date range instead of month boundaries for filtering
+- Period label changes from `"YYYY-MM"` to `"YYYY-MM-DD to YYYY-MM-DD"`
+- Projection logic adjusts to custom range length instead of days-in-month
+
+**Caller Update:** `AiAnalysisPanel.handleAnalyze()` now passes:
+```ts
+const startDate = subDays(now, scopeDays)
+buildFinancialSummary(transactions, categories, budgets, baseCurrency, now, startDate, now)
+```
+
+**Validation:** Added 5 new test cases in `ai-financial-summary.test.ts` covering:
+- 30-day cross-month analysis (May 25 - June 24)
+- Custom range period label formatting
+- Projection to end of custom range (not end of month)
+- Backward compatibility (monthly analysis when custom dates omitted)
+- Cancelled transaction exclusion with custom dates
+
+All 595 tests pass. Zero ESLint errors.
+
+---
+
+### Streaming & Enhanced Financial Expertise (June 24, 2026)
+
+**Motivation:** Initial AI responses were slow (5-10 seconds with no feedback), generic (basic system prompt), and lacking context (transaction count, period labels). Users needed:
+- Real-time feedback during analysis generation
+- Expert-level financial insights instead of generic advice
+- Richer context about their data (transaction volume, period type)
+
+**Changes Implemented:**
+
+#### 1. Enhanced System Prompt
+
+Replaced the basic "concise personal finance assistant" prompt with a detailed financial expert role:
+
+```ts
+const SYSTEM_PROMPT = `You are a highly skilled personal finance analyst with expertise in budgeting, expense tracking, and financial planning. Your role is to provide clear, actionable insights based on aggregated financial data, focusing on identifying budget overruns, unusual spending patterns, and opportunities for savings. 
+
+Your analysis should:
+- Provide 3-5 specific, actionable recommendations based strictly on the data provided
+- Focus on practical advice that can be implemented immediately to improve financial health and stability
+- Highlight trends, anomalies, and areas requiring attention
+- Be direct and professional, avoiding generic advice
+- Keep your response under 400 words
+- Use the transaction count and period information to contextualize your insights
+
+The user will share an aggregated financial summary (no personal names, no account details, only category totals and budget metrics).`
+```
+
+**Impact:** AI now provides context-aware, actionable recommendations instead of generic financial tips.
+
+#### 2. Streaming Response Support
+
+Added `chatStream()` method to all three AI provider adapters (`ai-openai-adapter.ts`, `ai-lmstudio-adapter.ts`, `ai-ollama-adapter.ts`):
+
+```ts
+interface AiProvider {
+  readonly id: string
+  readonly label: string
+  chat(messages: AiMessage[], signal?: AbortSignal): Promise<string>
+  chatStream(messages: AiMessage[], onChunk: (chunk: string) => void, signal?: AbortSignal): Promise<void>
+}
+```
+
+**Implementation Details:**
+
+| Adapter | Endpoint | Streaming Format |
+|---|---|---|
+| **OpenAI-compatible** | `POST /chat/completions` with `stream: true` | SSE with `data:` prefix, JSON chunks with `delta.content` |
+| **LM Studio** | `POST /api/v1/chat` with `stream: true` | SSE with `data:` prefix, JSON chunks with `output[].content` |
+| **Ollama** | `POST /api/chat` with `stream: true` | Newline-delimited JSON, chunks with `message.content`, `done` flag |
+
+**AiAnalysisPanel Integration:**
+
+```ts
+let accumulatedResponse = ''
+await ai.chatStream(
+  [
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'user', content: prompt },
+  ],
+  (chunk) => {
+    accumulatedResponse += chunk
+    setResponse(accumulatedResponse)
+  },
+  ctrl.signal,
+)
+```
+
+**User Experience:** Response text appears progressively as the AI generates it, providing immediate feedback and reducing perceived latency.
+
+#### 3. Enhanced Financial Summary
+
+Updated `summaryToPrompt()` to accept optional transaction count and period label:
+
+```ts
+export function summaryToPrompt(
+  summary: FinancialSummary, 
+  transactionCount?: number, 
+  periodLabel?: string
+): string
+```
+
+**New Context Fields:**
+- `Transactions analyzed: ${transactionCount}` — Shows data volume for context
+- `Financial Summary — ${periodLabel}` — Human-friendly period ("Current month", "Last quarter") instead of ISO dates
+
+**Example Output:**
+
+```
+Financial Summary — Last 3 months
+Base currency: MXN
+Transactions analyzed: 127
+
+Income:   12,500.00 MXN
+Expenses: 8,340.00 MXN
+Net:      4,160.00 MXN
+
+Spending by category:
+  Groceries: 2,100.00 MXN
+  Transportation: 1,850.00 MXN
+  Utilities: 980.00 MXN
+  ...
+
+Budget status:
+  Groceries: 87% used (2,100.00 of 2,400.00)
+  Transportation: 105% used (1,850.00 of 1,750.00)
+
+Month-end projection: 11,120.00 MXN
+(based on 24 days of data)
+```
+
+**Scope Label Helper:**
+
+Added `getScopeLabel()` function to generate human-friendly labels for all analysis periods:
+- `'current-month'` → "Current month"
+- `'last-quarter'` → "Last quarter"
+- `30` → "Last 30 days"
+
+**Validation:**
+- ✅ All 595 tests pass
+- ✅ Zero ESLint errors
+- ✅ Backward compatible with existing cached analyses
+- ✅ All three streaming adapters tested (OpenAI-compatible, LM Studio, Ollama)
+
+**Files Changed:**
+- `src/features/insights/components/AiAnalysisPanel.tsx` — System prompt, streaming integration, scope labels
+- `src/lib/ai-provider.ts` — Added `chatStream` to interface
+- `src/lib/ai-openai-adapter.ts` — Streaming implementation with SSE parsing
+- `src/lib/ai-lmstudio-adapter.ts` — Streaming with LM Studio-specific format
+- `src/lib/ai-ollama-adapter.ts` — Streaming with Ollama JSON format
+- `src/lib/ai-financial-summary.ts` — Enhanced `summaryToPrompt` with transaction count and period label
+
+---
