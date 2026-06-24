@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest'
+import 'fake-indexeddb/auto'
 
 // Node.js 26 defines localStorage / sessionStorage as experimental accessor
 // globals (getter + setter) that return undefined when --localstorage-file is

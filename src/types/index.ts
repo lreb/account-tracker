@@ -141,3 +141,17 @@ export interface RecurringTransaction {
   createdAt: string           // ISO 8601
   active: boolean             // false when paused or all occurrences completed
 }
+
+// ─── AI Analysis History ─────────────────────────────────────────────────────
+
+export interface AiAnalysis {
+  id: string
+  period: string              // "YYYY-MM" — month analysed
+  scopeDays: string | number  // 'current-month' | 'last-month' | 'last-3-months' | 'last-quarter' | 'last-6-months' | 'last-year' | 30 | 90 | 365
+  prompt: string              // serialized FinancialSummary sent to AI
+  response: string            // AI response text
+  provider: string            // "openai-compatible" | "anthropic" | "ollama" | etc.
+  model: string               // "gpt-4o-mini" | "claude-3-haiku" | etc.
+  transactionCount: number    // how many transactions were in the analysis
+  createdAt: string           // ISO 8601
+}

@@ -463,7 +463,21 @@
       "configureAction": "Configure AI",
       "response": "Response",
       "newAnalysis": "New Analysis",
-      "errorGeneric": "Could not get AI response. Check your API key and connection."
+      "errorGeneric": "Could not get AI response. Check your API key and connection.",
+      "analysisScope": "Analysis Period",
+      "scopeCurrentMonth": "Current month",
+      "scopeLastMonth": "Last month",
+      "scopeLast3Months": "Last 3 months",
+      "scopeLastQuarter": "Last quarter",
+      "scopeLast6Months": "Last 6 months",
+      "scopeLastYear": "Last year",
+      "scope30": "Last 30 days",
+      "scope90": "Last 90 days",
+      "scope365": "Last 365 days",
+      "analyzedAgo": "Analyzed {{time}}",
+      "dataChanged": "new transactions",
+      "cacheStillValid": "Using cached analysis. Data hasn't changed.",
+      "refresh": "Refresh"
     }
   },
   "reports": {

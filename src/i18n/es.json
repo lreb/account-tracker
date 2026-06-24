@@ -461,7 +461,21 @@
       "configureAction": "Configurar IA",
       "response": "Respuesta",
       "newAnalysis": "Nuevo análisis",
-      "errorGeneric": "No se pudo obtener respuesta de la IA. Verifica tu clave y conexión."
+      "errorGeneric": "No se pudo obtener respuesta de la IA. Verifica tu clave y conexión.",
+      "analysisScope": "Período de Análisis",
+      "scopeCurrentMonth": "Mes actual",
+      "scopeLastMonth": "Mes pasado",
+      "scopeLast3Months": "Últimos 3 meses",
+      "scopeLastQuarter": "Último trimestre",
+      "scopeLast6Months": "Últimos 6 meses",
+      "scopeLastYear": "Último año",
+      "scope30": "Últimos 30 días",
+      "scope90": "Últimos 90 días",
+      "scope365": "Últimos 365 días",
+      "analyzedAgo": "Analizado {{time}}",
+      "dataChanged": "nuevas transacciones",
+      "cacheStillValid": "Usando análisis guardado. Los datos no han cambiado.",
+      "refresh": "Actualizar"
     }
   },
   "reports": {

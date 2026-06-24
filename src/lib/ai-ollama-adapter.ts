@@ -52,4 +52,57 @@ export class OllamaAdapter implements AiProvider {
     if (!content) throw new Error('Empty response from Ollama')
     return content
   }
-}
+  async chatStream(messages: AiMessage[], onChunk: (chunk: string) => void, signal?: AbortSignal): Promise<void> {
+    const endpoint = `${this.baseUrl.replace(/\/+$/, '')}/api/chat`
+    let res: Response
+    try {
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: this.model, messages, stream: true }),
+        signal,
+      })
+    } catch (err) {
+      if (err instanceof TypeError) {
+        throw new Error(
+          `Cannot reach ${endpoint}. Make sure Ollama is running (check with 'ollama serve').`,
+        )
+      }
+      throw err
+    }
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      throw new Error(`Ollama API error ${res.status}${text ? `: ${text.slice(0, 200)}` : ''}`)
+    }
+
+    if (!res.body) throw new Error('No response body')
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n').filter((line) => line.trim() !== '')
+
+        for (const line of lines) {
+          try {
+            const parsed = JSON.parse(line)
+            const content = parsed.message?.content
+            if (content) {
+              onChunk(content)
+            }
+            if (parsed.done) return
+          } catch {
+            // Skip invalid JSON chunks
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock()
+    }
+  }}

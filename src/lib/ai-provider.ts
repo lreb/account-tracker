@@ -15,6 +15,7 @@ export interface AiProvider {
   readonly id: string
   readonly label: string
   chat(messages: AiMessage[], signal?: AbortSignal): Promise<string>
+  chatStream(messages: AiMessage[], onChunk: (chunk: string) => void, signal?: AbortSignal): Promise<void>
 }
 
 // Wire protocols:
