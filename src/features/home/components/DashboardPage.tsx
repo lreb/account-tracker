@@ -22,6 +22,7 @@ import { DashboardTrendChart } from './DashboardTrendChart'
 import type { TrendPeriod } from './DashboardTrendChart.types'
 import { DashboardBudgetHealth } from './DashboardBudgetHealth'
 import { DashboardRecentTransactions } from './DashboardRecentTransactions'
+import { DashboardCalendarHeatmap } from './DashboardCalendarHeatmap'
 import {
   Select,
   SelectContent,
@@ -309,6 +310,16 @@ export default function DashboardPage() {
           trendPeriod={trendPeriod}
           baseCurrency={baseCurrency}
           onPeriodChange={setTrendPeriod}
+        />
+      )}
+
+      {/* ── Calendar heatmap ─────────────────────────────────────────── */}
+      {visibleTransactions.length > 0 && (
+        <DashboardCalendarHeatmap
+          transactions={visibleTransactions}
+          baseCurrency={baseCurrency}
+          from={summaryFilters.from}
+          to={summaryFilters.to}
         />
       )}
 

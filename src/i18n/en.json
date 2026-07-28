@@ -130,6 +130,15 @@
       "6m": "6M",
       "1y": "1Y",
       "2y": "2Y"
+    },
+    "calendarHeatmap": {
+      "title": "Spending Calendar",
+      "income": "Income",
+      "expense": "Expense",
+      "net": "Net",
+      "prevMonth": "Previous month",
+      "nextMonth": "Next month",
+      "noData": "No transactions this month."
     }
   },
   "transactions": {
@@ -680,7 +689,7 @@
     "installAppBtn": "Install App",
     "installAppInstalledTitle": "App installed",
     "installAppInstalledDesc": "You're running the app from your home screen.",
-    "installAppIOSTitle": "Open in Safari and follow these steps:",
+    "installAppIOSTitle": "Follow these steps in Safari:",
     "installAppIOSStep1": "Tap the Share button in the toolbar",
     "installAppIOSStep2": "Select \"Add to Home Screen\"",
     "installAppIOSStep3": "Tap \"Add\" to confirm",

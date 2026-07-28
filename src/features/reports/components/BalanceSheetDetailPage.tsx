@@ -28,6 +28,7 @@ import { useGroupedTransactions } from '@/features/transactions/hooks/useGrouped
 import { ExportStatementButtons } from '@/components/ui/export-statement-buttons'
 import { BalanceSheetDetailFiltersSheet } from './BalanceSheetDetailFiltersSheet'
 import { EMPTY_FILTERS, type DetailFilters } from './balance-sheet-detail-filters.types'
+import { sortTransactionsNewestFirst } from '@/lib/transactions'
 import { getTransactionPresentation } from '../lib/transaction-presentation'
 
 // Persists scroll position across navigation (e.g. edit → back).
@@ -136,18 +137,18 @@ export default function BalanceSheetDetailPage() {
       return []
     }
 
-    return allTx
-      .filter((transaction) => isTransactionForAccount(transaction, account.id))
-      .sort((left, right) => right.date.localeCompare(left.date))
+    return sortTransactionsNewestFirst(
+      allTx.filter((transaction) => isTransactionForAccount(transaction, account.id))
+    )
   }, [account, allTx])
 
   const filteredAccountTransactions = useMemo(() => {
     const q = filters.search.trim().toLowerCase()
     const dateFromISO = filters.dateFrom ? new Date(`${filters.dateFrom}T00:00:00.000`).toISOString() : ''
     const dateToISO   = filters.dateTo   ? new Date(`${filters.dateTo}T23:59:59.999`).toISOString()   : ''
-    const all = transactions
-      .filter((transaction) => isTransactionForAccount(transaction, account?.id ?? ''))
-      .sort((left, right) => right.date.localeCompare(left.date))
+    const all = sortTransactionsNewestFirst(
+      transactions.filter((transaction) => isTransactionForAccount(transaction, account?.id ?? ''))
+    )
     return all.filter((tx) => {
       if (q && !tx.description.toLowerCase().includes(q) && !(tx.notes ?? '').toLowerCase().includes(q)) return false
       if (filters.status     && tx.status !== filters.status) return false

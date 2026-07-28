@@ -10,6 +10,7 @@ import {
   isTransactionForVisiblePrimaryAccount,
 } from '@/lib/accounts'
 import { getAccountBalanceAtDate } from '@/lib/balance-sheet'
+import { sortTransactionsNewestFirst } from '@/lib/transactions'
 import type { Transaction } from '@/types'
 import { db } from '@/db'
 import { TransactionList } from './TransactionList'
@@ -123,8 +124,8 @@ export default function TransactionListPage() {
       push(tx.accountId, tx)
       if (tx.toAccountId) push(tx.toAccountId, tx)
     }
-    for (const list of map.values()) {
-      list.sort((a, b) => b.date.localeCompare(a.date))
+    for (const [key, list] of map.entries()) {
+      map.set(key, sortTransactionsNewestFirst(list))
     }
     return map
   }, [allTx])

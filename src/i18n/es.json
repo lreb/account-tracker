@@ -130,6 +130,15 @@
       "6m": "6M",
       "1y": "1A",
       "2y": "2A"
+    },
+    "calendarHeatmap": {
+      "title": "Calendario de Gastos",
+      "income": "Ingresos",
+      "expense": "Gastos",
+      "net": "Neto",
+      "prevMonth": "Mes anterior",
+      "nextMonth": "Mes siguiente",
+      "noData": "Sin transacciones este mes."
     }
   },
   "transactions": {
@@ -678,7 +687,7 @@
     "installAppBtn": "Instalar App",
     "installAppInstalledTitle": "App instalada",
     "installAppInstalledDesc": "Estás usando la app desde tu pantalla de inicio.",
-    "installAppIOSTitle": "Abre Safari y sigue estos pasos:",
+    "installAppIOSTitle": "Sigue estos pasos en Safari:",
     "installAppIOSStep1": "Toca el botón Compartir en la barra de herramientas",
     "installAppIOSStep2": "Selecciona \"Agregar a pantalla de inicio\"",
     "installAppIOSStep3": "Toca \"Agregar\" para confirmar",

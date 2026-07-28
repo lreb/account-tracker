@@ -35,10 +35,12 @@ export interface UsePWAInstallReturn {
 }
 
 function detectIOS(): boolean {
-  const ua = navigator.userAgent.toLowerCase()
-  if (/iphone|ipad|ipod/.test(ua)) return true
-  // iPadOS 13+ reports "MacIntel" with touch support
-  return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
+  const ua = navigator.userAgent
+  if (/iPhone|iPad|iPod/i.test(ua)) return true
+  // iPadOS 13+ in Desktop mode: UA looks like a Mac but the device has touch points.
+  // Use the UA string (not the deprecated navigator.platform) so M-series iPads are
+  // also caught — they report the same Macintosh UA regardless of chip architecture.
+  return /Macintosh/i.test(ua) && navigator.maxTouchPoints > 1
 }
 
 function getIsStandalone(): boolean {
@@ -117,8 +119,12 @@ export function usePWAInstall(): UsePWAInstallReturn {
   // display-mode media queries are not fully initialized during the synchronous first
   // render — the post-mount effect gives the browser a tick to settle.
   useEffect(() => {
-    // Post-mount re-check (covers late display-mode initialization on Android).
-    setIsStandalone(getIsStandalone())
+    // Post-mount re-check (covers late display-mode initialization on Android WebAPK
+    // builds and iOS where navigator.standalone may not be ready during the first
+    // synchronous render).
+    const standalone = getIsStandalone()
+    setIsStandalone(standalone)
+    if (standalone) setIsInstalled(true)
 
     const queries = [
       window.matchMedia('(display-mode: browser)'),
