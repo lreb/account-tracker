@@ -24,6 +24,7 @@ import {
 } from '@/lib/balance-sheet'
 import { formatCurrency } from '@/lib/currency'
 import { db } from '@/db'
+import { sortTransactionsNewestFirst } from '@/lib/transactions'
 import type { Account, AccountType, Transaction } from '@/types'
 
 import { Button } from '@/components/ui/button'
@@ -163,7 +164,9 @@ export default function BalanceSheetPage() {
 
   const snapshots = useMemo(() => {
     const rawSnapshots = visibleAccounts.map((account) => {
-      const accountTransactions = allTx.filter((tx) => isTransactionForAccount(tx, account.id))
+      const accountTransactions = sortTransactionsNewestFirst(
+        allTx.filter((tx) => isTransactionForAccount(tx, account.id))
+      )
       const currentBalance = getAccountBalanceAtDate(account, accountTransactions, new Date())
       const previousBalance = getAccountBalanceAtDate(account, accountTransactions, comparisonDate)
       const delta = currentBalance - previousBalance

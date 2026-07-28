@@ -189,20 +189,28 @@ describe('usePWAInstall', () => {
       expect(result.current.isIOS).toBe(true)
     })
 
-    it('detects iPadOS 13+ via MacIntel + maxTouchPoints > 1', () => {
+    it('detects iPadOS 13+ via Mac-like UA + maxTouchPoints > 1', () => {
       setNavigator({
         userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-        platform: 'MacIntel',
         maxTouchPoints: 5,
       })
       const { result } = renderHook(() => usePWAInstall())
       expect(result.current.isIOS).toBe(true)
     })
 
-    it('does NOT detect a Mac desktop as iOS (MacIntel, 0 touch points)', () => {
+    it('detects M-series iPad via Mac-like UA + maxTouchPoints > 1', () => {
+      // M1/M2/M4 iPads in Desktop mode send the same Macintosh UA regardless of chip
+      setNavigator({
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15',
+        maxTouchPoints: 5,
+      })
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isIOS).toBe(true)
+    })
+
+    it('does NOT detect a Mac desktop as iOS (Macintosh UA, 0 touch points)', () => {
       setNavigator({
         userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-        platform: 'MacIntel',
         maxTouchPoints: 0,
       })
       const { result } = renderHook(() => usePWAInstall())
