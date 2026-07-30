@@ -166,7 +166,7 @@ export default function AccountFormPage() {
               setValue('subtype', '', { shouldDirty: true })
             }}
           >
-            <SelectTrigger>
+            <SelectTrigger className="w-full">
               <SelectValue>
                 {t(`accounts.types.${watchType}`)}
               </SelectValue>
@@ -187,7 +187,7 @@ export default function AccountFormPage() {
             value={watchSubtype || getOtherSubtypeValue(watchType)}
             onValueChange={(value) => setValue('subtype', value ?? '', { shouldDirty: true })}
           >
-            <SelectTrigger>
+            <SelectTrigger className="w-full">
               <SelectValue>
                 {(() => {
                   const option = subtypeOptions.find((subtype) => subtype.value === watchSubtype)
@@ -212,7 +212,7 @@ export default function AccountFormPage() {
             value={watch('currency')}
             onValueChange={(value) => setValue('currency', value ?? '')}
           >
-            <SelectTrigger>
+            <SelectTrigger className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
