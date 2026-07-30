@@ -12,7 +12,9 @@ export function sortTransactionsNewestFirst(txs: Transaction[]): Transaction[] {
   return [...txs].sort((a, b) => {
     const dateDiff = b.date.localeCompare(a.date)
     if (dateDiff !== 0) return dateDiff
-    // Tie-break: higher numeric id = inserted later = more recent
-    return Number(b.id) - Number(a.id)
+    // Tie-break: lexicographic id comparison — UUID v4s are random but this
+    // guarantees a consistent, deterministic order within the same timestamp
+    // across every call site. Number(uuid) returns NaN and does not work.
+    return b.id.localeCompare(a.id)
   })
 }

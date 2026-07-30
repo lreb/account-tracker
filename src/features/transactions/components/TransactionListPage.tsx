@@ -51,7 +51,9 @@ export default function TransactionListPage() {
   const accountMap        = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
 
   const visibleTransactions = useMemo(
-    () => transactions.filter((tx) => isTransactionForVisiblePrimaryAccount(tx, visibleAccountIds)),
+    () => sortTransactionsNewestFirst(
+      transactions.filter((tx) => isTransactionForVisiblePrimaryAccount(tx, visibleAccountIds)),
+    ),
     [transactions, visibleAccountIds],
   )
 

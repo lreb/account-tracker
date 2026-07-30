@@ -113,7 +113,7 @@ export default function CategoryDialog({
           <div className="space-y-1">
             <Label>{t('categories.type')}</Label>
             <Select value={watchType} onValueChange={(v) => setValue('type', v as CategoryType)}>
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue>
                   {t(`categories.types.${watchType}`)}
                 </SelectValue>
