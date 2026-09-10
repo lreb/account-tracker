@@ -31,6 +31,14 @@ export interface UsePWAInstallReturn {
    */
   isStandalone: boolean
   isIOS: boolean
+  /**
+   * True when running on a real Mac desktop (Macintosh UA that is NOT an iPad in
+   * desktop mode). Safari on macOS can only install the app via "Add to Dock" on
+   * macOS Sonoma (14) or later; older macOS versions require Chrome or Edge.
+   */
+  isMacOS: boolean
+  /** True when the browser is Safari (desktop or iOS). Chrome, Edge, Firefox return false. */
+  isSafari: boolean
   install: () => Promise<void>
 }
 
@@ -41,6 +49,18 @@ function detectIOS(): boolean {
   // Use the UA string (not the deprecated navigator.platform) so M-series iPads are
   // also caught — they report the same Macintosh UA regardless of chip architecture.
   return /Macintosh/i.test(ua) && navigator.maxTouchPoints > 1
+}
+
+function detectMacOS(): boolean {
+  const ua = navigator.userAgent
+  return /Macintosh/i.test(ua) && !detectIOS()
+}
+
+function detectSafari(): boolean {
+  // Safari UA includes "Safari/" but not Chromium's "Chrome"/"CriOS"/"Edg" markers
+  // (Chromium UAs contain "Safari/537.36"). Firefox has neither.
+  const ua = navigator.userAgent
+  return /\bSafari\//.test(ua) && !/Chrome|CriOS|Edg\//i.test(ua)
 }
 
 function getIsStandalone(): boolean {
@@ -111,6 +131,8 @@ export function usePWAInstall(): UsePWAInstallReturn {
   const isInstallingRef = useRef(false)
 
   const isIOS = detectIOS()
+  const isMacOS = detectMacOS()
+  const isSafari = detectSafari()
 
   // Keep isStandalone in sync with display-mode media query changes (e.g. user drags the
   // PWA window into a browser tab on desktop, or the OS opens the PWA in a tab after an
@@ -183,6 +205,8 @@ export function usePWAInstall(): UsePWAInstallReturn {
     isInstalled,
     isStandalone,
     isIOS,
+    isMacOS,
+    isSafari,
     install,
   }
 }

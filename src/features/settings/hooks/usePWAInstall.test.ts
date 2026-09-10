@@ -91,6 +91,8 @@ describe('usePWAInstall', () => {
       expect(result.current.isInstallable).toBe(false)
       expect(result.current.isInstalled).toBe(false)
       expect(result.current.isIOS).toBe(false)
+      expect(result.current.isMacOS).toBe(false)
+      expect(result.current.isSafari).toBe(false)
       expect(typeof result.current.install).toBe('function')
     })
 
@@ -215,6 +217,68 @@ describe('usePWAInstall', () => {
       })
       const { result } = renderHook(() => usePWAInstall())
       expect(result.current.isIOS).toBe(false)
+    })
+  })
+
+  // ── isMacOS / isSafari detection ────────────────────────────────────────
+
+  describe('isMacOS / isSafari detection', () => {
+    it('detects a Mac desktop (Macintosh UA, 0 touch points) as macOS', () => {
+      setNavigator({
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15',
+        maxTouchPoints: 0,
+      })
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isMacOS).toBe(true)
+      expect(result.current.isIOS).toBe(false)
+    })
+
+    it('does NOT detect an iPad in desktop mode as macOS', () => {
+      setNavigator({
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+        maxTouchPoints: 5,
+      })
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isMacOS).toBe(false)
+      expect(result.current.isIOS).toBe(true)
+    })
+
+    it('does NOT detect Windows as macOS', () => {
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isMacOS).toBe(false)
+    })
+
+    it('does NOT detect iPhone as macOS', () => {
+      setNavigator({ userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)' })
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isMacOS).toBe(false)
+    })
+
+    it('detects Safari on a Mac', () => {
+      setNavigator({
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15',
+        maxTouchPoints: 0,
+      })
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isSafari).toBe(true)
+    })
+
+    it('does NOT detect Chrome on a Mac as Safari', () => {
+      setNavigator({
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        maxTouchPoints: 0,
+      })
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isSafari).toBe(false)
+    })
+
+    it('does NOT detect Firefox as Safari', () => {
+      setNavigator({
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:127.0) Gecko/20100101 Firefox/127.0',
+        maxTouchPoints: 0,
+      })
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isSafari).toBe(false)
     })
   })
 
