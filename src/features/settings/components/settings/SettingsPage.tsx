@@ -16,7 +16,7 @@ const settingsItems = [
 
 export default function SettingsPage() {
   const { t } = useTranslation()
-  const { isInstallable, isInstalled, isStandalone, isIOS, install } = usePWAInstall()
+  const { isInstallable, isInstalled, isStandalone, isIOS, isMacOS, isSafari, install } = usePWAInstall()
 
   return (
     <div className="p-4 pb-24 space-y-4">
@@ -82,6 +82,31 @@ export default function SettingsPage() {
                 <span>{t('settings.installAppIOSStep3')}</span>
               </li>
             </ol>
+          </div>
+        ) : isMacOS && isSafari ? (
+          <div className="px-4 py-4 space-y-3">
+            <div className="flex items-start gap-3">
+              <Smartphone size={20} className="text-gray-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium">{t('settings.installApp')}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{t('settings.installAppMacOSSafariTitle')}</p>
+              </div>
+            </div>
+            <ol className="space-y-2 pl-1">
+              <li className="flex items-center gap-2 text-xs text-gray-600">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-bold text-gray-500">1</span>
+                <span>{t('settings.installAppMacOSStep1')}</span>
+              </li>
+              <li className="flex items-center gap-2 text-xs text-gray-600">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-bold text-gray-500">2</span>
+                <span>{t('settings.installAppMacOSStep2')}</span>
+              </li>
+              <li className="flex items-center gap-2 text-xs text-gray-600">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-bold text-gray-500">3</span>
+                <span>{t('settings.installAppMacOSStep3')}</span>
+              </li>
+            </ol>
+            <p className="text-xs text-gray-500">{t('settings.installAppMacOSOldOSHint')}</p>
           </div>
         ) : (
           <div className="flex items-start gap-3 px-4 py-4">
