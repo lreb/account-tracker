@@ -8,10 +8,10 @@ import {
   getOtherSubtypeLabelKey,
 } from '@/constants/account-subtypes'
 import { getActiveAccounts, sortAccounts } from '@/lib/accounts'
-import { getAccountBalanceAtDate, isTransactionForAccount } from '@/lib/balance-sheet'
 import { useAccountsStore } from '@/stores/accounts.store'
+import { useBalancesStore } from '@/stores/balances.store'
 import { useTransactionsStore } from '@/stores/transactions.store'
-import type { Account, AccountType, Transaction } from '@/types'
+import type { Account, AccountType } from '@/types'
 import { formatCurrency } from '@/lib/currency'
 import { db } from '@/db'
 
@@ -39,9 +39,6 @@ export default function AccountsSettingsPage() {
   const { accounts, remove, update } = useAccountsStore()
   const { transactions, removeMany } = useTransactionsStore()
   const [actionAccount, setActionAccount] = useState<Account | null>(null)
-  // All non-cancelled transactions loaded directly from Dexie — avoids using
-  // the store's potentially date-filtered slice for balance calculations.
-  const [allTx, setAllTx] = useState<Transaction[]>([])
   const [processingAccountAction, setProcessingAccountAction] = useState(false)
   const openAdd = () => {
     navigate('/settings/accounts/new')
@@ -99,14 +96,6 @@ export default function AccountsSettingsPage() {
   }
 
   useEffect(() => {
-    db.transactions
-      .filter((tx) => tx.status !== 'cancelled')
-      .toArray()
-      .then(setAllTx)
-      .catch(console.error)
-  }, [transactions])
-
-  useEffect(() => {
     let mounted = true
 
     async function maybeStartOnboarding() {
@@ -126,14 +115,7 @@ export default function AccountsSettingsPage() {
     }
   }, [accounts.length, navigate])
 
-  const accountBalances = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const account of accounts) {
-      const accountTxs = allTx.filter((tx) => isTransactionForAccount(tx, account.id))
-      map.set(account.id, getAccountBalanceAtDate(account, accountTxs, new Date()))
-    }
-    return map
-  }, [accounts, allTx])
+  const accountBalances = useBalancesStore((s) => s.balances)
 
   const groupedAccounts = useMemo(() => {
     const sorted = sortAccounts(accounts)

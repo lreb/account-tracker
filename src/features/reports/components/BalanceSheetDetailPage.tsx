@@ -6,13 +6,16 @@ import { useTranslation } from 'react-i18next'
 import { db } from '@/db'
 import { getVisibleAccounts } from '@/lib/accounts'
 import { useAccountsStore } from '@/stores/accounts.store'
+import { useBalancesStore } from '@/stores/balances.store'
 import { useCategoriesStore } from '@/stores/categories.store'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useLabelsStore } from '@/stores/labels.store'
 import {
   BALANCE_SHEET_PRESETS,
+  buildAccountRunningBalanceMap,
   getAccountBalanceAtDate,
   isTransactionForAccount,
+  type AccountRunningBalance,
   type BalanceSheetPreset,
 } from '@/lib/balance-sheet'
 import { getTranslatedCategoryName } from '@/lib/categories'
@@ -71,6 +74,8 @@ export default function BalanceSheetDetailPage() {
   const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
   const labelMap    = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels])
   const accountMap  = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
+  // Authoritative current balance — same source as every other surface.
+  const { balances } = useBalancesStore()
 
   const presetParam = searchParams.get('period')
   const selectedPreset = BALANCE_SHEET_PRESETS.includes(presetParam as BalanceSheetPreset)
@@ -165,65 +170,23 @@ export default function BalanceSheetDetailPage() {
       return 0
     }
 
-    return getAccountBalanceAtDate(account, accountTransactions, new Date())
-  }, [account, accountTransactions])
+    return balances.get(account.id) ?? getAccountBalanceAtDate(account, accountTransactions, new Date())
+  }, [account, accountTransactions, balances])
 
-  type BalanceEntry = {
-    accountBalance: number
-    accountCurrency: string
-    toAccountBalance?: number
-    toAccountCurrency?: string
-  }
-
-  // Running balance after each transaction — seeded from getAccountBalanceAtDate
-  // (the same call BalanceSheetPage uses) then walked backwards so the most recent
-  // transaction's displayed balance is guaranteed to match BalanceSheetPage exactly.
+  // Running balance after each transaction — seeded from the shared current
+  // balance, so the most recent row always matches BalanceSheetPage and every
+  // other surface.
   const balanceAfterTx = useMemo(() => {
-    if (!account) return new Map<string, BalanceEntry>()
+    if (!account) return new Map<string, AccountRunningBalance>()
 
-    const result = new Map<string, BalanceEntry>()
-    // accountTransactions is newest-first; walk in order (newest→oldest)
-    // and subtract each tx's effect to recover the balance *before* it.
-    let running = currentBalance
-
-    for (const tx of accountTransactions) {
-      // running is the balance after this tx — record it first
-      const entry: BalanceEntry = {
-        accountBalance: running,
-        accountCurrency: account.currency,
-      }
-
-      if (tx.type === 'transfer') {
-        // Counterpart is whichever side of the transfer is NOT the current account.
-        const counterpartId = tx.accountId === account.id ? tx.toAccountId : tx.accountId
-        const counterpartAcc = counterpartId ? accountMap.get(counterpartId) : undefined
-        if (counterpartAcc) {
-          // Derive the counterpart account's balance at this exact moment using
-          // the same getAccountBalanceAtDate function — avoids tracking a separate
-          // running total for every account and uses the same source of truth.
-          const counterpartTxns = allTx.filter((t) => isTransactionForAccount(t, counterpartAcc.id))
-          entry.toAccountBalance = getAccountBalanceAtDate(counterpartAcc, counterpartTxns, new Date(tx.date))
-          entry.toAccountCurrency = counterpartAcc.currency
-        }
-      }
-
-      result.set(tx.id, entry)
-
-      // Undo this tx's effect to step back to the balance before it
-      if (tx.type === 'income') {
-        running -= tx.amount
-      } else if (tx.type === 'expense') {
-        running += tx.amount
-      } else if (tx.type === 'transfer') {
-        if (tx.accountId === account.id) {
-          running += tx.amount                        // undo debit from source
-        } else {
-          running -= (tx.originalAmount ?? tx.amount) // undo credit to destination
-        }
-      }
-    }
-
-    return result
+    return buildAccountRunningBalanceMap(
+      account,
+      accountTransactions,
+      allTx,
+      currentBalance,
+      accountMap,
+      { includeIncoming: true },
+    )
   }, [account, accountTransactions, allTx, currentBalance, accountMap])
 
   const flatItems = useGroupedTransactions(filteredAccountTransactions)

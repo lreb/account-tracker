@@ -105,3 +105,100 @@ export function convertBalanceToBase(
 
   return convertToBase(balance, rate)
 }
+
+// ── Centralized balance computation ───────────────────────────────────────────
+
+/** Balance shown next to a transaction, in each involved account's currency. */
+export interface AccountRunningBalance {
+  accountBalance: number
+  accountCurrency: string
+  toAccountBalance?: number
+  toAccountCurrency?: string
+}
+
+export interface BuildRunningBalanceOptions {
+  /**
+   * When true, also records an entry for incoming transfers (where the account
+   * is the transfer destination). Single-account views (e.g. account detail)
+   * want every transaction row keyed under its own transaction id.
+   * Multi-account lists pass false so each transaction is recorded once, from
+   * its source account's perspective.
+   */
+  includeIncoming?: boolean
+}
+
+/**
+ * Computes the balance of every account at `at`, using the same
+ * getAccountBalanceAtDate logic everywhere. Cancelled transactions must already
+ * be filtered out by the caller.
+ */
+export function buildAccountBalanceMap(
+  accounts: Account[],
+  transactions: Transaction[],
+  at: Date = new Date(),
+): Map<string, number> {
+  const map = new Map<string, number>()
+  for (const account of accounts) {
+    const accountTxns = transactions.filter((tx) => isTransactionForAccount(tx, account.id))
+    map.set(account.id, getAccountBalanceAtDate(account, accountTxns, at))
+  }
+  return map
+}
+
+/**
+ * Builds the running ("latest") balance after each transaction of a single
+ * account. `accountTransactions` must be newest-first; the walk starts at
+ * `currentBalance` and steps backwards, so the most recent row always equals the
+ * account's current balance. `allTransactions` is used to resolve the
+ * counterpart account's balance for transfers.
+ */
+export function buildAccountRunningBalanceMap(
+  account: Account,
+  accountTransactions: Transaction[],
+  allTransactions: Transaction[],
+  currentBalance: number,
+  accountMap: Map<string, Account>,
+  options: BuildRunningBalanceOptions = {},
+): Map<string, AccountRunningBalance> {
+  const result = new Map<string, AccountRunningBalance>()
+  let running = currentBalance
+
+  for (const tx of accountTransactions) {
+    const recordFromSource = tx.accountId === account.id
+    const shouldRecord = recordFromSource || options.includeIncoming === true
+
+    if (shouldRecord) {
+      const entry: AccountRunningBalance = {
+        accountBalance: running,
+        accountCurrency: account.currency,
+      }
+
+      if (tx.type === 'transfer') {
+        const counterpartId = recordFromSource ? tx.toAccountId : tx.accountId
+        const counterpartAcc = counterpartId ? accountMap.get(counterpartId) : undefined
+        if (counterpartAcc) {
+          const counterpartTxns = allTransactions.filter((t) => isTransactionForAccount(t, counterpartAcc.id))
+          entry.toAccountBalance = getAccountBalanceAtDate(counterpartAcc, counterpartTxns, new Date(tx.date))
+          entry.toAccountCurrency = counterpartAcc.currency
+        }
+      }
+
+      result.set(tx.id, entry)
+    }
+
+    // Undo this tx's effect to step back to the balance before it
+    if (tx.type === 'income') {
+      running -= tx.amount
+    } else if (tx.type === 'expense') {
+      running += tx.amount
+    } else if (tx.type === 'transfer') {
+      if (recordFromSource) {
+        running += tx.amount // undo debit from source
+      } else {
+        running -= (tx.originalAmount ?? tx.amount) // undo credit to destination
+      }
+    }
+  }
+
+  return result
+}

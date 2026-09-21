@@ -424,6 +424,36 @@ interface AccountsStore {
 
 ---
 
+### useBalancesStore()
+
+Centralizes the current balance of every account so every UI surface renders the
+same values. Balances are computed in each account's own currency (integer
+cents), exclude cancelled transactions, and include hidden accounts. Loaded once
+at app bootstrap (`App.tsx` calls `loadBalances()` after other stores) and kept
+fresh automatically: the store subscribes to `useAccountsStore` (recomputes when
+the accounts array identity changes) and `useTransactionsStore` (recomputes when
+`revision` changes — revision is bumped by every mutation but **not** by
+`load()`, so date-filtered reloads don't trigger redundant recomputes).
+
+```typescript
+interface BalancesStore {
+  balances: Map<string, number>;  // accountId → current balance (cents)
+  loading: boolean;
+
+  load(): Promise<void>;
+}
+
+// Components read the map via a selector or destructure:
+const balances = useBalancesStore((s) => s.balances)
+const { balances: accountBalances } = useBalancesStore()
+```
+
+> Derivation: `balances[id] = getAccountBalanceAtDate(account, allNonCancelledTxForAccount, now)`.
+> See `buildAccountBalanceMap` / `buildAccountRunningBalanceMap` in `src/lib/balance-sheet.ts`
+> for the shared computation used by the transaction list and balance sheet.
+
+---
+
 ### useSettingsStore()
 
 ```typescript
