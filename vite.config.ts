@@ -10,15 +10,15 @@ const packageJson = JSON.parse(
 )
 const appVersion = packageJson.version || '0.0.0'
 
-function getBasePath(): string {
-  const repo = process.env.GITHUB_REPOSITORY?.split('/')[1]
-  if (!repo) return '/'
-  if (repo.endsWith('.github.io')) return '/'
-  return `/${repo}/`
-}
+// function getBasePath(): string {
+//   const repo = process.env.GITHUB_REPOSITORY?.split('/')[1]
+//   if (!repo) return '/'
+//   if (repo.endsWith('.github.io')) return '/'
+//   return `/${repo}/`
+// }
 
 export default defineConfig({
-  base: process.env.GITHUB_ACTIONS ? getBasePath() : '/',
+  base: '/',
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
   },
