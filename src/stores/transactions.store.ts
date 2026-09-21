@@ -6,6 +6,8 @@ import type { Transaction } from '@/types'
 interface TransactionsState {
   transactions: Transaction[]
   loading: boolean
+  /** Bumped on every mutation so subscribers (e.g. balances) can refresh. Never bumped by load(). */
+  revision: number
   load: (since?: string) => Promise<void>
   add: (t: Transaction) => Promise<void>
   update: (t: Transaction) => Promise<void>
@@ -17,6 +19,7 @@ interface TransactionsState {
 export const useTransactionsStore = create<TransactionsState>((set) => ({
   transactions: [],
   loading: false,
+  revision: 0,
 
   load: async (since?: string) => {
     set({ loading: true })
@@ -38,7 +41,7 @@ export const useTransactionsStore = create<TransactionsState>((set) => ({
   add: async (transaction) => {
     try {
       await db.transactions.add(transaction)
-      set((s) => ({ transactions: [transaction, ...s.transactions] }))
+      set((s) => ({ transactions: [transaction, ...s.transactions], revision: s.revision + 1 }))
       toast.success('Transaction added')
     } catch (err) {
       console.error(err)
@@ -51,6 +54,7 @@ export const useTransactionsStore = create<TransactionsState>((set) => ({
       await db.transactions.put(transaction)
       set((s) => ({
         transactions: s.transactions.map((t) => (t.id === transaction.id ? transaction : t)),
+        revision: s.revision + 1,
       }))
       toast.success('Transaction updated')
     } catch (err) {
@@ -62,7 +66,7 @@ export const useTransactionsStore = create<TransactionsState>((set) => ({
   remove: async (id) => {
     try {
       await db.transactions.delete(id)
-      set((s) => ({ transactions: s.transactions.filter((t) => t.id !== id) }))
+      set((s) => ({ transactions: s.transactions.filter((t) => t.id !== id), revision: s.revision + 1 }))
       toast.success('Transaction deleted')
     } catch (err) {
       console.error(err)
@@ -72,7 +76,10 @@ export const useTransactionsStore = create<TransactionsState>((set) => ({
 
   removeMany: (ids) => {
     const set_ = new Set(ids)
-    set((s) => ({ transactions: s.transactions.filter((t) => !set_.has(t.id)) }))
+    set((s) => ({
+      transactions: s.transactions.filter((t) => !set_.has(t.id)),
+      revision: s.revision + 1,
+    }))
   },
 
   removeLabelFromTransactions: async (labelId) => {
@@ -88,6 +95,7 @@ export const useTransactionsStore = create<TransactionsState>((set) => ({
             ? { ...t, labels: t.labels.filter((l) => l !== labelId) }
             : t,
         ),
+        revision: s.revision + 1,
       }))
     } catch (err) {
       console.error(err)

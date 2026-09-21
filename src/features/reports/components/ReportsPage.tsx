@@ -15,14 +15,13 @@ import {
   Line,
 } from 'recharts'
 
-import { db } from '@/db'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useAccountsStore } from '@/stores/accounts.store'
+import { useBalancesStore } from '@/stores/balances.store'
 import { useCategoriesStore } from '@/stores/categories.store'
 import { useLabelsStore } from '@/stores/labels.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { getVisibleAccountIds, getVisibleAccounts } from '@/lib/accounts'
-import { getAccountBalanceAtDate, isTransactionForAccount } from '@/lib/balance-sheet'
 import { formatCurrency } from '@/lib/currency'
 import {
   computePeriodSummary,
@@ -158,29 +157,7 @@ export default function ReportsPage() {
   )
 
   // ── Live account balances (all-time, not date-filtered) ─────────────────
-  const [liveBalances, setLiveBalances] = useState<Map<string, number>>(() => {
-    const map = new Map<string, number>()
-    for (const acct of accounts) map.set(acct.id, acct.openingBalance)
-    return map
-  })
-
-  useEffect(() => {
-    let stale = false
-    async function computeBalances() {
-      const activeTx = await db.transactions
-        .filter((tx) => tx.status !== 'cancelled')
-        .toArray()
-      if (stale) return
-      const map = new Map<string, number>()
-      for (const acct of accounts) {
-        const acctTxs = activeTx.filter((tx) => isTransactionForAccount(tx, acct.id))
-        map.set(acct.id, getAccountBalanceAtDate(acct, acctTxs, new Date()))
-      }
-      setLiveBalances(map)
-    }
-    void computeBalances()
-    return () => { stale = true }
-  }, [accounts])
+  const { balances: liveBalances } = useBalancesStore()
 
   // ── Filter state ─────────────────────────────────────────────────────────
   const [preset, setPreset] = useState<PresetKey>('thisMonth')

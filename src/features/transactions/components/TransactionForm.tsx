@@ -8,11 +8,11 @@ import { v4 as uuid } from 'uuid'
 
 import { db } from '@/db'
 import { getAccountSelectOptions, getVisibleAccounts } from '@/lib/accounts'
-import { getAccountBalanceAtDate, isTransactionForAccount } from '@/lib/balance-sheet'
 import { getTranslatedCategoryName } from '@/lib/categories'
 import { transactionSchema, type TransactionFormValues } from '../schemas/transaction.schema'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useAccountsStore } from '@/stores/accounts.store'
+import { useBalancesStore } from '@/stores/balances.store'
 import { useLabelsStore } from '@/stores/labels.store'
 import { useExchangeRatesStore } from '@/stores/exchange-rates.store'
 import { useSettingsStore } from '@/stores/settings.store'
@@ -205,32 +205,10 @@ export default function TransactionForm() {
     detectLink()
   }, [storeReady, isEdit, id])
 
-  // Current balance per account: openingBalance + income − expense ± transfers
-  // Queried directly from Dexie (all-time) so the result is always correct,
-  // regardless of the date-filtered slice the list page keeps in the store.
-  const [accountBalances, setAccountBalances] = useState<Map<string, number>>(() => {
-    const map = new Map<string, number>()
-    for (const acct of accounts) map.set(acct.id, acct.openingBalance)
-    return map
-  })
-
-  useEffect(() => {
-    let stale = false
-    async function computeBalances() {
-      const activeTx = await db.transactions
-        .filter((tx) => tx.status !== 'cancelled')
-        .toArray()
-      if (stale) return
-      const map = new Map<string, number>()
-      for (const acct of accounts) {
-        const acctTxs = activeTx.filter((tx) => isTransactionForAccount(tx, acct.id))
-        map.set(acct.id, getAccountBalanceAtDate(acct, acctTxs, new Date()))
-      }
-      setAccountBalances(map)
-    }
-    computeBalances()
-    return () => { stale = true }
-  }, [accounts])
+  // Current balance per account — centralized in the balances store. Loaded
+  // once at app bootstrap and kept fresh by store mutations, so the value shown
+  // here always matches every other surface (transaction list, balance sheet).
+  const { balances: accountBalances } = useBalancesStore()
 
   // Description auto-suggest: deduplicated map of description → most recent tx
   const suggestionMap = useMemo(() => {

@@ -32,6 +32,14 @@ vi.mock('@/stores/transactions.store', () => ({
   useTransactionsStore: () => ({ transactions: mockTransactions, removeMany: mockRemoveMany }),
 }))
 
+vi.mock('@/stores/balances.store', () => ({
+  // Mirrors the old getAccountBalanceAtDate mock: every account's balance is 0.
+  useBalancesStore: (selector?: (s: { balances: Map<string, number> }) => unknown) =>
+    selector
+      ? selector({ balances: new Map(mockAccounts.map((a) => [a.id, 0])) })
+      : new Map(mockAccounts.map((a) => [a.id, 0])),
+}))
+
 vi.mock('@/lib/accounts', () => ({
   getActiveAccounts: (accounts: Account[]) => accounts.filter((a) => !a.cancelled),
   sortAccounts: (accounts: Account[]) => [...accounts],

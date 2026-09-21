@@ -7,6 +7,7 @@ import { createDefaultAccount } from '@/lib/accounts'
 import { COMMON_CURRENCIES } from '@/constants/currencies'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useAccountsStore } from '@/stores/accounts.store'
+import { useBalancesStore } from '@/stores/balances.store'
 import { useCategoriesStore } from '@/stores/categories.store'
 import { useBudgetsStore } from '@/stores/budgets.store'
 import { useVehiclesStore } from '@/stores/vehicles.store'
@@ -41,6 +42,7 @@ export default function App() {
 
   const loadTransactions = useTransactionsStore((s) => s.load)
   const loadAccounts     = useAccountsStore((s) => s.load)
+  const loadBalances     = useBalancesStore((s) => s.load)
   const loadCategories   = useCategoriesStore((s) => s.load)
   const loadBudgets      = useBudgetsStore((s) => s.load)
   const loadVehicles     = useVehiclesStore((s) => s.load)
@@ -59,7 +61,10 @@ export default function App() {
       loadSettings(),
       loadLabels(),
     ])
-  }, [loadTransactions, loadAccounts, loadCategories, loadBudgets, loadVehicles, loadSettings, loadLabels])
+    // Balances read accounts directly from the accounts store, so they must be
+    // computed after accounts (and with a populated transaction table).
+    await loadBalances()
+  }, [loadTransactions, loadAccounts, loadCategories, loadBudgets, loadVehicles, loadSettings, loadLabels, loadBalances])
 
   // Keep i18n in sync with the persisted language preference
   useEffect(() => { void i18n.changeLanguage(language) }, [language])

@@ -3,13 +3,14 @@ import { useSearchParams } from 'react-router-dom'
 import { subMonths, subYears } from 'date-fns'
 import { useTransactionsStore } from '@/stores/transactions.store'
 import { useAccountsStore } from '@/stores/accounts.store'
+import { useBalancesStore } from '@/stores/balances.store'
 import { useLabelsStore } from '@/stores/labels.store'
 import {
   getVisibleAccountIds,
   getVisibleAccounts,
   isTransactionForVisiblePrimaryAccount,
 } from '@/lib/accounts'
-import { getAccountBalanceAtDate } from '@/lib/balance-sheet'
+import { getAccountBalanceAtDate, buildAccountRunningBalanceMap } from '@/lib/balance-sheet'
 import { sortTransactionsNewestFirst } from '@/lib/transactions'
 import type { Transaction } from '@/types'
 import { db } from '@/db'
@@ -49,6 +50,10 @@ export default function TransactionListPage() {
   const visibleAccountIds = useMemo(() => getVisibleAccountIds(accounts), [accounts])
   const visibleAccounts   = useMemo(() => getVisibleAccounts(accounts), [accounts])
   const accountMap        = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
+  // Authoritative current balances — the same values AccountSelect and the
+  // balance sheet render. The running-balance walk below starts from these so
+  // the most recent row always matches every other surface.
+  const { balances } = useBalancesStore()
 
   const visibleTransactions = useMemo(
     () => sortTransactionsNewestFirst(
@@ -137,38 +142,16 @@ export default function TransactionListPage() {
 
     for (const acc of visibleAccounts) {
       const accTxns = allTxByAccount.get(acc.id) ?? []
-      let running = getAccountBalanceAtDate(acc, accTxns, new Date())
+      const currentBalance = balances.get(acc.id) ?? getAccountBalanceAtDate(acc, accTxns, new Date())
+      const accBalances = buildAccountRunningBalanceMap(acc, accTxns, allTx, currentBalance, accountMap)
 
-      for (const tx of accTxns) {
-        if (tx.accountId === acc.id) {
-          const entry: TxRunningBalance = {
-            accountBalance:  running,
-            accountCurrency: acc.currency,
-          }
-          if (tx.type === 'transfer' && tx.toAccountId) {
-            const toAcc = accountMap.get(tx.toAccountId)
-            if (toAcc) {
-              const toAccTxns = allTxByAccount.get(toAcc.id) ?? []
-              entry.toAccountBalance  = getAccountBalanceAtDate(toAcc, toAccTxns, new Date(tx.date))
-              entry.toAccountCurrency = toAcc.currency
-            }
-          }
-          result.set(tx.id, entry)
-        }
-        // Undo this tx's effect on acc.id to step back in time
-        if (tx.accountId === acc.id) {
-          if (tx.type === 'income')    running -= tx.amount
-          else if (tx.type === 'expense')   running += tx.amount
-          else if (tx.type === 'transfer')  running += tx.amount
-        } else {
-          // tx.toAccountId === acc.id: undo the incoming transfer credit
-          running -= (tx.originalAmount ?? tx.amount)
-        }
+      for (const [txId, entry] of accBalances) {
+        result.set(txId, entry)
       }
     }
 
     return result
-  }, [visibleAccounts, allTxByAccount, accountMap])
+  }, [visibleAccounts, allTxByAccount, allTx, balances, accountMap])
 
   return (
     <>

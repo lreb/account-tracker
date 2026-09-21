@@ -11,6 +11,7 @@ import {
   getOtherSubtypeValue,
 } from '@/constants/account-subtypes'
 import { useAccountsStore } from '@/stores/accounts.store'
+import { useBalancesStore } from '@/stores/balances.store'
 import { useExchangeRatesStore } from '@/stores/exchange-rates.store'
 import { useSettingsStore } from '@/stores/settings.store'
 import { useTransactionsStore } from '@/stores/transactions.store'
@@ -104,6 +105,9 @@ function DeltaBadge({
 export default function BalanceSheetPage() {
   const { t } = useTranslation()
   const { accounts } = useAccountsStore()
+  // Authoritative current balances from the shared store (matches AccountSelect
+  // and the transaction list's running balances).
+  const { balances } = useBalancesStore()
   // Reload full transaction history on every mount — TransactionListPage loads a
   // date-filtered subset into this same store, so without an explicit reload the
   // Dexie trigger ref would be stale and the first render would show wrong balances.
@@ -167,7 +171,7 @@ export default function BalanceSheetPage() {
       const accountTransactions = sortTransactionsNewestFirst(
         allTx.filter((tx) => isTransactionForAccount(tx, account.id))
       )
-      const currentBalance = getAccountBalanceAtDate(account, accountTransactions, new Date())
+      const currentBalance = balances.get(account.id) ?? getAccountBalanceAtDate(account, accountTransactions, new Date())
       const previousBalance = getAccountBalanceAtDate(account, accountTransactions, comparisonDate)
       const delta = currentBalance - previousBalance
       const baseBalance = convertBalanceToBase(currentBalance, account.currency, baseCurrency, getRateForPair)
@@ -193,7 +197,7 @@ export default function BalanceSheetPage() {
         ? null
         : (Math.abs(s.netWorthContribution) / totalAbsNW) * 100,
     }))
-  }, [visibleAccounts, allTx, comparisonDate, baseCurrency, getRateForPair])
+  }, [visibleAccounts, allTx, comparisonDate, baseCurrency, getRateForPair, balances])
 
   const totalNetWorth = useMemo(
     () => snapshots.reduce((sum, s) => sum + (s.netWorthContribution ?? 0), 0),
