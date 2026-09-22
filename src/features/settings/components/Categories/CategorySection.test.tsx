@@ -24,15 +24,27 @@ vi.mock('@/components/ui/button', () => ({
     children,
     onClick,
     title,
+    variant,
   }: {
     children: React.ReactNode
     onClick?: () => void
     title?: string
+    variant?: string
   }) => (
-    <button type="button" onClick={onClick} title={title}>
+    <button type="button" onClick={onClick} title={title} data-variant={variant}>
       {children}
     </button>
   ),
+}))
+
+vi.mock('@/components/ui/dialog', () => ({
+  Dialog: ({ children, open }: { children: React.ReactNode; open?: boolean }) => (
+    <div data-open={open}>{children}</div>
+  ),
+  DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -131,6 +143,66 @@ describe('CategorySection', () => {
     expect(screen.getByText('2')).toBeInTheDocument()
   })
 
+  it('archive button opens confirmation dialog', () => {
+    render(
+      <CategorySection
+        type="expense"
+        items={[makeCategory({ id: 'cat-99' })]}
+        onEdit={onEdit}
+        onRemove={onRemove}
+        onRestore={onRestore}
+        t={mockT}
+      />,
+    )
+    const buttons = screen.getAllByRole('button')
+    // button[0] = edit, button[1] = archive
+    fireEvent.click(buttons[1])
+    expect(screen.getByText('categories.archiveConfirmTitle')).toBeInTheDocument()
+    expect(onRemove).not.toHaveBeenCalled()
+  })
+
+  it('confirming archive calls onRemove with the category id', () => {
+    render(
+      <CategorySection
+        type="expense"
+        items={[makeCategory({ id: 'cat-99' })]}
+        onEdit={onEdit}
+        onRemove={onRemove}
+        onRestore={onRestore}
+        t={mockT}
+      />,
+    )
+    const buttons = screen.getAllByRole('button')
+    fireEvent.click(buttons[1])
+    const confirmButtons = screen.getAllByRole('button')
+    const archiveBtn = confirmButtons.find(
+      (b) => b.textContent === 'categories.archive',
+    )
+    fireEvent.click(archiveBtn!)
+    expect(onRemove).toHaveBeenCalledWith('cat-99')
+  })
+
+  it('canceling archive does not call onRemove', () => {
+    render(
+      <CategorySection
+        type="expense"
+        items={[makeCategory({ id: 'cat-99' })]}
+        onEdit={onEdit}
+        onRemove={onRemove}
+        onRestore={onRestore}
+        t={mockT}
+      />,
+    )
+    const buttons = screen.getAllByRole('button')
+    fireEvent.click(buttons[1])
+    const allButtons = screen.getAllByRole('button')
+    const cancelBtn = allButtons.find(
+      (b) => b.textContent === 'common.cancel',
+    )
+    fireEvent.click(cancelBtn!)
+    expect(onRemove).not.toHaveBeenCalled()
+  })
+
   it('edit button calls onEdit with the full category object', () => {
     const cat = makeCategory({ id: 'cat-1', name: 'Food' })
     render(
@@ -143,7 +215,7 @@ describe('CategorySection', () => {
         t={mockT}
       />,
     )
-    // Per item: button[0] = edit (Pencil), button[1] = remove (Trash2)
+    // button[0] = edit (Pencil), button[1] = archive (Archive)
     fireEvent.click(screen.getAllByRole('button')[0])
     expect(onEdit).toHaveBeenCalledWith(cat)
   })
@@ -159,8 +231,15 @@ describe('CategorySection', () => {
         t={mockT}
       />,
     )
-    // Per item: button[0] = edit, button[1] = remove
-    fireEvent.click(screen.getAllByRole('button')[1])
+    // Per item: button[0] = edit, button[1] = archive (opens dialog)
+    const buttons = screen.getAllByRole('button')
+    fireEvent.click(buttons[1])
+    // Confirm the dialog
+    const confirmButtons = screen.getAllByRole('button')
+    const archiveBtn = confirmButtons.find(
+      (b) => b.textContent === 'categories.archive',
+    )
+    fireEvent.click(archiveBtn!)
     expect(onRemove).toHaveBeenCalledWith('cat-99')
   })
 
