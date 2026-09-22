@@ -930,6 +930,9 @@
     "default": "Predeterminadas",
     "archived": "Archivado",
     "restore": "Restaurar",
+    "archive": "Archivar",
+    "archiveConfirmTitle": "¿Archivar categoría?",
+    "archiveConfirmDesc": "Esta categoría se archivará y no estará disponible para nuevas transacciones. Se puede restaurar en cualquier momento.",
     "names": {
       "transportation": "Transporte",
       "food-groceries": "Comida y supermercado",

@@ -1,4 +1,5 @@
-import { Pencil, Trash2, RotateCcw } from 'lucide-react'
+import { useState } from 'react'
+import { Pencil, Archive, RotateCcw } from 'lucide-react'
 
 import { getTranslatedCategoryName, sortCategories } from '@/lib/categories'
 import { CategoryIcon } from '@/lib/icon-map'
@@ -6,6 +7,13 @@ import type { Category, CategoryType } from '@/types'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 
 type CategorySectionProps = {
   type: CategoryType
@@ -24,6 +32,7 @@ export default function CategorySection({
   onRestore,
   t,
 }: CategorySectionProps) {
+  const [archivingId, setArchivingId] = useState<string | null>(null)
   const active = sortCategories(items.filter((c) => !c.deletedAt), t)
   const archived = sortCategories(items.filter((c) => !!c.deletedAt), t)
 
@@ -33,6 +42,21 @@ export default function CategorySection({
     expense: 'text-red-600',
     income: 'text-green-600',
     any: 'text-gray-500',
+  }
+
+  const handleArchiveClick = (id: string) => {
+    setArchivingId(id)
+  }
+
+  const handleConfirmArchive = () => {
+    if (archivingId) {
+      onRemove(archivingId)
+      setArchivingId(null)
+    }
+  }
+
+  const handleCancelArchive = () => {
+    setArchivingId(null)
   }
 
   return (
@@ -65,10 +89,10 @@ export default function CategorySection({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-red-400 hover:text-red-600"
-              onClick={() => onRemove(cat.id)}
+              className="h-8 w-8 text-amber-400 hover:text-amber-600"
+              onClick={() => handleArchiveClick(cat.id)}
             >
-              <Trash2 size={14} />
+              <Archive size={14} />
             </Button>
           </li>
         ))}
@@ -105,6 +129,25 @@ export default function CategorySection({
           </ul>
         </div>
       )}
+
+      <Dialog open={!!archivingId} onOpenChange={(open) => { if (!open) handleCancelArchive() }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('categories.archiveConfirmTitle')}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {t('categories.archiveConfirmDesc')}
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancelArchive}>
+              {t('common.cancel')}
+            </Button>
+            <Button variant="secondary" onClick={handleConfirmArchive}>
+              {t('categories.archive')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }

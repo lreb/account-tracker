@@ -932,6 +932,9 @@
     "default": "Default",
     "archived": "Archived",
     "restore": "Restore",
+    "archive": "Archive",
+    "archiveConfirmTitle": "Archive category?",
+    "archiveConfirmDesc": "This category will be archived and won't be available for new transactions. It can be restored anytime.",
     "names": {
       "transportation": "Transportation",
       "food-groceries": "Food & Groceries",
