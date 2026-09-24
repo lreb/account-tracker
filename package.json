@@ -1,7 +1,7 @@
 {
   "name": "expense-tracking",
   "private": true,
-  "version": "1.3.2",
+  "version": "1.3.4",
   "type": "module",
   "engines": {
     "node": "^20.19.0 || ^22.13.0 || >=24"
@@ -15,7 +15,7 @@
     "lint": "eslint src --max-warnings 0",
     "lint:fix": "eslint src --fix",
     "ci:validate": "npm run lint && npm run test && npm run build",
-    "generate-icons": "pwa-assets-generator --preset minimal public/icon.svg",
+    "generate-icons": "pwa-assets-generator --preset minimal public/MainLogo-512x512.svg",
     "publish:intranet": "powershell -ExecutionPolicy Bypass -File ./scripts/publish-pwa-intranet.ps1",
     "prepare": "husky"
   },

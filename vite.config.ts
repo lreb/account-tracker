@@ -27,7 +27,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg', 'apple-touch-icon-180x180.png', 'pwa-64x64.png', 'pwa-192x192.png', 'pwa-512x512.png', 'maskable-icon-512x512.png'],
+      includeAssets: ['MainLogo-512x512.svg', 'MainLogo-198x198.png', 'MainLogo-64x64.png', 'MainLogo-198x198.png', 'MainLogo-512x512.png', 'MainLogo-512x512.png'],
       // Ensure the service worker intercepts all navigation requests and falls back to
       // index.html. Without this, launching the PWA after it's been closed can bypass
       // the service worker and open in a regular browser tab.
@@ -67,22 +67,22 @@ export default defineConfig({
         orientation: 'portrait',
         icons: [
           {
-            src: 'pwa-64x64.png',
+            src: 'MainLogo-64x64.png',
             sizes: '64x64',
             type: 'image/png'
           },
           {
-            src: 'pwa-192x192.png',
+            src: 'MainLogo-198x198.png',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'MainLogo-512x512.png',
             sizes: '512x512',
             type: 'image/png'
           },
           {
-            src: 'maskable-icon-512x512.png',
+            src: 'MainLogo-512x512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable'
