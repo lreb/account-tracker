@@ -4,7 +4,7 @@ import { usePWAInstall } from './usePWAInstall'
 
 // ——— helpers ———
 
-type DisplayMode = 'browser' | 'standalone' | 'fullscreen' | 'minimal-ui'
+type DisplayMode = 'browser' | 'standalone' | 'fullscreen' | 'minimal-ui' | 'window-controls-overlay'
 
 /**
  * Mocks `window.matchMedia` so that only `(display-mode: <mode>)` returns `true`.
@@ -128,6 +128,13 @@ describe('usePWAInstall', () => {
       mockMatchMediaMode('minimal-ui')
       const { result } = renderHook(() => usePWAInstall())
       expect(result.current.isStandalone).toBe(true)
+    })
+
+    it('is true when display-mode is window-controls-overlay (desktop title-bar mode)', () => {
+      mockMatchMediaMode('window-controls-overlay')
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isStandalone).toBe(true)
+      expect(result.current.isInstalled).toBe(true)
     })
 
     it('is true when localStorage has pwa-installed and display-mode is standalone', () => {

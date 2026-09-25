@@ -16,6 +16,7 @@
     "quickCreate": "Creación Rápida",
     "data": "Datos",
     "settings": "Configuración",
+    "about": "Acerca de",
     "googleAuthTitle": "Google Drive",
     "googleAuthLoginPrompt": "Inicia sesión aquí para conectar tu cuenta de Google Drive.",
     "googleAuthLoginAction": "Iniciar sesión con Google",
@@ -23,6 +24,15 @@
     "googleAuthImageAlt": "Imagen de perfil de la cuenta de Google",
     "googleAuthFallbackName": "Cuenta de Google",
     "googleAuthFallbackEmail": "Correo no disponible"
+  },
+  "about": {
+    "title": "Acerca de ExpenseTracking",
+    "description": "Versión, licencia y datos de contacto de esta app.",
+    "versionLabel": "Versión",
+    "licenseLabel": "Licencia",
+    "officialPageLabel": "Página oficial",
+    "creatorLabel": "Creador",
+    "contactLabel": "Contacto"
   },
   "common": {
     "add": "Agregar",
@@ -56,6 +66,12 @@
   },
   "shell": {
     "openInAppBanner": "Esta app está instalada en tu dispositivo. Ábrela desde el icono en tu pantalla de inicio para la experiencia completa."
+  },
+  "pwa": {
+    "updateAvailable": "Actualización disponible",
+    "updateAvailableDesc": "Se descargó una nueva versión. Recarga cuando quieras — no se pierde nada.",
+    "reload": "Recargar",
+    "offlineReady": "La app está lista para usarse sin conexión"
   },
   "reminders": {
     "title": "Recordatorios",

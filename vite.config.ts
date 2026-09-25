@@ -27,7 +27,11 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg', 'apple-touch-icon-180x180.png', 'pwa-64x64.png', 'pwa-192x192.png', 'pwa-512x512.png', 'maskable-icon-512x512.png'],
+      includeAssets: [
+        'MainLogo-16x16.ico',
+        'MainLogo-512x512.svg',
+        'MainLogo-apple-touch-180x180.png',
+      ],
       // Ensure the service worker intercepts all navigation requests and falls back to
       // index.html. Without this, launching the PWA after it's been closed can bypass
       // the service worker and open in a regular browser tab.
@@ -35,15 +39,26 @@ export default defineConfig({
         navigateFallback: 'index.html',
         // Exclude API and OAuth redirect routes from the SPA fallback so they are
         // handled by the network (or produce a proper 404) rather than serving HTML.
+        // Google sign-in / Drive traffic never hits these routes — it goes to
+        // accounts.google.com and googleapis.com, which the service worker ignores.
         navigateFallbackDenylist: [/^\/api\//, /^\/oauth-callback/],
         cleanupOutdatedCaches: true,
+        // No runtimeCaching: all financial data lives in IndexedDB (offline by
+        // design), static assets are precached at build time, and API/auth/OAuth
+        // responses must never be served stale from a cache.
       },
       manifest: {
-        name: 'ExpenseTracking',
+        name: 'ExpenseTracking by Facware',
         short_name: 'Expenses',
-        description: 'Personal finance and expense tracking PWA',
+        description:
+          'Track income and expenses, organize transactions, and turn spending into actionable insights.',
+        lang: 'en',
+        dir: 'ltr',
+        categories: ['finance', 'productivity', 'utilities'],
         theme_color: '#4f46e5',
-        background_color: '#1a1a1a',
+        // Matches the app shell background (bg-gray-50) so the splash screen
+        // blends into first paint instead of flashing dark.
+        background_color: '#f9fafb',
         // `id` is the stable identifier for this PWA. Browsers use it to match an
         // existing installation so that updates to the manifest don't create a second
         // entry on the home screen.
@@ -60,35 +75,67 @@ export default defineConfig({
         // open in the default browser, which is the correct behaviour.
         scope: '/',
         display: 'standalone',
-        // `display_override` lets browsers that support newer display modes (e.g.
-        // window-controls-overlay on desktop) pick a richer mode while still falling
-        // back to `display: standalone` on Android and iOS.
-        display_override: ['standalone', 'minimal-ui'],
-        orientation: 'portrait',
+        // Browsers try these in order and fall back to `display`. Listing
+        // window-controls-overlay first enables the richer desktop title-bar mode
+        // where supported (Windows/Edge/Chrome); minimal-ui covers the rest.
+        // NOTE: previously this listed 'standalone' (== display, a no-op) first.
+        display_override: ['window-controls-overlay', 'minimal-ui'],
+        // No `orientation` lock: tablets and foldables can use landscape for
+        // wide tables and charts.
         icons: [
+          { src: 'MainLogo-64x64.png', sizes: '64x64', type: 'image/png', purpose: 'any' },
+          { src: 'MainLogo-96x96.png', sizes: '96x96', type: 'image/png', purpose: 'any' },
+          { src: 'MainLogo-128x128.png', sizes: '128x128', type: 'image/png', purpose: 'any' },
+          { src: 'MainLogo-144x144.png', sizes: '144x144', type: 'image/png', purpose: 'any' },
+          { src: 'MainLogo-152x152.png', sizes: '152x152', type: 'image/png', purpose: 'any' },
+          // NOTE: previously MainLogo-198x198.png was declared as 192x192, which
+          // Chromium can reject. This is now an exact 192x192 render.
+          { src: 'MainLogo-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'MainLogo-384x384.png', sizes: '384x384', type: 'image/png', purpose: 'any' },
+          { src: 'MainLogo-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          // Maskable icons are cropped to a circle/squircle: only the central
+          // ~80%-diameter circle is guaranteed visible. This variant carries the
+          // artwork scaled to 80% on transparency; never reuse a full-bleed icon here.
           {
-            src: 'pwa-64x64.png',
-            sizes: '64x64',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          },
-          {
-            src: 'maskable-icon-512x512.png',
+            src: 'MainLogo-maskable-512x512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'maskable'
-          }
-        ]
-      }
+            purpose: 'maskable',
+          },
+        ],
+        // Placeholder captures — replace with real screenshots (same filenames or
+        // update the src below). `label` is shown in the install UI.
+        screenshots: [
+          {
+            src: 'screenshots/placeholder-dashboard-wide.png',
+            sizes: '1280x720',
+            type: 'image/png',
+            form_factor: 'wide',
+            label: 'Dashboard',
+          },
+          {
+            src: 'screenshots/placeholder-reports-wide.png',
+            sizes: '1280x720',
+            type: 'image/png',
+            form_factor: 'wide',
+            label: 'Reports',
+          },
+          {
+            src: 'screenshots/placeholder-dashboard-narrow.png',
+            sizes: '390x844',
+            type: 'image/png',
+            form_factor: 'narrow',
+            label: 'Dashboard',
+          },
+          {
+            src: 'screenshots/placeholder-budgets-narrow.png',
+            sizes: '390x844',
+            type: 'image/png',
+            form_factor: 'narrow',
+            label: 'Budgets',
+          },
+        ],
+      },
     })
   ],
   resolve: {

@@ -16,6 +16,7 @@
     "quickCreate": "Quick Create",
     "data": "Data",
     "settings": "Settings",
+    "about": "About",
     "googleAuthTitle": "Google Drive",
     "googleAuthLoginPrompt": "Login here to connect your Google Drive account.",
     "googleAuthLoginAction": "Login with Google",
@@ -23,6 +24,15 @@
     "googleAuthImageAlt": "Google account profile image",
     "googleAuthFallbackName": "Google account",
     "googleAuthFallbackEmail": "Email not available"
+  },
+  "about": {
+    "title": "About ExpenseTracking",
+    "description": "Version, license and contact details for this app.",
+    "versionLabel": "Version",
+    "licenseLabel": "License",
+    "officialPageLabel": "Official page",
+    "creatorLabel": "Creator",
+    "contactLabel": "Contact"
   },
   "common": {
     "add": "Add",
@@ -56,6 +66,12 @@
   },
   "shell": {
     "openInAppBanner": "This app is installed on your device. Open it from your home screen icon for the full experience."
+  },
+  "pwa": {
+    "updateAvailable": "Update available",
+    "updateAvailableDesc": "A new version was downloaded. Reload when you're ready — nothing is lost.",
+    "reload": "Reload",
+    "offlineReady": "App is ready for offline use"
   },
   "reminders": {
     "title": "Reminders",

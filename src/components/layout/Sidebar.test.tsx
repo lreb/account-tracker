@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import Sidebar from './Sidebar'
 
@@ -64,7 +64,7 @@ describe('Sidebar', () => {
       const onClose = vi.fn()
       renderSidebar(true, onClose)
       onClose.mockClear() // clear the call from the initial pathname-change useEffect
-      fireEvent.click(screen.getByRole('button'))
+      fireEvent.click(screen.getByRole('button', { name: 'common.cancel' }))
       expect(onClose).toHaveBeenCalledTimes(1)
     })
 
@@ -139,6 +139,56 @@ describe('Sidebar', () => {
     it('renders the google auth section', () => {
       renderSidebar()
       expect(screen.getByTestId('google-auth-section')).toBeInTheDocument()
+    })
+  })
+
+  describe('about section', () => {
+    it('renders the About button', () => {
+      renderSidebar()
+      expect(screen.getByText('sidebar.about')).toBeInTheDocument()
+    })
+
+    it('opens the about dialog without closing the sidebar', () => {
+      const onClose = vi.fn()
+      renderSidebar(true, onClose)
+      onClose.mockClear() // clear the call from the initial pathname-change useEffect
+      fireEvent.click(screen.getByText('sidebar.about'))
+      expect(screen.getByText('about.title')).toBeInTheDocument()
+      expect(onClose).not.toHaveBeenCalled()
+    })
+
+    it('shows the logo and dynamic version in the dialog', () => {
+      renderSidebar()
+      fireEvent.click(screen.getByText('sidebar.about'))
+      const dialog = screen.getByRole('dialog')
+      const logos = within(dialog).getAllByAltText('ExpenseTracking')
+      expect(
+        logos.some((img) => img.getAttribute('src') === '/ImagoTipo-2778x512.png'),
+      ).toBe(true)
+      expect(within(dialog).getByText(`v${__APP_VERSION__}`)).toBeInTheDocument()
+    })
+
+    it('shows license, official page, creator and contact links', () => {
+      renderSidebar()
+      fireEvent.click(screen.getByText('sidebar.about'))
+      expect(screen.getByText('GPL-3.0-only')).toHaveAttribute(
+        'href',
+        'https://www.gnu.org/licenses/gpl-3.0.html',
+      )
+      expect(
+        screen.getByText('https://www.facware.com/products/expense-tracking.html'),
+      ).toHaveAttribute(
+        'href',
+        'https://www.facware.com/products/expense-tracking.html',
+      )
+      expect(screen.getByText('Luis Raúl Espinoza Barboza')).toHaveAttribute(
+        'href',
+        expect.stringContaining('linkedin.com'),
+      )
+      expect(screen.getByText('luis.espinoza@facware.com')).toHaveAttribute(
+        'href',
+        'mailto:luis.espinoza@facware.com',
+      )
     })
   })
 })

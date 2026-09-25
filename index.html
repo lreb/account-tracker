@@ -2,14 +2,28 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" href="/favicon.ico" sizes="any" />
-    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
+    <link rel="icon" href="/MainLogo-16x16.ico" sizes="any" />
+    <link rel="icon" href="/MainLogo-512x512.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/MainLogo-apple-touch-180x180.png" />
     <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Expenses" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#4f46e5" />
-    <title>ExpenseTracking by Facware</title>
+    <style>
+      /* Paint the app shell background before CSS/JS loads so a home-screen
+         launch never flashes white or dark. Must match bg-gray-50. */
+      html { background-color: #f9fafb; }
+    </style>
+    <title>Expense Tracking by Facware</title>
+    <meta name="description" content="ExpenseTracking is a modern, mobile-first personal finance app built to help you take control of your money. Track income and expenses, organize transactions, understand your spending habits, and turn your financial data into actionable insights. With smart categorization, powerful reports, and personalized recommendations, ExpenseTracking makes it easier to see where your money goes, save with purpose, and make better financial decisions." />
+    <meta property="og:title" content="Expense Tracking System" />
+    <meta property="og:description" content=" ExpenseTracking is a modern, mobile-first personal finance app built to help you take control of your money. Track income and expenses, organize transactions, understand your spending habits, and turn your financial data into actionable insights. With smart categorization, powerful reports, and personalized recommendations, ExpenseTracking makes it easier to see where your money goes, save with purpose, and make better financial decisions." />
+    <meta property="og:image" content="https://expense-tracking.facware.com/MainLogo-512x512.png" />
+    <meta property="og:url" content="https://expense-tracking.facware.com" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
     <div id="root"></div>
