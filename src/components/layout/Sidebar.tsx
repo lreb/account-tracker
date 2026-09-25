@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -18,9 +18,26 @@ import {
   TrendingUp,
   Download,
   CloudUpload,
+  Info,
 } from 'lucide-react'
 import { useVehiclesStore } from '@/stores/vehicles.store'
 import SidebarGoogleAuthSection from './SidebarGoogleAuthSection'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+
+const CREATOR_NAME = 'Luis Raúl Espinoza Barboza'
+const CREATOR_LINKEDIN_URL =
+  'https://www.linkedin.com/in/luis-ra%C3%BAl-espinoza-barboza-5b767751/'
+const CREATOR_SITE_URL = 'https://www.facware.com'
+const CONTACT_EMAIL = 'luis.espinoza@facware.com'
+const OFFICIAL_PAGE_URL = 'https://www.facware.com/products/expense-tracking.html'
+const LICENSE_URL = 'https://www.gnu.org/licenses/gpl-3.0.html'
+const LICENSE_NAME = 'GPL-3.0-only'
 
 interface SidebarProps {
   open: boolean
@@ -55,6 +72,7 @@ const settingsItems = [
 export default function Sidebar({ open, onClose }: SidebarProps) {
   const { t } = useTranslation()
   const location = useLocation()
+  const [aboutOpen, setAboutOpen] = useState(false)
   useVehiclesStore()
 
   // Close sidebar on route change
@@ -87,12 +105,15 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         }`}
       >
         {/* Sidebar header */}
-        <div className="flex items-center justify-between h-14 px-4 border-b shrink-0">
-          <div className="flex flex-col">
-            <span className="font-semibold text-lg tracking-tight text-gray-900">
-              ExpenseTracking
-            </span>
-            <span className="text-[10px] text-gray-400 font-mono">
+        <div className="flex items-center justify-between h-14 px-6 border-b shrink-0">
+          <div className="flex flex-col gap-0.0 min-w-0">
+            <img
+              src="/ImagoTipo-1389x256.png"
+              alt="ExpenseTracking"
+              className="h-12 w-auto max-w-[200px] object-contain"
+              loading="eager"
+            />
+            <span className="text-[10px] text-gray-400 font-mono leading-none">
               v{__APP_VERSION__}
             </span>
           </div>
@@ -189,9 +210,100 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                 </NavLink>
               </li>
             ))}
+            <li>
+              <button
+                type="button"
+                onClick={() => setAboutOpen(true)}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+              >
+                <Info size={18} className="shrink-0" />
+                <span>{t('sidebar.about')}</span>
+              </button>
+            </li>
           </ul>
         </nav>
       </aside>
+
+      {/* About dialog */}
+      <Dialog open={aboutOpen} onOpenChange={setAboutOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('about.title')}</DialogTitle>
+            <DialogDescription>{t('about.description')}</DialogDescription>
+          </DialogHeader>
+          <img
+            src="/ImagoTipo-2778x512.png"
+            alt="ExpenseTracking"
+            className="h-10 w-auto max-w-full object-contain"
+            loading="lazy"
+          />
+          <dl className="space-y-2 text-sm">
+            <div className="flex gap-2">
+              <dt className="font-medium text-gray-500">{t('about.versionLabel')}</dt>
+              <dd className="font-mono">v{__APP_VERSION__}</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="font-medium text-gray-500">{t('about.licenseLabel')}</dt>
+              <dd>
+                <a
+                  href={LICENSE_URL}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="underline underline-offset-2 hover:text-gray-900"
+                >
+                  {LICENSE_NAME}
+                </a>
+              </dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="font-medium text-gray-500">{t('about.officialPageLabel')}</dt>
+              <dd>
+                <a
+                  href={OFFICIAL_PAGE_URL}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="underline underline-offset-2 hover:text-gray-900 break-all"
+                >
+                  {OFFICIAL_PAGE_URL}
+                </a>
+              </dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="font-medium text-gray-500">{t('about.creatorLabel')}</dt>
+              <dd>
+                <a
+                  href={CREATOR_LINKEDIN_URL}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="underline underline-offset-2 hover:text-gray-900"
+                >
+                  {CREATOR_NAME}
+                </a>{' '}
+                ·{' '}
+                <a
+                  href={CREATOR_SITE_URL}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="underline underline-offset-2 hover:text-gray-900"
+                >
+                  {CREATOR_SITE_URL}
+                </a>
+              </dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="font-medium text-gray-500">{t('about.contactLabel')}</dt>
+              <dd>
+                <a
+                  href={`mailto:${CONTACT_EMAIL}`}
+                  className="underline underline-offset-2 hover:text-gray-900"
+                >
+                  {CONTACT_EMAIL}
+                </a>
+              </dd>
+            </div>
+          </dl>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
