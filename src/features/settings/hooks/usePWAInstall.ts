@@ -93,10 +93,13 @@ function getIsStandalone(): boolean {
   }
 
   // 4. Not in browser mode — verify with explicit standalone variants and persist.
+  // window-controls-overlay is the desktop title-bar mode (Windows/Edge/Chrome);
+  // a PWA running in it is installed, even though `standalone` is not set.
   if (
     window.matchMedia('(display-mode: standalone)').matches ||
     window.matchMedia('(display-mode: fullscreen)').matches ||
-    window.matchMedia('(display-mode: minimal-ui)').matches
+    window.matchMedia('(display-mode: minimal-ui)').matches ||
+    window.matchMedia('(display-mode: window-controls-overlay)').matches
   ) {
     sessionStorage.setItem(PWA_STANDALONE_SESSION_KEY, '1')
     return true
@@ -153,6 +156,7 @@ export function usePWAInstall(): UsePWAInstallReturn {
       window.matchMedia('(display-mode: standalone)'),
       window.matchMedia('(display-mode: fullscreen)'),
       window.matchMedia('(display-mode: minimal-ui)'),
+      window.matchMedia('(display-mode: window-controls-overlay)'),
     ]
     const onDisplayModeChange = () => setIsStandalone(getIsStandalone())
     queries.forEach((q) => q.addEventListener('change', onDisplayModeChange))

@@ -67,6 +67,12 @@
   "shell": {
     "openInAppBanner": "This app is installed on your device. Open it from your home screen icon for the full experience."
   },
+  "pwa": {
+    "updateAvailable": "Update available",
+    "updateAvailableDesc": "A new version was downloaded. Reload when you're ready — nothing is lost.",
+    "reload": "Reload",
+    "offlineReady": "App is ready for offline use"
+  },
   "reminders": {
     "title": "Reminders",
     "new": "New Reminder",

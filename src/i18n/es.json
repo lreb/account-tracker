@@ -67,6 +67,12 @@
   "shell": {
     "openInAppBanner": "Esta app está instalada en tu dispositivo. Ábrela desde el icono en tu pantalla de inicio para la experiencia completa."
   },
+  "pwa": {
+    "updateAvailable": "Actualización disponible",
+    "updateAvailableDesc": "Se descargó una nueva versión. Recarga cuando quieras — no se pierde nada.",
+    "reload": "Recargar",
+    "offlineReady": "La app está lista para usarse sin conexión"
+  },
   "reminders": {
     "title": "Recordatorios",
     "new": "Nuevo Recordatorio",

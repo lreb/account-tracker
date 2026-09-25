@@ -1,13 +1,33 @@
 import { StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Toaster } from 'sonner'
+import { Toaster, toast } from 'sonner'
 import { registerSW } from 'virtual:pwa-register'
-import './i18n'
+import i18n from './i18n'
 import './index.css'
 import App from './app/App'
 
-// Automatically check for updates and register service worker
-registerSW({ immediate: true })
+// Register the service worker and check for updates on launch. With
+// registerType 'autoUpdate' the new worker activates in the background, but
+// the running page keeps the old assets until reloaded — so surface a
+// persistent toast and let the user reload when safe (never force a reload
+// while they may be entering financial data).
+const updateSW = registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    toast(i18n.t('pwa.updateAvailable'), {
+      description: i18n.t('pwa.updateAvailableDesc'),
+      action: {
+        label: i18n.t('pwa.reload'),
+        onClick: () => void updateSW(true),
+      },
+      duration: Infinity,
+      id: 'pwa-update',
+    })
+  },
+  onOfflineReady() {
+    toast.success(i18n.t('pwa.offlineReady'), { id: 'pwa-offline-ready' })
+  },
+})
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
