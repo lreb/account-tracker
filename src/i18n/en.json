@@ -714,7 +714,12 @@
     "installAppMacOSStep2": "Choose \"Add to Dock\"",
     "installAppMacOSStep3": "Click \"Add\" to confirm",
     "installAppMacOSOldOSHint": "On macOS versions before Sonoma (14), Safari can't add the app to the Dock. Open this page in Chrome or Edge to install the app instead.",
+    "installAppFirefoxTitle": "In Firefox, install from the browser menu:",
+    "installAppFirefoxStep1": "Open the application menu (☰) in the toolbar",
+    "installAppFirefoxStep2": "Choose \"Install\" (or \"Save page to Pocket / Add to Home Screen\" on Android)",
+    "installAppFirefoxStep3": "Confirm to add the app icon to your device",
     "installAppBrowserHint": "Open this page in Chrome or Edge to install the app on your device.",
+    "installAppChromiumHint": "Use the install icon in your browser's address bar, or the browser menu, and choose Install app. Chrome, Edge and Vivaldi may only offer this after you've visited the app a couple of times.",
     "installAppInstalledInBrowserTitle": "App installed — not running from home screen",
     "installAppInstalledInBrowserDesc": "Close this browser tab and tap the app icon on your home screen to launch in full-screen mode.",
     "aiAssistantTitle": "AI Assistant"

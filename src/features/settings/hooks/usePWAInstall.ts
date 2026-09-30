@@ -39,6 +39,21 @@ export interface UsePWAInstallReturn {
   isMacOS: boolean
   /** True when the browser is Safari (desktop or iOS). Chrome, Edge, Firefox return false. */
   isSafari: boolean
+  /**
+   * True when the browser is Firefox (desktop, Android, or Firefox iOS).
+   * Firefox never fires `beforeinstallprompt` — installation is via the
+   * browser menu ("Install" / "Add to Home Screen").
+   */
+  isFirefox: boolean
+  /** True when the browser is Vivaldi (Chromium-based; `beforeinstallprompt` applies). */
+  isVivaldi: boolean
+  /**
+   * True for any Chromium engine (Chrome, Edge, Vivaldi, Opera, Brave,
+   * Samsung Internet, …). These browsers may fire `beforeinstallprompt`;
+   * before the prompt is available the UI should point at the manual
+   * address-bar/menu install affordance instead of sending the user away.
+   */
+  isChromium: boolean
   install: () => Promise<void>
 }
 
@@ -57,10 +72,33 @@ function detectMacOS(): boolean {
 }
 
 function detectSafari(): boolean {
-  // Safari UA includes "Safari/" but not Chromium's "Chrome"/"CriOS"/"Edg" markers
-  // (Chromium UAs contain "Safari/537.36"). Firefox has neither.
+  // Safari UA includes "Safari/" but not Chromium's markers (Chromium UAs
+  // contain "Safari/537.36"). Explicitly exclude every Chromium fork and
+  // Firefox iOS so only real Safari (desktop or iOS) returns true.
   const ua = navigator.userAgent
-  return /\bSafari\//.test(ua) && !/Chrome|CriOS|Edg\//i.test(ua)
+  return (
+    /\bSafari\//.test(ua) &&
+    !/Chrome|Chromium|CriOS|Edg\/|EdgA|EdgiOS|OPR\/|OPX\/|Vivaldi\/|SamsungBrowser|FxiOS/i.test(ua)
+  )
+}
+
+function detectFirefox(): boolean {
+  // Desktop Firefox ("Firefox/x"), Android Firefox (same token) and
+  // Firefox on iOS ("FxiOS/x"). Exclude Seamonkey (legacy Gecko fork that
+  // reuses the Firefox token) to avoid a false positive.
+  const ua = navigator.userAgent
+  return /Firefox\/|FxiOS\//i.test(ua) && !/Seamonkey\//i.test(ua)
+}
+
+function detectVivaldi(): boolean {
+  return /Vivaldi\//i.test(navigator.userAgent)
+}
+
+function detectChromium(): boolean {
+  // Any Chromium engine: Chrome, Edge (desktop/Android/iOS), Opera,
+  // Vivaldi, Brave (reports as Chrome), Samsung Internet, and Chrome iOS.
+  const ua = navigator.userAgent
+  return /Chrome\/|Chromium\/|CriOS\/|Edg\/|EdgA\/|EdgiOS\/|OPR\/|OPX\/|Vivaldi\/|SamsungBrowser\//i.test(ua)
 }
 
 function getIsStandalone(): boolean {
@@ -136,6 +174,9 @@ export function usePWAInstall(): UsePWAInstallReturn {
   const isIOS = detectIOS()
   const isMacOS = detectMacOS()
   const isSafari = detectSafari()
+  const isFirefox = detectFirefox()
+  const isVivaldi = detectVivaldi()
+  const isChromium = detectChromium()
 
   // Keep isStandalone in sync with display-mode media query changes (e.g. user drags the
   // PWA window into a browser tab on desktop, or the OS opens the PWA in a tab after an
@@ -211,6 +252,9 @@ export function usePWAInstall(): UsePWAInstallReturn {
     isIOS,
     isMacOS,
     isSafari,
+    isFirefox,
+    isVivaldi,
+    isChromium,
     install,
   }
 }

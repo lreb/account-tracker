@@ -93,6 +93,9 @@ describe('usePWAInstall', () => {
       expect(result.current.isIOS).toBe(false)
       expect(result.current.isMacOS).toBe(false)
       expect(result.current.isSafari).toBe(false)
+      expect(result.current.isFirefox).toBe(false)
+      expect(result.current.isVivaldi).toBe(false)
+      expect(result.current.isChromium).toBe(false)
       expect(typeof result.current.install).toBe('function')
     })
 
@@ -286,6 +289,113 @@ describe('usePWAInstall', () => {
       })
       const { result } = renderHook(() => usePWAInstall())
       expect(result.current.isSafari).toBe(false)
+    })
+
+    it('does NOT detect Vivaldi as Safari', () => {
+      setNavigator({
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Vivaldi/6.9',
+        maxTouchPoints: 0,
+      })
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isSafari).toBe(false)
+    })
+
+    it('does NOT detect Firefox iOS as Safari', () => {
+      setNavigator({
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/127.0 Mobile/15E148 Safari/605.1.15',
+        maxTouchPoints: 5,
+      })
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isSafari).toBe(false)
+    })
+  })
+
+  // ── isFirefox / isVivaldi / isChromium detection ──────────────────────────
+
+  describe('isFirefox / isVivaldi / isChromium detection', () => {
+    it('detects Firefox on desktop', () => {
+      setNavigator({
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0',
+        maxTouchPoints: 0,
+      })
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isFirefox).toBe(true)
+      expect(result.current.isChromium).toBe(false)
+      expect(result.current.isVivaldi).toBe(false)
+    })
+
+    it('detects Firefox on Android', () => {
+      setNavigator({
+        userAgent: 'Mozilla/5.0 (Android 14; Mobile; rv:127.0) Gecko/127.0 Firefox/127.0',
+        maxTouchPoints: 5,
+      })
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isFirefox).toBe(true)
+      expect(result.current.isChromium).toBe(false)
+    })
+
+    it('detects Firefox on iOS via FxiOS token', () => {
+      setNavigator({
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/127.0 Mobile/15E148 Safari/605.1.15',
+        maxTouchPoints: 5,
+      })
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isFirefox).toBe(true)
+    })
+
+    it('does NOT detect Chrome as Firefox', () => {
+      setNavigator({
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        maxTouchPoints: 0,
+      })
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isFirefox).toBe(false)
+    })
+
+    it('detects Vivaldi and classifies it as Chromium', () => {
+      setNavigator({
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Vivaldi/6.9',
+        maxTouchPoints: 0,
+      })
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isVivaldi).toBe(true)
+      expect(result.current.isChromium).toBe(true)
+      expect(result.current.isFirefox).toBe(false)
+    })
+
+    it('detects Chrome as Chromium but not Vivaldi', () => {
+      setNavigator({
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        maxTouchPoints: 0,
+      })
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isChromium).toBe(true)
+      expect(result.current.isVivaldi).toBe(false)
+    })
+
+    it('detects Edge as Chromium', () => {
+      setNavigator({
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0',
+        maxTouchPoints: 0,
+      })
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isChromium).toBe(true)
+    })
+
+    it('does NOT detect Firefox or Safari as Chromium', () => {
+      setNavigator({
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:127.0) Gecko/20100101 Firefox/127.0',
+        maxTouchPoints: 0,
+      })
+      const { result } = renderHook(() => usePWAInstall())
+      expect(result.current.isChromium).toBe(false)
+
+      setNavigator({
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15',
+        maxTouchPoints: 0,
+      })
+      const { result: safari } = renderHook(() => usePWAInstall())
+      expect(safari.current.isChromium).toBe(false)
     })
   })
 
