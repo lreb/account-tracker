@@ -6,7 +6,7 @@
 |---------|---------|
 | `npm run dev` | Start Vite dev server (port 5173) |
 | `npm run build` | Type-check + production build → `dist/` |
-| `npm run preview` | Serve production build locally (port 4173) |
+| `npm run preview` | Serve production build locally (port 4173) — **required for PWA install testing** |
 | `npm run test` | Run all Vitest unit tests once |
 | `npm run test -- <file>` | Run single test file |
 | `npm run lint` | ESLint on `src/` (zero warnings allowed) |
@@ -45,6 +45,13 @@
 - Unit tests: Vitest + jsdom + `@testing-library/react`
 - Run single file: `npm run test -- src/lib/categories.test.ts`
 - Keep regression tests when fixing bugs
+
+### PWA Install Prompts
+- **Never verify installability under `npm run dev`.** `vite-plugin-pwa` v1 ships *no* service worker in dev (`devOptions.enabled` defaults to `false`), and Chromium requires an *activated* SW with a fetch handler before firing `beforeinstallprompt`. Use `npm run preview` or a real deploy.
+- Chromium gates `beforeinstallprompt` behind engagement heuristics (~2 visits, ~30s), so even a correct build shows no install button on the first visit. This is expected, not a bug.
+- `beforeinstallprompt` **never fires** on Safari (iOS/macOS) or Firefox — they use "Add to Home Screen" / "Add to Dock" instead, handled by dedicated copy branches in `SettingsPage.tsx`.
+- The manifest is **generated** from `VitePWA({ manifest })` in `vite.config.ts` and its `<link rel="manifest">` is injected by the plugin. Do not hand-write `public/manifest.webmanifest` — a `public/` copy silently collides with the plugin's output at the same `dist/` path, and a stripped-down version drops `id` and `start_url: '/?source=pwa'`, which breaks home-screen launch detection.
+- Do not add `related_applications` to enable `getInstalledRelatedApps()` detection. Chromium only reports a `webapp` for Chrome/Edge 140+ desktop, it cannot *launch* the PWA from JS, and it is not worth the manifest churn.
 
 ### Pre-commit Hook
 Husky runs `npm run ci:validate` (lint → test → build) on staged `src/**/*.{ts,tsx}`. **Commits blocked on any error.**
