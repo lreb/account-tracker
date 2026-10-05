@@ -88,6 +88,10 @@ features/transactions/
 
 **Rule**: A feature-scoped type file (e.g. `foo.types.ts`) is co-located with its feature. Only when a type is imported by 2+ different features does it move to `src/types/`.
 
+### Shared UI Components
+
+Reusable controls belong in `src/components/ui/`; feature-specific composition stays under `src/features/<name>/components/`. Extend or compose an existing control when its interaction model matches the need. For selection controls, make single- and multi-select behavior explicit in the component API, keep selected values controlled by the caller, and provide accessible labels and keyboard-operable options. Features must pass only eligible records (for example active, non-hidden accounts) as options rather than relying on the control to infer business rules.
+
 ### Store Pattern
 
 All state lives in Zustand stores (`src/stores/<domain>.store.ts`). Each store:

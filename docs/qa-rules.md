@@ -144,6 +144,15 @@ Generates HTML report in `coverage/` directory. Required before merge:
 - [ ] Archive vehicle (retain history)
 - [ ] View archived vehicles
 
+**Reports — Account Performance**:
+- [ ] Account selector starts with no accounts selected
+- [ ] Selector supports choosing and clearing multiple accounts
+- [ ] Hidden and cancelled accounts are not offered for selection or charted
+- [ ] One selected account renders one line without a legend; multiple accounts have identifiable lines and a legend
+- [ ] Unavailable conversion rates do not display values as if they were in the base currency
+- [ ] Interval changes update the date range and axis labels; tooltips show the date and base-currency value
+- [ ] Account selection dialog remains usable with keyboard and on narrow screens
+
 ### Forms & Validation
 
 **Acceptance Criteria**:
