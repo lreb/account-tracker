@@ -505,6 +505,21 @@
   },
   "reports": {
     "title": "Reportes",
+    "accountPerformance": "Saldo de cuentas a lo largo del tiempo",
+    "performanceAccounts": "Cuentas para comparar",
+    "interval": "Intervalo",
+    "selectAccountsForPerformance": "Selecciona una o más cuentas para ver su rendimiento.",
+    "valuesInCurrency": "Valores en {{currency}}",
+    "missingPerformanceRates": "Algunos valores no aparecen porque falta una tasa de cambio a la moneda de la aplicación.",
+    "performanceIntervals": {
+      "oneHour": "1 hora", "sixHours": "6 horas", "twelveHours": "12 horas",
+      "oneDay": "1 día", "oneWeek": "1 semana", "twoWeeks": "2 semanas", "oneMonth": "1 mes",
+      "oneYear": "1 año", "threeYears": "3 años", "fiveYears": "5 años", "tenYears": "10 años"
+    },
+    "combinedBalanceCandlestick": "Velas del saldo combinado de cuentas",
+    "candlestickDescription": "Apertura, máximo, mínimo y cierre de {{count}} cuenta(s), convertidas a {{currency}}.",
+    "high": "Máximo",
+    "low": "Mínimo",
     "filters": "Filtros",
     "period": "Período",
     "account": "Cuenta",

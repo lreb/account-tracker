@@ -21,31 +21,26 @@ import { useBalancesStore } from '@/stores/balances.store'
 import { useCategoriesStore } from '@/stores/categories.store'
 import { useLabelsStore } from '@/stores/labels.store'
 import { useSettingsStore } from '@/stores/settings.store'
-import { getVisibleAccountIds, getVisibleAccounts } from '@/lib/accounts'
+import { useExchangeRatesStore } from '@/stores/exchange-rates.store'
+import { getActiveAccounts, getVisibleAccountIds, getVisibleAccounts } from '@/lib/accounts'
 import { formatCurrency } from '@/lib/currency'
 import {
   computePeriodSummary,
   computeMonthlyTrend,
-  computeAccountBalances,
   computeCashFlow,
   type ReportFilters,
 } from '@/lib/reports'
-import { CategoryIcon } from '@/lib/icon-map'
 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LabelPickerButton } from '@/components/ui/label-picker-button'
 import { AccountSelect } from '@/components/ui/account-select'
+import { AccountMultiSelect } from '@/components/ui/account-multi-select'
 import { CategoryExpensesByCategoryReport } from './CategoryExpensesByCategoryReport'
 import { CategoryIncomesByCategoryReport } from './CategoryIncomesByCategoryReport'
 import { LabelReport } from './LabelReport'
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const PIE_COLORS = [
-  '#6366f1', '#f59e0b', '#10b981', '#ef4444', '#3b82f6',
-  '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#84cc16',
-]
+import { AccountPerformanceChart } from './AccountPerformanceChart'
+import { type AccountPerformanceInterval } from '../lib/account-performance'
 
 import {
   type MonthlyPresetKey as PresetKey,
@@ -149,7 +144,9 @@ export default function ReportsPage() {
   const { categories } = useCategoriesStore()
   const { labels } = useLabelsStore()
   const { baseCurrency } = useSettingsStore()
+  const { load: loadExchangeRates, getRateForPair } = useExchangeRatesStore()
   const visibleAccounts = useMemo(() => getVisibleAccounts(accounts), [accounts])
+  const activeAccounts = useMemo(() => getActiveAccounts(accounts), [accounts])
   const visibleAccountIds = useMemo(() => getVisibleAccountIds(accounts), [accounts])
   const hasData = useMemo(
     () => transactions.some((transaction) => visibleAccountIds.has(transaction.accountId)),
@@ -166,6 +163,9 @@ export default function ReportsPage() {
   const [filterAccount, setFilterAccount] = useState<string>('all')
   const [filterLabelIds, setFilterLabelIds] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<'overview' | 'category' | 'accounts' | 'cashflow' | 'labels'>('overview')
+  const [performanceInterval, setPerformanceInterval] = useState<AccountPerformanceInterval>('1y')
+  const [performanceAccountIds, setPerformanceAccountIds] = useState<string[]>([])
+  useEffect(() => { void loadExchangeRates() }, [loadExchangeRates])
 
   // If the selected account is no longer in the visible list (e.g. hidden/removed),
   // treat it as 'all' without a setState-in-effect cycle.
@@ -220,11 +220,6 @@ export default function ReportsPage() {
       visibleAccountIds,
     ),
     [filteredTransactions, monthCount, effectiveAccount, visibleAccountIds],
-  )
-
-  const accountBalances = useMemo(
-    () => computeAccountBalances(filteredTransactions, accounts, categories, filters),
-    [filteredTransactions, accounts, categories, filters],
   )
 
   const cashFlow = useMemo(
@@ -418,72 +413,21 @@ export default function ReportsPage() {
       {/* ── Accounts tab: balance sheet by account ───────────────────────── */}
       {activeTab === 'accounts' && (
         <div className="space-y-4">
-          {visibleAccounts.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center mt-8">{t('reports.noAccountsYet')}</p>
-          ) : (
-            accountBalances.map((ab) => (
-              <div key={ab.accountId} className="rounded-2xl border bg-white shadow-sm overflow-hidden">
-                {/* Account header */}
-                <div className="px-4 py-3 border-b bg-gray-50 flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-900">{ab.name}</p>
-                    <p className="text-xs text-gray-400">{ab.currency}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-indigo-600">
-                      {formatCurrency(ab.closingBalance, ab.currency)}
-                    </p>
-                    <p className={`text-xs ${ab.vsLastMonth >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                      {ab.vsLastMonth >= 0 ? '+' : ''}{formatCurrency(ab.vsLastMonth, ab.currency)} vs last month
-                    </p>
-                  </div>
-                </div>
-
-                {/* Opening / Income / Expenses / Closing row */}
-                <div className="grid grid-cols-4 divide-x text-center py-3">
-                  {[
-                    { label: 'Opening', value: ab.openingBalance, color: 'text-gray-700' },
-                    { label: 'Income', value: ab.totalIncome, color: 'text-green-600' },
-                    { label: 'Expenses', value: ab.totalExpenses, color: 'text-red-500' },
-                    { label: 'Closing', value: ab.closingBalance, color: 'text-indigo-600' },
-                  ].map(({ label, value, color }) => (
-                    <div key={label} className="px-2">
-                      <p className="text-[10px] text-gray-400 uppercase tracking-wide">{label}</p>
-                      <p className={`text-xs font-semibold mt-0.5 ${color}`}>
-                        {formatCurrency(value, ab.currency)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Expenses by category (for this account) */}
-                {ab.byCategory.length > 0 && (
-                  <div className="px-4 pb-3 space-y-1.5">
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-2">{t('reports.expensesByCategory')}</p>
-                    {ab.byCategory.map((slice, i) => (
-                      <div key={slice.categoryId} className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <CategoryIcon name={slice.icon} size={12} className="text-gray-400 shrink-0" />
-                          <span className="flex-1 text-xs text-gray-700 truncate">{slice.name}</span>
-                          <span className="text-xs text-gray-400">{slice.percent}%</span>
-                          <span className="text-xs font-medium">{formatCurrency(slice.amount, ab.currency)}</span>
-                        </div>
-                        <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden ml-5">
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{
-                              width: `${slice.percent}%`,
-                              background: PIE_COLORS[i % PIE_COLORS.length],
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))
-          )}
+          <AccountMultiSelect
+            options={activeAccounts}
+            value={performanceAccountIds}
+            onChange={setPerformanceAccountIds}
+            label={t('reports.performanceAccounts')}
+          />
+          <AccountPerformanceChart
+            accounts={activeAccounts.filter((account) => performanceAccountIds.includes(account.id))}
+            transactions={transactions}
+            interval={performanceInterval}
+            onIntervalChange={setPerformanceInterval}
+            baseCurrency={baseCurrency}
+            getRateForPair={getRateForPair}
+          />
+          
         </div>
       )}
 
