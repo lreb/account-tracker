@@ -514,9 +514,14 @@
     "valuesInCurrency": "Values in {{currency}}",
     "missingPerformanceRates": "Some values are hidden because an exchange rate to the app currency is unavailable.",
     "performanceIntervals": {
+      "oneHour": "1 hour", "sixHours": "6 hours", "twelveHours": "12 hours",
       "oneDay": "1 day", "oneWeek": "1 week", "twoWeeks": "2 weeks", "oneMonth": "1 month",
       "oneYear": "1 year", "threeYears": "3 years", "fiveYears": "5 years", "tenYears": "10 years"
     },
+    "combinedBalanceCandlestick": "Combined account balance candles",
+    "candlestickDescription": "Open, high, low, and close for {{count}} selected account(s), converted to {{currency}}.",
+    "high": "High",
+    "low": "Low",
     "filters": "Filters",
     "period": "Period",
     "account": "Account",
