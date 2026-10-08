@@ -26,7 +26,7 @@ const REQUIRED_SCOPES = [
 ]
 const SCOPE = REQUIRED_SCOPES.join(' ')
 const BACKUP_FILE_PREFIX = 'expense-tracking'
-export const APP_BACKUP_FOLDER_NAME = 'ExpenseTracking Backups'
+export const APP_BACKUP_FOLDER_NAME = 'Facware-ExpenseTrackingBackups'
 
 // ── Storage keys ──────────────────────────────────────────────────────────────
 // Tokens go in localStorage to survive page reloads and browser restarts.
