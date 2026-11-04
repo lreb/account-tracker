@@ -1,74 +1,118 @@
-# ExpenseTracking — Agent Instructions
+# ExpenseTracking: Agent Instructions
 
-## Quick Reference
+## Purpose
+ExpenseTracking is a local-first, offline-first personal-finance PWA. It records transactions, accounts, budgets, categories, vehicles, fuel logs and services. Core features must work without a backend or Internet connection.
 
+## Canonical stack
+- React 19, Vite 6 and strict TypeScript
+- Zustand stores are the only application-level mutation path
+- Dexie.js over IndexedDB, schema version 9 or later
+- react-hook-form and Zod for forms and validation
+- React Router with `createBrowserRouter`
+- Tailwind CSS v4 and shadcn/ui
+- react-i18next, with English and Spanish parity
+- Vitest, jsdom and Testing Library
+- Vite PWA Plugin generates the manifest and service worker
+
+## Required commands
 | Command | Purpose |
-|---------|---------|
-| `npm run dev` | Start Vite dev server (port 5173) |
-| `npm run build` | Type-check + production build → `dist/` |
-| `npm run preview` | Serve production build locally (port 4173) — **required for PWA install testing** |
-| `npm run test` | Run all Vitest unit tests once |
-| `npm run test -- <file>` | Run single test file |
-| `npm run lint` | ESLint on `src/` (zero warnings allowed) |
-| `npm run lint:fix` | Auto-fix ESLint issues |
-| `npm run ci:validate` | **Pre-commit gate**: lint + test + build |
+|---|---|
+| `npm run dev` | Start development server on port 5173 |
+| `npm run test -- <file>` | Run the smallest relevant test file |
+| `npm run lint` | Run ESLint; zero errors allowed |
+| `npm run build` | Type-check and build production output |
+| `npm run preview` | Test the production PWA on port 4173 |
+| `npm run ci:validate` | Required completion gate: lint, tests and build |
 
-## Architecture Essentials
+## Non-negotiable rules
+### Data and business logic
+- Store monetary amounts as integer minor units, normally cents. Never use floating-point amounts as authoritative financial values.
+- Exclude cancelled transactions from balances, budgets, reports and AI summaries.
+- A transfer creates two linked records sharing `transferId`: expense on the source account and income on the destination account.
+- For cross-currency transfers, persist the confirmed source-to-destination exchange rate and the original currency information.
+- Financial calculations are deterministic code. AI may explain results but must not produce authoritative balances, totals, taxes or exchange calculations.
+- Historical retention uses explicit manual compaction only. Never implement automatic deletion. See `docs/features/data-retention.md`.
 
-- **Framework**: React 19 + Vite 6 + TypeScript (strict)
-- **State**: Zustand stores in `src/stores/` — **only** way to mutate data
-- **DB**: Dexie.js (IndexedDB) singleton at `src/db/index.ts` — v9
-- **Forms**: react-hook-form + zod schemas in `src/features/<module>/schemas/`
-- **Routing**: `createBrowserRouter` in `src/app/router.tsx`
-- **Styling**: Tailwind CSS v4 + shadcn/ui (CLI-managed in `src/components/ui/`)
-- **i18n**: react-i18next — **no hardcoded strings in JSX**
+### State and persistence
+- Components read and mutate data through Zustand stores. Do not call Dexie directly from components.
+- Every Dexie schema change adds a new `.version(n)` block. Never edit an existing schema version.
+- Keep business calculations in pure functions under `src/lib/` when possible.
+- Store mutations must keep Dexie and in-memory Zustand state consistent.
 
-## Critical Conventions
+### Code organization
+- Feature code lives in `src/features/<domain>/`.
+- Feature-specific hooks, schemas and types remain co-located.
+- Move a hook or type to a shared folder only when at least two features consume it.
+- Shared pure utilities belong in `src/lib/`.
+- Shared UI primitives belong in `src/components/ui/`; feature compositions stay in the feature.
+- Reuse existing patterns before creating abstractions or dependencies.
+- Do not modify unrelated behavior.
 
-### Data & DB
-- Currency values stored as **integers (cents)** — avoid floating point
-- Exchange rates: Frankfurter v2 API (`api.frankfurter.dev/v2`)
-- **Dexie migrations**: Every schema change → new `.version(n)` block in `src/db/index.ts` (never edit existing versions)
-- Cross-currency transfers create **two linked records** sharing `transferId`
+### UI, language and accessibility
+- Do not hardcode user-facing strings in JSX. Add keys to both English and Spanish resources.
+- Use semantic HTML, visible focus, labeled controls and keyboard-operable interactions.
+- Target WCAG 2.1 AA and touch targets of at least 44 by 44 CSS pixels.
+- Keep layouts usable at 320 CSS pixels without page-level horizontal scrolling.
 
-### Code Organization
-- Feature modules: `src/features/<domain>/` (components, hooks, schemas)
-- Pure utilities: `src/lib/` (currency, budgets, vehicles, dates, insights)
-- Shared hooks: `src/hooks/` (only if used by 2+ features)
-- `@/` alias maps to `src/` (configured in vite.config.ts + tsconfig.json)
-
-### Linting Rules (enforced, block commits)
-- `@typescript-eslint/no-unused-vars: error` — unused imports = error
-- `react-refresh/only-export-components: warn` — `.tsx` must export only React components; move types/constants to companion `.types.ts`
+### Security and privacy
+- Core financial data stays on device unless the user explicitly exports, synchronizes or invokes AI.
+- Never log API keys, OAuth tokens, raw financial records, account names, notes, descriptions or personal identifiers.
+- AI adapters may receive only the sanitized aggregate defined in `docs/features/ai.md`.
+- AI keys are user supplied and stored locally in IndexedDB settings. They are sent only to the configured provider's authorization endpoint and are never included in backups or diagnostics.
+- Use HTTPS for external calls, except explicit localhost development endpoints for Ollama or LM Studio.
+- Never use `eval`, `Function`, `dangerouslySetInnerHTML` or embedded client secrets.
 
 ### Testing
-- Unit tests: Vitest + jsdom + `@testing-library/react`
-- Run single file: `npm run test -- src/lib/categories.test.ts`
-- Keep regression tests when fixing bugs
+- Bug fixes require a regression test.
+- New or changed business logic requires focused unit tests.
+- Store changes require persistence and in-memory-state tests.
+- Data migration, import/export, transfer, balance, retention and AI privacy paths require explicit coverage.
+- Before completing a change, run `npm run ci:validate`.
 
-### PWA Install Prompts
-- **Never verify installability under `npm run dev`.** `vite-plugin-pwa` v1 ships *no* service worker in dev (`devOptions.enabled` defaults to `false`), and Chromium requires an *activated* SW with a fetch handler before firing `beforeinstallprompt`. Use `npm run preview` or a real deploy.
-- Chromium gates `beforeinstallprompt` behind engagement heuristics (~2 visits, ~30s), so even a correct build shows no install button on the first visit. This is expected, not a bug.
-- `beforeinstallprompt` **never fires** on Safari (iOS/macOS) or Firefox — they use "Add to Home Screen" / "Add to Dock" instead, handled by dedicated copy branches in `SettingsPage.tsx`.
-- The manifest is **generated** from `VitePWA({ manifest })` in `vite.config.ts` and its `<link rel="manifest">` is injected by the plugin. Do not hand-write `public/manifest.webmanifest` — a `public/` copy silently collides with the plugin's output at the same `dist/` path, and a stripped-down version drops `id` and `start_url: '/?source=pwa'`, which breaks home-screen launch detection.
-- Do not add `related_applications` to enable `getInstalledRelatedApps()` detection. Chromium only reports a `webapp` for Chrome/Edge 140+ desktop, it cannot *launch* the PWA from JS, and it is not worth the manifest churn.
+### PWA
+- Do not test installability under `npm run dev`; use `npm run preview` or a deployed HTTPS build.
+- The manifest is generated by `VitePWA({ manifest })`. Do not add `public/manifest.webmanifest`.
+- Safari and Firefox do not use Chromium's `beforeinstallprompt`; retain platform-specific install guidance.
 
-### Pre-commit Hook
-Husky runs `npm run ci:validate` (lint → test → build) on staged `src/**/*.{ts,tsx}`. **Commits blocked on any error.**
+## AI context strategy
+`AGENTS.md` is the only document loaded by default. Do not load all documentation.
 
-## Environment
-- Copy `.env.example` → `.env` for local Google Drive sync
-- `VITE_GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_SECRET` required for Drive
-- Version from `package.json` injected as `__APP_VERSION__` at build time
+For each task:
+1. Identify the affected domain and risk level.
+2. Read only the mapped documentation below.
+3. Inspect the smallest relevant set of source files and tests.
+4. Search for existing implementations before creating new code.
+5. State any material conflict between code and canonical documentation before changing behavior.
+6. Implement the smallest coherent change.
+7. Validate with focused tests, then `npm run ci:validate`.
 
-## CI/CD
-- GitHub Actions: push to `main` → lint/test/build → deploy to GitHub Pages
-- Workflow: `.github/workflows/deploy-pages.yml`
-- SPA fallback: `dist/404.html` copy for GitHub Pages routing
+## Context routing
+| Task | Read |
+|---|---|
+| Layering, module placement, data flow, dates | `docs/architecture.md` |
+| Transactions, accounts, transfers, budgets, vehicles, reports | `docs/business-rules.md` |
+| Types, tables, stores and backup format | `docs/data-model.md` |
+| Why an architectural choice exists | Relevant ADR in `docs/decision-log.md` |
+| AI providers, prompts, privacy and cache | `docs/features/ai.md` |
+| Historical compaction | `docs/features/data-retention.md` |
+| Credentials, external transmission, OAuth, logging | `docs/security.md` |
+| Test selection and acceptance gates | `docs/operations/testing.md` |
+| Build, CI/CD and release | `docs/operations/deployment.md` |
+| LAN PWA testing | `docs/operations/pwa-intranet.md` |
+| Project-specific terminology only | `docs/glossary.md` |
 
-## Key Files to Reference
-- `docs/architecture.md` — system layers, patterns, performance
-- `docs/business-rules.md` — transaction lifecycle, budgets, currency
-- `docs/api-contracts.md` — TypeScript interfaces, store contracts, backup formats
-- `docs/decision-log.md` — 18 ADRs (Zustand, Dexie, React 19, offline-first, etc.)
-- `.github/copilot-instructions.md` — detailed hook/store reference, conventions
+## Authority and conflict policy
+Use this priority for intended behavior:
+1. Accepted ADR and explicit business rule
+2. Current feature specification
+3. Current source code and tests
+4. Architecture and data-model documentation
+5. README or historical notes
+
+Source code is implementation evidence, not automatic design authority. If code conflicts with an accepted rule, do not silently copy the conflict. Report it and align the change with the canonical rule unless the task explicitly changes that rule.
+
+## Response expectations for coding agents
+- Summarize affected behavior and files.
+- List assumptions or detected conflicts.
+- Make no claim that tests passed unless they were executed.
+- Do not paste broad documentation into prompts; reference file and heading.

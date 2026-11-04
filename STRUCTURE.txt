@@ -1,0 +1,18 @@
+ExpenseTracking/
+├── README.md
+├── AGENTS.md
+├── DOCUMENTATION-MIGRATION.md
+└── docs/
+    ├── architecture.md
+    ├── business-rules.md
+    ├── data-model.md
+    ├── decision-log.md
+    ├── glossary.md
+    ├── security.md
+    ├── features/
+    │   ├── ai.md
+    │   └── data-retention.md
+    └── operations/
+        ├── testing.md
+        ├── deployment.md
+        └── pwa-intranet.md
