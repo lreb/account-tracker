@@ -1,0 +1,20 @@
+ExpenseTracking/
+├── README.md
+├── AGENTS.md
+└── docs/
+    ├── architecture.md
+    ├── business-rules.md
+    ├── data-model.md
+    ├── decision-log.md
+    ├── glossary.md
+    ├── security.md
+    ├── features/
+    │   ├── ai.md
+    │   └── data-retention.md
+    └── operations/
+        ├── testing.md
+        ├── deployment.md
+        └── pwa-intranet.md
+
+Files outside this tree are redirects, not authority.
+Schema authority is src/types/index.ts, src/db/index.ts, and src/lib/backup.ts.

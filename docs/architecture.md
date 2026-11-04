@@ -1,231 +1,86 @@
-# Architecture Overview
+# Architecture
 
-## System Design
+## System
+ExpenseTracking is a client-side PWA with no required backend.
 
-**ExpenseTracking** is a local-first, offline-first Progressive Web App (PWA) with zero backend dependency. All data lives in the user's device via IndexedDB.
-
-### Architecture Layers
-
-```
-┌─────────────────────────────────────────────────────┐
-│  UI Layer (React Components + shadcn/ui)            │
-├─────────────────────────────────────────────────────┤
-│  State Management (Zustand stores)                  │
-├─────────────────────────────────────────────────────┤
-│  Data Persistence (Dexie.js / IndexedDB)            │
-├─────────────────────────────────────────────────────┤
-│  Utility & Business Logic (src/lib/)                │
-└─────────────────────────────────────────────────────┘
+```text
+React UI
+   ↓
+Zustand stores
+   ↓
+Pure domain utilities
+   ↓
+Dexie
+   ↓
+IndexedDB
 ```
 
-### Core Principles
+Optional user-triggered network integrations:
+- Frankfurter v2 for exchange rates. `src/stores/exchange-rates.store.ts` calls `https://api.frankfurter.dev/v2/rates?base=` and `https://api.frankfurter.dev/v2/rate/{from}/{to}`.
+- User-selected cloud backup provider
+- User-configured AI provider
 
-1. **Offline-First**: Every feature works without internet; sync is optional and user-triggered
-2. **Local-First**: No data leaves the device without explicit user action
-3. **Single Responsibility**: Each module owns its domain (transactions, vehicles, budgets, reports, etc.)
-4. **Type Safety**: Strict TypeScript throughout; zero any-types
-5. **Performance**: Virtual lists, memoization, code splitting by route
+## Layer responsibilities
+### UI
+Renders state, captures input and calls store actions. It does not call Dexie or contain authoritative financial calculations.
 
-### Module Organization
+### Stores
+Own application state and mutation workflows. Store mutations validate input, persist to Dexie, update memory and surface sanitized errors.
 
-```
+### Domain utilities
+Pure functions for balances, budgets, currency conversion, reporting, retention aggregation and AI data preparation.
+
+### Persistence
+Dexie is the only IndexedDB abstraction. Each structural change adds a new immutable schema version.
+
+## Source layout
+```text
 src/
-├── app/                    # Root component & routing setup
-├── components/
-│   ├── ui/                 # Primitive UI components (shadcn/ui + custom)
-│   └── layout/             # Shell, Header, Sidebar, ErrorBoundary
-├── features/               # Feature-scoped modules (one per domain)
-│   ├── transactions/       # Transaction recording & management
-│   ├── vehicles/           # Fuel & service tracking
-│   ├── budgets/            # Budget management
-│   ├── reports/            # Analysis & dashboards
-│   ├── insights/           # Smart recommendations
-│   ├── settings/           # User preferences & account management
-│   └── reminders/          # Alerts & notifications
-├── db/                     # Dexie schema & migrations
-├── stores/                 # Zustand state management
-├── lib/                    # Pure utility functions
-├── hooks/                  # Shared custom hooks (2+ features)
-├── types/                  # Shared TypeScript definitions
-└── i18n/                   # Internationalization (EN / ES)
+  app/                 application shell and router
+  components/ui/       shared UI primitives
+  components/layout/   shell and navigation
+  features/<domain>/   feature UI, hooks, schemas and local types
+  stores/              Zustand domain stores
+  db/                  Dexie schema and migrations
+  lib/                 pure domain utilities and integrations
+  hooks/               hooks shared by 2+ features
+  types/               types shared by 2+ features
+  i18n/                English and Spanish resources
 ```
 
-### Data Flow
-
-1. **User Interaction** → React component event handler
-2. **Store Mutation** → Zustand store updates in-memory state
-3. **Dexie Persist** → Store writes to IndexedDB (wrapped in try/catch)
-4. **UI Rerender** → React reads from Zustand (not Dexie directly)
-5. **Error Surface** → Via `sonner` toast notifications
-
-### Key Design Decisions
-
-| Decision | Rationale |
-|----------|-----------|
-| Zustand over Redux | Lightweight, no boilerplate, perfect for offline PWAs |
-| Dexie over raw IndexedDB | Cleaner API, schema versioning, better DX |
-| react-hook-form + zod | Type-safe forms with minimal runtime overhead |
-| Tailwind + shadcn | Utility-first styling, accessible components, fast iteration |
-| Virtual lists | Responsive list rendering even with 1000+ transactions |
-| Client-side PDF/CSV | No backend needed, full user privacy |
-
----
-
-## Feature Architecture
-
-Each feature module (`src/features/<name>/`) is self-contained:
-
-```
-features/transactions/
-├── components/          # UI components (TransactionForm, List, Card)
-├── hooks/              # Feature-specific hooks
-├── schemas/            # zod validation schemas
-├── types.ts            # TypeScript interfaces (if needed)
-└── index.ts            # Barrel export
+## Data flow
+```text
+User action
+  → Zod/form validation
+  → Zustand action
+  → pure business rule
+  → Dexie transaction
+  → in-memory state update
+  → UI rerender
 ```
 
-**Rule**: A feature-scoped hook is co-located with its feature. Only when a hook is consumed by 2+ features does it move to `src/hooks/`.
-
-**Rule**: A feature-scoped type file (e.g. `foo.types.ts`) is co-located with its feature. Only when a type is imported by 2+ different features does it move to `src/types/`.
-
-### Shared UI Components
-
-Reusable controls belong in `src/components/ui/`; feature-specific composition stays under `src/features/<name>/components/`. Extend or compose an existing control when its interaction model matches the need. For selection controls, make single- and multi-select behavior explicit in the component API, keep selected values controlled by the caller, and provide accessible labels and keyboard-operable options. Features must pass only eligible records (for example active, non-hidden accounts) as options rather than relying on the control to infer business rules.
-
-### Store Pattern
-
-All state lives in Zustand stores (`src/stores/<domain>.store.ts`). Each store:
-- Loads data from Dexie on `load()`
-- Wraps mutations in try/catch → console.error + toast.error()
-- Never calls Dexie directly from components
-- Exports a single hook (e.g., `useTransactionsStore()`)
-
-### Database Schema
-
-Dexie tables are defined in `src/db/index.ts` with explicit versioning:
-- Every structural change adds a new `.version(n)` block
-- Never modify existing version blocks
-- Migrations happen automatically on version mismatch
-
----
-
-## Currency & Exchange Rates
-
-- **Currency values** stored as integers (cents) to avoid floating-point errors
-- **Exchange rates** stored as numbers (up to 6 decimal places)
-- **Base currency** set in settings; all reports convert to this currency
-- **API**: Frankfurter v2 (`https://api.frankfurter.dev/v2`) — no key required
-
-### Cross-Currency Transfers
-
-When transferring between accounts with different currencies:
-1. TransactionForm detects mismatch
-2. CrossCurrencyDialog opens
-3. User confirms or fetches live rate from Frankfurter API
-4. Transaction stores `exchangeRate` and `originalAmount` (destination-side)
-
----
-
-## Offline & PWA
-
-- **Vite PWA Plugin** handles service worker generation (Workbox)
-- App is installable on mobile (manifest.json + icons)
-- Works fully offline; user can update data without connectivity
-- Optional manual sync to Google Drive / Dropbox (planned)
-
----
-
-## Performance Optimizations
-
-| Technique | Where | Benefit |
-|-----------|-------|---------|
-| Virtual lists | TransactionListPage | Renders 1000+ items smoothly |
-| useDeferredValue | DashboardPage, ReportsPage | Keeps navigation instant during memo recomputation |
-| Skeleton loaders | Page startup | Better perceived performance |
-| Code splitting by route | Router setup | Smaller initial bundle |
-| Memoization (useMemo, useCallback) | Custom hooks | Prevents unnecessary re-renders |
-
----
-
-## Error Handling
-
-- **React Error Boundaries** wrap each feature route
-- **Dexie errors** are caught in store mutations → `toast.error()`
-- **User-facing errors** always use `sonner` toasts
-- Never swallow errors silently
-
----
-
-## Testing Strategy
-
-- **Vitest** for unit tests
-- Focus on pure utility functions (`src/lib/`)
-- Regression tests for critical paths (e.g., category renaming)
-- Components tested via integration rather than snapshot tests
-
----
-
-## i18n Strategy
-
-- **English (en)** is the source language
-- **Spanish (es)** translations maintain feature parity
-- All strings pass through `react-i18next` — no hardcoded English in JSX
-- New keys must be added to both `en.json` and `es.json`
-
----
+If persistence fails, do not leave memory in a successful state. Display a localized, non-sensitive error.
 
 ## Date / Time Handling
-
-### Transaction date storage
-
-Transactions are saved as UTC ISO strings:
-
-```ts
-new Date(`${date}T${time}:00`).toISOString()
-// e.g. "2026-05-22T05:57:00.000Z"  ← 11:57 PM Chihuahua (UTC-6)
-```
-
-### Filter boundary rule — always use LOCAL time, never `Z`
-
-**Common pitfall:** writing `T23:59:59.999Z` for an end-of-day ceiling.
-
-- `T23:59:59.999Z` = 11:59 PM **UTC**.
-- A transaction entered at 11:57 PM in Chihuahua (UTC-6) is stored as `T05:57:00.000Z` (next UTC day). That is **after** the `T23:59:59.999Z` ceiling, so it is wrongly excluded.
-
-**Fix:** drop the `Z` suffix to create a **local-time** boundary:
+- Persist transaction instants as UTC ISO strings.
+- Build date-range boundaries in device-local time, then convert to ISO when string comparison requires UTC.
+- Do not append `Z` to a user-selected local day boundary before constructing the Date.
 
 ```ts
-// ✅ Correct — local end-of-day
-new Date(`${dateTo}T23:59:59.999`)          // no Z → interpreted in the device's local timezone
-// In UTC-6 this becomes T05:59:59.999Z     → correctly covers all same-day local transactions
-
-// ❌ Wrong — UTC end-of-day
-new Date(`${dateTo}T23:59:59.999Z`)         // Z → hard UTC ceiling, excludes late-night local entries
+const from = new Date(`${dateFrom}T00:00:00.000`).toISOString()
+const to = new Date(`${dateTo}T23:59:59.999`).toISOString()
 ```
 
-Apply the same principle to start-of-day:
+This preserves the user's local calendar day and avoids excluding late-night entries.
 
-```ts
-new Date(`${dateFrom}T00:00:00.000`)        // no Z → local midnight
-```
+## Money and currency
+- Monetary values use integer minor units.
+- Exchange rates may use decimal numbers with explicit rounding at the money boundary.
+- Reports convert values into the selected base currency at read time.
+- Missing rates must produce an unavailable state, never a mislabeled unconverted value.
 
-### Special case — lexicographic string comparison (BalanceSheetDetailPage)
+## Performance
+Apply optimizations after measuring. Existing approved patterns include route-level splitting, virtualized long lists, memoized pure calculations and deferred rendering for expensive reporting views.
 
-`BalanceSheetDetailPage` compares `tx.date` (a UTC ISO string) with filter strings **lexicographically**, so both sides must be in the same UTC format:
-
-```ts
-const dateFromISO = new Date(`${filters.dateFrom}T00:00:00.000`).toISOString()
-const dateToISO   = new Date(`${filters.dateTo}T23:59:59.999`).toISOString()
-// Then: tx.date >= dateFromISO && tx.date <= dateToISO
-```
-
-Building the `Date` without `Z` first preserves local timezone intent; `.toISOString()` then converts it to the correct UTC string for the comparison.
-
----
-
-## Security & Privacy
-
-- No analytics, tracking pixels, or telemetry
-- No data transmission without explicit user action
-- OAuth2 PKCE flow for cloud sync (no client secrets in code)
-- Financial data never leaves device unless user triggers export/sync
+## PWA
+Vite PWA Plugin generates the service worker and manifest. Core data operations must work offline. Network integrations degrade without blocking the core application.
