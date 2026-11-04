@@ -5,7 +5,8 @@ Retention is explicit manual compaction. There is no automatic or scheduled dele
 
 ## Scope
 - Applies only to the `transactions` table.
-- A year is eligible when it is older than five calendar years relative to the current year.
+- A year is eligible when `year <= currentUTCYear - 5`, matching `getCompactableTransactionYears` in `src/lib/retention.ts`.
+- Year bounds in `getYearBounds` are UTC `Z` strings (`YYYY-01-01T00:00:00.000Z` through `YYYY-12-31T23:59:59.999Z`). Do not change those bounds to the local-day rule in `docs/architecture.md`.
 - Transactions linked to fuel logs or vehicle services are excluded.
 - Fuel logs, service records and other tables are not compacted by this feature.
 

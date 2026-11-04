@@ -17,16 +17,16 @@ npm run ci:validate
 PRs require focused tests for changed behavior and a review of migrations, privacy boundaries and user-facing translations.
 
 ## CI
-Pushes and pull requests should run on a supported Node 20+ environment:
+Pushes and pull requests should run on Node `^20.19.0 || ^22.13.0 || >=24`, matching `package.json` `engines`:
 1. checkout;
 2. `npm ci`;
 3. `npm run ci:validate`;
 4. upload build/test evidence when configured.
 
-A successful main build deploys `dist/` to GitHub Pages through the repository workflow.
+A successful main build deploys `dist/` to GitHub Pages through `.github/workflows/deploy-pages.yml`.
 
 ## Release
-1. Update `package.json` version and CHANGELOG.
+1. Update the version in `package.json`. There is no CHANGELOG file.
 2. Run `npm ci` and `npm run ci:validate`.
 3. Test the production build with `npm run preview`.
 4. Validate PWA manifest, service worker, routing fallback and offline core flow.

@@ -1,7 +1,7 @@
 # PWA Intranet Testing
 
 ## Prerequisites
-- Node.js 20+
+- Node.js `^20.19.0 || ^22.13.0 || >=24`
 - npm 10+
 - Windows PowerShell
 - Test devices on the same private LAN
@@ -23,6 +23,8 @@ Get-NetIPAddress -AddressFamily IPv4 |
 Open `http://<PC-IP>:4173/` from the test device. Permit Node/npm through Windows Firewall only on private networks.
 
 ## Script
+`npm run publish:intranet` runs `scripts/publish-pwa-intranet.ps1`.
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\publish-pwa-intranet.ps1
 ```

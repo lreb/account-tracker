@@ -15,7 +15,8 @@ This document is the canonical source for domain behavior.
 - Destination record: `income` against the destination account.
 - Both records must be created, updated or removed atomically.
 - Cross-currency transfers require an explicit rate confirmation.
-- `exchangeRate` means source currency to destination currency.
+- `exchangeRate` converts account currency into base currency: `amountCents * exchangeRate` in `convertToBase`. One account unit equals `exchangeRate` base units.
+- `originalAmount` and `originalCurrency` keep the source side of a cross-currency transfer.
 
 ## Reconciliation
 - Normal progression: `pending → cleared → reconciled`.
@@ -26,6 +27,7 @@ This document is the canonical source for domain behavior.
 - Each account has one ISO 4217 currency.
 - Current balance equals opening balance plus non-cancelled income and transfer-in records minus non-cancelled expense and transfer-out records.
 - Hidden accounts remain valid and keep balances, but are omitted from user-selected consolidated reports unless explicitly requested.
+- `Account.cancelled` marks a closed account. Cancelled accounts are excluded from calculations. Hidden and cancelled are separate flags.
 
 ## Categories and labels
 - A transaction has one category and zero or more labels.
@@ -58,7 +60,7 @@ This document is the canonical source for domain behavior.
 - AI may interpret prepared aggregates but cannot replace exact calculations.
 
 ## Historical retention
-Historical transactions use manual compaction, not automatic deletion. The detailed canonical rules are in `features/data-retention.md`.
+Historical transactions use manual compaction, not automatic deletion. The detailed canonical rules are in `docs/features/data-retention.md`.
 
 ## Import and export
 - Full JSON backup is versioned and validated before import.

@@ -1,6 +1,6 @@
 # Architecture Decision Log
 
-Only decisions that constrain future implementation belong here. Detailed implementation history belongs in Git and CHANGELOG.
+Only decisions that constrain future implementation belong here. Detailed implementation history belongs in Git.
 
 ## Index
 | ADR | Decision | Status |
@@ -39,7 +39,7 @@ Users configure their own compatible provider. AI is optional, provider-agnostic
 ## ADR-008: Manual historical compaction
 Status: accepted. Supersedes the previous automatic seven-year deletion proposal.
 
-Eligible years are older than five calendar years. The user must export the selected year during the current session and explicitly confirm. Vehicle-linked transactions are excluded. Detailed eligible transactions are replaced with annual summary records grouped by type, account, category and currency. No scheduled deletion job or retention-days setting is allowed.
+A year is eligible when `year <= currentUTCYear - 5`, matching `getCompactableTransactionYears`. Year bounds in `getYearBounds` are UTC `Z` strings. Do not change those bounds to the local-day rule in `docs/architecture.md`. The user must export the selected year during the current session and explicitly confirm. Vehicle-linked transactions are excluded. Detailed eligible transactions are replaced with annual summary records grouped by type, account, category and currency. No scheduled deletion job or retention-days setting is allowed.
 
 ## ADR-009: Plugin-owned PWA artifacts
 `vite-plugin-pwa` generates the manifest and service worker. A hand-authored `public/manifest.webmanifest` is prohibited because it can collide with generated output.

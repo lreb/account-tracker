@@ -29,7 +29,7 @@ ExpenseTracking is a local-first, offline-first personal-finance PWA. It records
 - Store monetary amounts as integer minor units, normally cents. Never use floating-point amounts as authoritative financial values.
 - Exclude cancelled transactions from balances, budgets, reports and AI summaries.
 - A transfer creates two linked records sharing `transferId`: expense on the source account and income on the destination account.
-- For cross-currency transfers, persist the confirmed source-to-destination exchange rate and the original currency information.
+- For cross-currency transfers, persist `exchangeRate` as account currency to base currency, plus `originalAmount` and `originalCurrency`.
 - Financial calculations are deterministic code. AI may explain results but must not produce authoritative balances, totals, taxes or exchange calculations.
 - Historical retention uses explicit manual compaction only. Never implement automatic deletion. See `docs/features/data-retention.md`.
 

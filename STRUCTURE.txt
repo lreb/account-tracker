@@ -1,7 +1,6 @@
 ExpenseTracking/
 ├── README.md
 ├── AGENTS.md
-├── DOCUMENTATION-MIGRATION.md
 └── docs/
     ├── architecture.md
     ├── business-rules.md
@@ -16,3 +15,6 @@ ExpenseTracking/
         ├── testing.md
         ├── deployment.md
         └── pwa-intranet.md
+
+Files outside this tree are redirects, not authority.
+Schema authority is src/types/index.ts, src/db/index.ts, and src/lib/backup.ts.

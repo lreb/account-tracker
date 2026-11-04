@@ -32,7 +32,7 @@ Start with `AGENTS.md` for both contributors and coding agents. It routes tasks 
 
 Do not use the README as implementation authority. Canonical precedence is defined in `AGENTS.md`.
 
-## Accessibility
+## Links
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/lreb/account-tracker)
 
 [![Github Page Access - Launch ExpenseTracking](https://img.shields.io/badge/DNS%20Access-Launch%20ExpenseTracking-0ea5e9?style=for-the-badge&logo=vercel&logoColor=white&labelColor=1e293b)](https://lreb.github.io/account-tracker/)

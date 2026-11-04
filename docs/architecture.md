@@ -16,7 +16,7 @@ IndexedDB
 ```
 
 Optional user-triggered network integrations:
-- Frankfurter v2 for exchange rates
+- Frankfurter v2 for exchange rates. `src/stores/exchange-rates.store.ts` calls `https://api.frankfurter.dev/v2/rates?base=` and `https://api.frankfurter.dev/v2/rate/{from}/{to}`.
 - User-selected cloud backup provider
 - User-configured AI provider
 
@@ -61,7 +61,7 @@ User action
 
 If persistence fails, do not leave memory in a successful state. Display a localized, non-sensitive error.
 
-## Dates and time zones
+## Date / Time Handling
 - Persist transaction instants as UTC ISO strings.
 - Build date-range boundaries in device-local time, then convert to ISO when string comparison requires UTC.
 - Do not append `Z` to a user-selected local day boundary before constructing the Date.
